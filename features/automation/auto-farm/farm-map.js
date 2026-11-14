@@ -41,7 +41,8 @@
     const held = binding?.lock;
     if (!held) return;
     routeLog(scene, "target_decision", { fromId: held.id, switchSource: "map", switchReason: reason });
-    if (scene.auto.target === held.id) {
+    if (!["manual_override", "native_radius_unsupported", "area_unavailable"].includes(reason)
+        && scene.auto.on && scene.auto.target === held.id) {
       scene.auto.target = 0; scene.auto.path = []; scene.auto.pathAt = -Infinity; scene.auto.think = 0;
     }
     binding.lock = null;
@@ -71,7 +72,6 @@
     if (!finite(actor.x) || !finite(actor.y)) {
       releaseTarget(scene, "invalid_position"); return false;
     }
-    if (!withinArea(area, actor)) { releaseTarget(scene, "outside_circle"); return false; }
     const enemies = typeof host.allEligibleEnemies === "function" ? host.allEligibleEnemies() : host.enemies();
     const enemy = Array.isArray(enemies) && enemies.find((item) => item.id === held.id);
     if (!enemy) {
@@ -80,6 +80,9 @@
       host.steer(0, 0); message = "Mục tiêu tạm mất khỏi danh sách; đang chờ tối đa 3 giây."; return true;
     }
     held.missingSince = null;
+    const nativeNearbyAggro = !preferences.enabled && host.inCombat?.() && enemy.aggro
+      && range(actor, { x: scene.px, y: scene.py }) < 3.2;
+    if (!withinArea(area, actor) && !nativeNearbyAggro) { releaseTarget(scene, "outside_circle"); return false; }
     if (!nativeEligible(enemy) || globalThis.GSTFarmBossSafety?.allowsTarget?.(scene, enemy) === false) {
       releaseTarget(scene, "target_ineligible"); return false;
     }
@@ -297,12 +300,17 @@
   // Known targets inside a configured radius also need long-distance navigation.
   // Idle policy only decides what to do AFTER all eligible targets are exhausted.
   const wanted = (scene) => preferences.enabled === true;
+  const assisted = () => globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true
+    && preferences.identityBlocked !== true;
   function searchArea(scene) {
     const w = scene.map?.w, h = scene.map?.h;
     if (![w, h].every(finite) || w <= 0 || h <= 0) return null;
-    if (preferences.searchScope === "map")
+    if (preferences.enabled && preferences.searchScope === "map")
       return { minX: 0, minY: 0, maxX: w, maxY: h, home: null };
-    const home = globalThis.GSTHarvest?.farmOrigin?.(scene), radius = preferences.radius;
+    const home = preferences.enabled ? globalThis.GSTHarvest?.farmOrigin?.(scene)
+      : { x: scene.auto.ax, y: scene.auto.ay };
+    const radius = preferences.enabled ? preferences.radius
+      : globalThis.GSTFarmCompatibility?.nativeRadius(scene.auto.radius);
     if (!home || ![home.x, home.y, radius].every(finite) || radius < 1) return null;
     return { minX: Math.max(0, home.x - radius), maxX: Math.min(w, home.x + radius),
       minY: Math.max(0, home.y - radius), maxY: Math.min(h, home.y + radius), home, radius };
@@ -317,9 +325,10 @@
         || to.x < 0 || to.y < 0 || to.x >= w || to.y >= h) return false;
     if (respectExclusions && globalThis.GSTFarmBossSafety?.allowsSegment?.(scene, from, to) === false) return false;
     const returning = job?.returnArea === true;
-    const outsideProgress = returning && !withinArea(area, from)
-      && (range(to, from) < 0.001 || range(to, area.home) < range(from, area.home) - 0.001);
-    if (area.home && (!withinArea(area, from) || !withinArea(area, to)) && !outsideProgress) {
+    // Only the return owner may use outside detours. Once inside, it must
+    // stay inside; route collision, exclusions and stall limits still apply.
+    const outsideReturn = returning && !withinArea(area, from);
+    if (area.home && (!withinArea(area, from) || !withinArea(area, to)) && !outsideReturn) {
       routeLog(scene, "farm_boundary_denied", { targetId: job?.actor ? job.id : null, action: "defer",
         remaining: range(to, from) });
       return false;
@@ -521,6 +530,13 @@
     const scene = binding?.scene;
     if (!scene) return;
     if (sceneNow() !== scene || binding.auto !== scene.auto || !scene.sys?.isActive?.()) { detach(); return; }
+    const manual = GSTFarmInput.movement(scene);
+    // WorldScene calls native pause() while a cast/aim is pending; that is
+    // not itself a manual movement and can leave moved set until update().
+    if (!manual && (scene.pendingSkill || scene.aiming)) binding.castPause = true;
+    if (!scene.auto.moved && !scene.pendingSkill && !scene.aiming) binding.castPause = false;
+    if (!scene.auto.on || manual || scene.auto.moved && !binding.castPause)
+      releaseTarget(scene, "manual_override");
     if (job && (globalThis.GSTMapTravel?.active(scene) || !allowed(scene) || scene.castAt !== job.castAt
         || globalThis.GSTFarmBossSafety?.controls(scene))) {
       if (globalThis.GSTFarmDefense?.controls?.(scene) && job.actor)
@@ -531,11 +547,11 @@
   function update(host, time, scouting = false) {
     const scene = binding?.scene;
     try {
-      if (!scene || !wanted(scene) || suspended || globalThis.GSTMapTravel?.active(scene)
+      if (!scene || !assisted() || suspended || globalThis.GSTMapTravel?.active(scene)
           || !allowed(scene)
           || globalThis.GSTFarmBossSafety?.controls(scene)) {
         release();
-        if (scene && (GSTFarmInput.movement(scene) || scene.auto?.moved || !scene.auto?.on))
+        if (scene && (GSTFarmInput.movement(scene) || scene.auto?.moved && !binding.castPause || !scene.auto?.on))
           releaseTarget(scene, "manual_override");
         if (!scene?.auto?.on || !wanted(scene) || suspended || (scene && GSTFarmInput.movement(scene)))
           endHandoff("manual_override");
@@ -553,14 +569,21 @@
         return false;
       }
       if (globalThis.GSTFarmCompatibility?.nativeRadius(scene.auto.radius) == null) {
+        releaseTarget(scene, "native_radius_unsupported");
         release();
         message = "Bán kính Auto Farm gốc không được hỗ trợ; đã nhường tìm mục tiêu cho game.";
         return false;
       }
       if (!finite(time)) { release(); message = "Đang chờ thời gian game hợp lệ để tiếp tục Farm."; return true; }
       const area = searchArea(scene);
-      if (!area) { release(); return false; }
+      if (!area) { releaseTarget(scene, "area_unavailable"); release(); return false; }
       if (typeof GSTHarvest.needsRecovery !== "function" || GSTHarvest.needsRecovery(scene)) { release(); return false; }
+      // With expanded search off, retain only the native target. Do not take
+      // movement ownership, shift the native center, or change its radius.
+      if (!wanted(scene)) {
+        release(); endHandoff("expanded_search_off");
+        return checkTarget(scene, host, area, time);
+      }
       if (binding.refreshNative && globalThis.GSTFarmRouting?.rebaseNativeWalk?.(scene)) {
         scene.auto.path = []; scene.auto.pathAt = -Infinity; scene.auto.think = 0;
         scene.auto.chaseSince = time; binding.refreshNative = false;
@@ -785,7 +808,7 @@
     resumeTarget = null; handoff = null; resumeReason = null; centerSync = null; nearbyCandidate = null;
   }
   function attach(scene) {
-    if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !wanted(scene) || suspended) { detach(); return; }
+    if (!assisted() || suspended) { detach(); return; }
     if (binding && binding.scene === scene && binding.auto === scene?.auto && GSTFarmUpdate.attached(scene)) return;
     detach();
     if (!scene?.sys?.isActive?.() || typeof scene.auto?.walk !== "function" || typeof scene.now !== "function"
@@ -800,11 +823,11 @@
   }
   globalThis.GSTFarmMap = {
     configure(scene, value) {
-      const sameOwner = binding?.scene === scene && value.enabled === true
+      const sameOwner = binding?.scene === scene && value.identityBlocked !== true
         && value.policyMode === preferences.policyMode && value.identityBlocked === preferences.identityBlocked
         && value.accountProfileKey === preferences.accountProfileKey && value.characterId === preferences.characterId;
       if (sameOwner) {
-        if (preferences.radius !== value.radius || preferences.searchScope !== value.searchScope) {
+        if (preferences.enabled !== value.enabled || preferences.radius !== value.radius || preferences.searchScope !== value.searchScope) {
           release(); endHandoff("radius_changed"); retryAt = 0;
           deferred.clear(); explored.clear(); scanAt = 0; exhaustedUntil = 0;
           binding.returnAttempt = 0; binding.refreshNative = true;
@@ -843,7 +866,7 @@
       retryAt = scene.now() + 0.2;
     },
     handoffNearby(scene, target) {
-      if (binding?.scene !== scene || !scene.auto?.on || !Number.isSafeInteger(target?.id)
+      if (binding?.scene !== scene || !wanted(scene) || !scene.auto?.on || !Number.isSafeInteger(target?.id)
           || !nativeEligible(target) || !withinArea(searchArea(scene), target)) return false;
       const time = scene.now();
       if (!finite(time)) return false;

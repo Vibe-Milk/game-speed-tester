@@ -546,9 +546,8 @@
     owner.auto.think = 0;
   }
   function syncFilter(scene, guardOnly = false) {
-    const filteringActive = (ownerScene) => !guardOnly && (settings.enabled || targetFilterActive()
-      || globalThis.GSTFarmBossSafety?.hasExclusions?.(ownerScene) === true);
-    const boundaryActive = () => !guardOnly && settings.enabled && settings.searchScope === "radius";
+    const filteringActive = () => !guardOnly && settings.policyMode === "extended" && !identityBlocked;
+    const boundaryActive = () => filteringActive() && settings.enabled && settings.searchScope === "radius";
     const filterHostActive = filteringActive(scene) || boundaryActive();
     const guardPlayers = playerTargetGuardActive();
     if (!filterHostActive && !guardPlayers) { clearFilter(); return; }
@@ -733,7 +732,7 @@
   function stop(reason, block = false) {
     // Keep the inert filter attached through death/off so the next native
     // update after revival/re-enable cannot select an unfiltered target.
-    if (block || !targetFilterActive() && !playerTargetGuardActive()) clearFilter();
+    if (block || settings.policyMode !== "extended" || identityBlocked) clearFilter();
     if (block) revival = null;
     if (session) {
       const old = session;
@@ -951,14 +950,6 @@
       // when the player-target guard is the only active Farm feature.
       globalThis.GSTFarmRevivePolicy?.attach(scene);
       checkRespawn(scene);
-      const farmFeaturesActive = settings.enabled || targetFilterActive()
-        || globalThis.GSTFarmBossSafety?.hasExclusions?.(scene) === true;
-      if (!farmFeaturesActive && playerTargetGuardActive()) {
-        if (compatible(scene) && scene.self && !scene.leaving && connected(scene) && scene.auto !== blockedAuto)
-          syncFilter(scene);
-        else clearFilter();
-        return;
-      }
       globalThis.GSTFarmCombat?.attach(scene);
       globalThis.GSTFarmBehavior?.attach(scene);
       globalThis.GSTFarmDefense?.attach(scene);
@@ -971,7 +962,7 @@
       const exclusionFilterNeeded = globalThis.GSTFarmBossSafety?.hasExclusions?.(scene) === true;
       if (compatible(scene) && scene.self && !scene.leaving && connected(scene)
           && scene.auto !== blockedAuto
-          && (settings.enabled || targetFilterActive() || exclusionFilterNeeded))
+          && settings.policyMode === "extended" && !identityBlocked)
         syncFilter(scene);
       else clearFilter();
       if (!settings.enabled && !targetFilterActive() && !exclusionFilterNeeded) return;
@@ -1410,8 +1401,8 @@
       globalThis.GSTFarmCombat?.attach(sceneNow());
       globalThis.GSTFarmRevivePolicy?.attach(sceneNow());
       stage = "filter";
-      if (!targetFilterActive() && !playerTargetGuardActive()) clearFilter();
-      else syncFilter(sceneNow());
+      if (settings.policyMode === "extended" && !identityBlocked && compatible(sceneNow())) syncFilter(sceneNow());
+      else clearFilter();
       if (settings.policyMode === "extended") clearExcludedBossTarget(sceneNow());
       if (session) {
         if (scopeChanged) { restore(session); session.at = -Infinity; }
@@ -1444,12 +1435,6 @@
       } else if (settings.policyMode === "disabled") {
         shortcutMessage = "";
         message = "Auto Farm đang bị khóa bởi chế độ Disabled; tùy chọn đã lưu vẫn được giữ.";
-      } else if (!settings.enabled && !targetFilterActive() && !playerTargetGuardActive() && !settings.autoRespawn) {
-        if (watcher !== null) clearInterval(watcher);
-        watcher = null;
-        stop("Extended range disabled; original center restored where owned.");
-        blockedAuto = null;
-        revival = null;
       } else {
         watch();
         discover();

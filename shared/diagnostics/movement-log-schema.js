@@ -44,7 +44,7 @@
     result.switchReason = ["boss_priority", "level_priority", "target_unavailable", "pick_failed",
       "nearby_actionable", "active_close_fight", "distant_retained", "outside_circle", "candidates_deferred",
       "observed_death", "identity_changed", "actor_unavailable", "enemy_unavailable", "invalid_position",
-      "target_ineligible", "route_unavailable", "manual_override", "map_changed"]
+      "target_ineligible", "route_unavailable", "manual_override", "map_changed", "native_radius_unsupported", "area_unavailable"]
       .includes(row.switchReason) ? row.switchReason : null;
     result.scope = ["radius", "map"].includes(row.scope) ? row.scope : null;
     result.panel = ["none", "skills", "workshop", "other"].includes(row.panel) ? row.panel : "none";
