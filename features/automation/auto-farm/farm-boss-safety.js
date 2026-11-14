@@ -972,7 +972,7 @@
         if (returnIntent) returnIntent.mapKey = mapKey;
       }
       const pos = { x: scene.px, y: scene.py }, bounds = zone(scene);
-      if (!bounds || !inside(bounds, pos) || !finite(scene.self.hp) || !finite(scene.self.mh) || scene.self.mh <= 0
+      if (!bounds || !finite(pos.x) || !finite(pos.y) || !finite(scene.self.hp) || !finite(scene.self.mh) || scene.self.mh <= 0
           || !finite(scene.selfAt) || scene.now() - scene.selfAt > 3) {
         return holdForRecoveryData(scene, time,
           "Vị trí hoặc trạng thái nhân vật chưa cập nhật; đang giữ hồi phục và chờ dữ liệu mới.");
@@ -1023,6 +1023,14 @@
           : null;
         note(scene, "retreat", `HP dưới ${settings.retreatHpPercent}%; đang rút khỏi nhóm quái và chờ hồi HP.`,
           { cooldown: typeof host.pillWait === "function" ? host.pillWait("hp") : null });
+      }
+      if (!inside(bounds, pos)) {
+        if (retreating) return delegateNativeRecovery(scene, host, time, delta);
+        if (returnIntent) {
+          release(); clearReturnIntent(); clearRecoveryMeditation();
+          note(scene, "return", "Đã hồi phục ngoài vùng farm; nhường bộ điều hướng quay vào vùng.");
+        }
+        return false;
       }
       const currentUrgent = urgentEscape(scene, time);
       if (blocked(scene, currentUrgent)) {
@@ -1076,7 +1084,12 @@
       }
       // When even one attack skill is available, immediately hand combat
       // back to native castSkills(). Do not add a second skill-spam engine.
-      if (returnIntent && !retreating && !danger && !job?.emergency) {
+      if (danger && hasDodgePreference()) {
+        const escape = job && inside(bounds, job.point) ? job : null;
+        if (tryDash(scene, host, time, pos, bounds, hazards, escape, avoidanceBoss,
+          retreating)) return true;
+      }
+      if (returnIntent && !retreating) {
         const returned = runReturn(scene, host, time, pos, bounds, hazards, threats);
         if (returned !== null) return returned;
       }
@@ -1098,10 +1111,12 @@
       }
       if (diagnosticDanger)
         globalThis.GSTFarmSkillDiagnostics?.blocked?.(scene, "Q", "auto_q", "dodge_preference_off");
-      if ((danger || cooldownKite) && hasDodgePreference()) {
-        const escape = job && inside(bounds, job.point) ? job : null;
-        if (danger && tryDash(scene, host, time, pos, bounds, hazards, escape, avoidanceBoss,
-          retreating)) return true;
+      // Only low-HP recovery may take over walking. A warning without an
+      // available Q must leave ordinary native combat in control.
+      if (!retreating) {
+        release();
+        cooldownHolding = false;
+        return false;
       }
       if (job && (!inside(bounds, job.point) || hazards.some((area) => distance(area, job.point) <= area.radius + 0.7)
           || !pathSafe(scene, pos, job.navigation.path.length ? job.navigation.path : [[job.point.x, job.point.y]], bounds, hazards)
@@ -1219,9 +1234,6 @@
       if (scene.pendingSkill) scene.pendingSkill = null;
       return;
     }
-    // With Q unavailable, interrupt the aimed/queued cast to allow normal dodge.
-    if (scene.aiming && typeof scene.cancelAim === "function") scene.cancelAim();
-    if (scene.pendingSkill) scene.pendingSkill = null;
   }
   function restoreWarnings(scene) {
     const hooks = warningHooks.get(scene);

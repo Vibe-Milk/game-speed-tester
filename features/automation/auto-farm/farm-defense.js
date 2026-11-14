@@ -258,6 +258,12 @@
     }
     try {
       if (!validateContext(scene, host)) { clearNearby(); clearGroup(); return false; }
+      const heldId = globalThis.GSTFarmMap?.heldTarget?.(scene);
+      if (heldId != null) { clearNearby(); clearGroup(); return false; }
+      const heldActor = scene.views?.get?.(scene.auto.target);
+      if (heldActor?.k === "m" && !heldActor.dead) {
+        clearNearby(); clearGroup(); return false;
+      }
       // A skill already started by native group combat is allowed to finish;
       // manual input, map changes and emergency boss dodges still abort it.
       const urgent = globalThis.GSTFarmBossSafety?.emergency?.(scene, time) === true;

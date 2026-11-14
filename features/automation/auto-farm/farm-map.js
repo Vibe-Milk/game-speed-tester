@@ -37,6 +37,62 @@
     if (handoff?.fromMap) resumeReason = reason;
     handoff = null;
   }
+  function releaseTarget(scene, reason) {
+    const held = binding?.lock;
+    if (!held) return;
+    routeLog(scene, "target_decision", { fromId: held.id, switchSource: "map", switchReason: reason });
+    if (scene.auto.target === held.id) {
+      scene.auto.target = 0; scene.auto.path = []; scene.auto.pathAt = -Infinity; scene.auto.think = 0;
+    }
+    binding.lock = null;
+    if (job?.actor && job.id === held.id) release();
+    if (handoff?.id === held.id) endHandoff(reason);
+    message = `Đã nhả mục tiêu: ${reason}.`;
+    binding.releaseNote = { reason, until: scene.now() + 3 };
+  }
+  function holdTarget(scene, id) {
+    const actor = scene.views?.get?.(id);
+    if (!binding?.lock && actor?.k === "m" && !actor.dead)
+      binding.lock = { id, actor, missingSince: null, lastAt: scene.now() };
+  }
+  function checkTarget(scene, host, area, time) {
+    const held = binding.lock;
+    if (!held) { holdTarget(scene, scene.auto.target); return false; }
+    const actor = scene.views?.get?.(held.id);
+    if (actor && (actor !== held.actor || actor.k !== "m")) {
+      releaseTarget(scene, "identity_changed"); return false;
+    }
+    if (actor?.dead) { releaseTarget(scene, "observed_death"); return false; }
+    if (!actor) {
+      if (held.missingSince === null) held.missingSince = time;
+      if (time - held.missingSince >= 3) { releaseTarget(scene, "actor_unavailable"); return false; }
+      host.steer(0, 0); message = "Mục tiêu tạm mất dữ liệu; đang chờ tối đa 3 giây."; return true;
+    }
+    if (!finite(actor.x) || !finite(actor.y)) {
+      releaseTarget(scene, "invalid_position"); return false;
+    }
+    if (!withinArea(area, actor)) { releaseTarget(scene, "outside_circle"); return false; }
+    const enemies = typeof host.allEligibleEnemies === "function" ? host.allEligibleEnemies() : host.enemies();
+    const enemy = Array.isArray(enemies) && enemies.find((item) => item.id === held.id);
+    if (!enemy) {
+      if (held.missingSince === null) held.missingSince = time;
+      if (time - held.missingSince >= 3) { releaseTarget(scene, "enemy_unavailable"); return false; }
+      host.steer(0, 0); message = "Mục tiêu tạm mất khỏi danh sách; đang chờ tối đa 3 giây."; return true;
+    }
+    held.missingSince = null;
+    if (!nativeEligible(enemy) || globalThis.GSTFarmBossSafety?.allowsTarget?.(scene, enemy) === false) {
+      releaseTarget(scene, "target_ineligible"); return false;
+    }
+    if (scene.auto.skipped?.get?.(held.id) > time || deferred.get(held.id) > time) {
+      releaseTarget(scene, "route_unavailable"); return false;
+    }
+    if (finite(held.lastAt) && time - held.lastAt > 1) scene.auto.chaseSince = time;
+    held.lastAt = time;
+    if (scene.auto.target !== held.id && !job?.actor) {
+      scene.auto.target = held.id; scene.auto.think = 0; scene.auto.chaseSince = time; scene.auto.path = [];
+    }
+    return false;
+  }
   function nativeTarget(scene, enemies, area, time) {
     if (!Number.isSafeInteger(scene.auto.target)) return null;
     return Array.isArray(enemies) ? enemies.find((enemy) => enemy.id === scene.auto.target
@@ -78,7 +134,7 @@
       ? enemies.find((enemy) => enemy.id === hit.id && !enemy.dead && enemy.hostile
           && withinArea(area, enemy) && !(scene.auto.skipped.get(enemy.id) > time)
           && range(enemy, { x: scene.px, y: scene.py }) < 3.2) : null;
-    if (recent && (!engaged || distance > 4) && target?.id !== recent.id) {
+    if (!binding.lock && recent && (!engaged || distance > 4) && target?.id !== recent.id) {
       binding.handledHit = hit.sequence;
       if (handoff?.id !== recent.id) yieldToNative(scene, time, recent, "recent_attacker");
       return true;
@@ -94,8 +150,8 @@
     const bossPriority = !!boss && !!target && !isBoss(target)
       && !(host.inCombat?.() && distance <= handoffReach) && boss.id !== target.id
       && ranked?.switchReason?.(target, boss, { x: scene.px, y: scene.py }, 3) === "boss_priority";
-    if (bossPriority && handoff) endHandoff("priority_preempt");
-    if (bossPriority) return false;
+    if (!binding.lock && bossPriority && handoff) endHandoff("priority_preempt");
+    if (!binding.lock && bossPriority) return false;
     if (handoff) {
       const held = Array.isArray(enemies) && enemies.find((enemy) => enemy.id === handoff.id
           && !enemy.dead && nativeEligible(enemy) && withinArea(area, enemy));
@@ -109,6 +165,11 @@
             switchSource: "map", switchReason: "active_close_fight" });
           if (job) release();
           return true;
+        }
+        if (binding.lock?.id === held.id) {
+          if (heldDistance <= nativeReach) return true;
+          endHandoff("native_out_of_range");
+          return false;
         }
         if (heldDistance <= nativeReach && time - handoff.at < 2) return true;
         if (time - handoff.at >= 2 && Number.isSafeInteger(handoff.id))
@@ -148,9 +209,10 @@
     routeLog(scene, "map_stuck", { targetId: job.id, remaining,
       stuckMs: Math.max(0, (time - job.progressAt) * 1000),
       replanReason: reason, attempt: job.replans, action: "defer", retryMs: job.scout ? 60000 : 15000 });
+    const returning = job.returnArea;
     defer(time);
-    message = "Đường vẫn bị chặn sau hai lần thử; tạm bỏ mục tiêu và xét bãi khác.";
-    return false;
+    if (!returning) message = "Đường vẫn bị chặn sau hai lần thử; tạm bỏ mục tiêu và xét bãi khác.";
+    return returning;
   }
   const isBoss = (enemy) => enemy?.cls === "boss" || enemy?.wb === true;
   const range = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -254,7 +316,10 @@
         || from.x < 0 || from.y < 0 || from.x >= w || from.y >= h
         || to.x < 0 || to.y < 0 || to.x >= w || to.y >= h) return false;
     if (respectExclusions && globalThis.GSTFarmBossSafety?.allowsSegment?.(scene, from, to) === false) return false;
-    if (area.home && (!withinArea(area, from) || !withinArea(area, to))) {
+    const returning = job?.returnArea === true;
+    const outsideProgress = returning && !withinArea(area, from)
+      && (range(to, from) < 0.001 || range(to, area.home) < range(from, area.home) - 0.001);
+    if (area.home && (!withinArea(area, from) || !withinArea(area, to)) && !outsideProgress) {
       routeLog(scene, "farm_boundary_denied", { targetId: job?.actor ? job.id : null, action: "defer",
         remaining: range(to, from) });
       return false;
@@ -331,8 +396,8 @@
     const preferNearby = !better && !localPriority && nearbyStable && retained
       && range(retained, position) > nativeReach && nearby.id !== retained.id
       && (!ranked || sameRank || !!nearbyPriority);
-    const target = engaged ? current : better || localPriority ? challenger
-      : preferNearby ? nearby : retained;
+    const target = binding.lock ? eligible.find((enemy) => enemy.id === binding.lock.id)
+      : engaged ? current : better || localPriority ? challenger : preferNearby ? nearby : retained;
     let decisionReason = "";
     if (preferNearby || engaged || better || localPriority) {
       decisionReason = engaged ? "active_close_fight" : better === "boss_priority" || localPriority === "boss_priority"
@@ -446,7 +511,11 @@
       if (deferred.size >= 200) deferred.delete(deferred.keys().next().value);
       deferred.set(id, time + 15);
     }
+    const returning = job?.returnArea === true;
+    if (returning && binding) binding.returnAttempt = (binding.returnAttempt || 0) + 1;
+    if (finite(id) && binding?.lock?.id === id) releaseTarget(binding.scene, "route_unavailable");
     release(); retryAt = time + (finite(id) ? 0.5 : 15);
+    if (returning) message = "Chưa có đường an toàn về vùng farm; chờ 15 giây rồi thử lại.";
   }
   function guard() {
     const scene = binding?.scene;
@@ -466,12 +535,15 @@
           || !allowed(scene)
           || globalThis.GSTFarmBossSafety?.controls(scene)) {
         release();
+        if (scene && (GSTFarmInput.movement(scene) || scene.auto?.moved || !scene.auto?.on))
+          releaseTarget(scene, "manual_override");
         if (!scene?.auto?.on || !wanted(scene) || suspended || (scene && GSTFarmInput.movement(scene)))
           endHandoff("manual_override");
         return false;
       }
       const mapKey = hostMapKey(host);
       if (mapKey !== null && binding.mapKey !== mapKey) {
+        releaseTarget(scene, "map_changed");
         release(); endHandoff("map_changed");
         resumeTarget = null; resumeReason = null; nearbyCandidate = null; deferred.clear(); explored.clear();
         scanAt = 0; exhaustedUntil = 0; retryAt = 0;
@@ -485,9 +557,19 @@
         message = "Bán kính Auto Farm gốc không được hỗ trợ; đã nhường tìm mục tiêu cho game.";
         return false;
       }
+      if (!finite(time)) { release(); message = "Đang chờ thời gian game hợp lệ để tiếp tục Farm."; return true; }
       const area = searchArea(scene);
       if (!area) { release(); return false; }
       if (typeof GSTHarvest.needsRecovery !== "function" || GSTHarvest.needsRecovery(scene)) { release(); return false; }
+      if (binding.refreshNative && globalThis.GSTFarmRouting?.rebaseNativeWalk?.(scene)) {
+        scene.auto.path = []; scene.auto.pathAt = -Infinity; scene.auto.think = 0;
+        scene.auto.chaseSince = time; binding.refreshNative = false;
+      }
+      const pos = { x: scene.px, y: scene.py };
+      const outside = !!area.home && (!withinArea(area, pos) || job?.returnArea === true
+        && range(pos, area.home) > area.radius - Math.min(0.3, area.radius * 0.2));
+      if (!outside && job?.returnArea) { release(); retryAt = 0; binding.returnAttempt = 0; }
+      if (checkTarget(scene, host, area, time)) return true;
       if (lastFix !== undefined && lastFix !== scene.self.fix && job) {
         GSTNavigation.cancel(scene, job.navigation);
         if (job.steer && scene.autoX === job.steer[0] && scene.autoY === job.steer[1])
@@ -504,18 +586,36 @@
       if (time < correctionUntil) {
         host.steer(0, 0); message = "Game vừa chỉnh vị trí; đang chờ ổn định trước khi tiếp tục."; return true;
       }
-      if (nativeBusy(scene, host, area, time)) return false;
-      if (globalThis.GSTFarmBehavior?.pendingLoot?.(scene)) {
+      if (!outside && nativeBusy(scene, host, area, time)) return false;
+      if (!outside && globalThis.GSTFarmBehavior?.pendingLoot?.(scene)) {
         release(); message = "Đang nhường nhặt đồ ở bãi vừa đánh trước khi tìm quái mới."; return false;
       }
       // Scouting is owned movement. Stop only that job when idle policy changes;
       // continue below so known eligible actors are still pursued this update.
       if (job?.scout && preferences.idleMode !== "seek") release();
-      const target = destination(scene, host, time, scouting);
+      let target;
+      if (outside && !scouting) {
+        if (time < retryAt) { host.steer(0, 0); message = "Chưa có đường an toàn về vùng farm; đang chờ thử lại."; return true; }
+        const points = [area.home];
+        const r = Math.max(0, area.radius - Math.min(1.5, area.radius * 0.4));
+        for (let i = 0; i < 16; i++) {
+          const a = i * Math.PI / 8;
+          points.push({ x: area.home.x + r * Math.cos(a), y: area.home.y + r * Math.sin(a) });
+        }
+        const validPoints = points.filter((p) => withinArea(area, p)
+          && globalThis.GSTFarmBossSafety?.isAreaExcluded?.(scene, p) !== true
+          && typeof scene.collision?.blockedCell === "function" && !scene.collision.blockedCell(p.x, p.y))
+          .sort((a, b) => range(a, { x: scene.px, y: scene.py }) - range(b, { x: scene.px, y: scene.py }));
+        const point = job?.returnArea ? { x: job.x, y: job.y }
+          : validPoints[(binding.returnAttempt || 0) % validPoints.length];
+        if (!point) { release(); retryAt = time + 15; host.steer(0, 0);
+          message = "Không có điểm hợp lệ trong vùng farm; chờ trước khi thử lại."; return true; }
+        target = { id: "farm:return-area", ...point, actor: false, home: true, returnArea: true };
+      } else target = destination(scene, host, time, scouting);
       if (!target) { if (scouting || !job?.scout) release(); return false; }
       exhaustedUntil = 0;
       if (scouting && !target.scout) return false;
-      if (!scouting && job?.actor && target.actor && job.id === target.id && !scene.auto.target
+      if (!binding.lock && !scouting && job?.actor && target.actor && job.id === target.id && !scene.auto.target
           && typeof host.enemies === "function") {
         const pos = { x: scene.px, y: scene.py };
         const blocker = host.enemies().filter((enemy) => !isBoss(enemy) && enemy.id !== target.id
@@ -542,12 +642,13 @@
       // Merely knowing a distant actor does not mean native pick() can route to it.
       // Its full route grid is bounded; native walk() can also use shorter hop() routes.
       const distance = Math.hypot(scene.px - target.x, scene.py - target.y);
+      if (target.actor) holdTarget(scene, target.id);
       if (target.actor && exclusionPathAllowed(scene, target) && distance <= handoffReach
           && (distance <= 2.2 || host.clear(scene.px, scene.py, target.x, target.y))) {
         yieldToNative(scene, time, target, "near_target");
         return false;
       }
-      if (!job && globalThis.GSTChest?.ready(scene)) { message = "Nhường mở rương an toàn gần trước khi tìm bãi xa."; return false; }
+      if (!job && !target.returnArea && globalThis.GSTChest?.ready(scene)) { message = "Nhường mở rương an toàn gần trước khi tìm bãi xa."; return false; }
       if (time < retryAt || job && time < job.retryUntil) {
         host.steer(0, 0); message = "Đang chờ nhịp thử lại đường tới bãi quái."; return true;
       }
@@ -565,9 +666,10 @@
         release();
         const navigation = Object.assign(Object.create(scene.auto), { path: [], lastX: scene.px, lastY: scene.py,
           stillSince: time, pathAt: -Infinity, stuckCount: 0, sideUntil: 0, sideX: 0, sideY: 0 });
-        job = { id: target.id, actor: target.actor, scout: target.scout === true, x: target.x, y: target.y, navigation, castAt: scene.castAt, progressAt: time,
+        job = { id: target.id, actor: target.actor, scout: target.scout === true, returnArea: target.returnArea === true, x: target.x, y: target.y, navigation, castAt: scene.castAt, progressAt: time,
           startedAt: time, steer: null, retargetAt: time, replans: 0, lastReplanAt: -Infinity, retryUntil: 0,
           checkpoint: null, visited: [], directUntil: -Infinity, checkpointRetryAt: -Infinity };
+        if (target.actor) holdTarget(scene, target.id);
         if (resumeReason) {
           routeLog(scene, "map_resume", { targetId: target.id,
             fromOwner: "native_farm_eligible", toOwner: "GSTFarmMap", handoffReason: resumeReason });
@@ -600,7 +702,10 @@
           routeLog(scene, "map_stuck", { targetId: job.id, remaining,
             stuckMs: Math.max(0, (time - job.progressAt) * 1000),
             replanReason: "timeout", attempt: job.replans, action: "defer", retryMs: job.scout ? 60000 : 15000 });
-          defer(time); message = "Đã theo đuổi quá lâu; tạm bỏ mục tiêu để xét bãi khác."; return false;
+          const returning = job.returnArea;
+          defer(time);
+          if (!returning) message = "Đã theo đuổi quá lâu; tạm bỏ mục tiêu để xét bãi khác.";
+          return returning;
         }
         return recover(scene, host, time, "no_progress", remaining);
       }
@@ -652,13 +757,13 @@
       if (target.scout && Math.hypot(scene.px - target.x, scene.py - target.y) <= 1.2) {
         explored.set(target.id, Infinity); release(); walking.steer(0, 0);
         message = "Đã tới điểm dò; đang tìm quái đúng bộ lọc.";
-      } else if (target.home && remaining <= 1.2) {
+      } else if (target.home && !target.returnArea && remaining <= 1.2) {
         release(); walking.steer(0, 0);
         message = "Đã về điểm bắt đầu; chờ quái xuất hiện.";
       } else if (waitingForBoss) {
         walking.steer(0, 0); message = "Đã tới gần tọa độ boss; chờ game cung cấp actor boss để Auto Farm chọn mục tiêu.";
       } else if (!GSTNavigation.walk(scene, owner.navigation, walking, time, scene.px, scene.py, next.x, next.y,
-          owner.checkpoint ? 0.8 : target.home ? 0.8 : target.scout ? 1 : target.actor ? 1.8 : 5) || owner.denied) {
+          owner.checkpoint ? 0.8 : target.returnArea ? 0.1 : target.home ? 0.8 : target.scout ? 1 : target.actor ? 1.8 : 5) || owner.denied) {
         return recover(scene, walking, time, owner.denied ? "blocked" : "walk_failed",
           Math.hypot(scene.px - owner.x, scene.py - owner.y));
       } else message = target.home ? `Đang quay về điểm bắt đầu · còn ${distance.toFixed(1)} ô.`
@@ -694,12 +799,27 @@
     scene.events.on("preupdate", guard); scene.events.on("shutdown", detach); scene.events.on("destroy", detach);
   }
   globalThis.GSTFarmMap = {
-    configure(scene, value) { detach(); preferences = value; this.attach(scene); },
+    configure(scene, value) {
+      const sameOwner = binding?.scene === scene && value.enabled === true
+        && value.policyMode === preferences.policyMode && value.identityBlocked === preferences.identityBlocked
+        && value.accountProfileKey === preferences.accountProfileKey && value.characterId === preferences.characterId;
+      if (sameOwner) {
+        if (preferences.radius !== value.radius || preferences.searchScope !== value.searchScope) {
+          release(); endHandoff("radius_changed"); retryAt = 0;
+          deferred.clear(); explored.clear(); scanAt = 0; exhaustedUntil = 0;
+          binding.returnAttempt = 0; binding.refreshNative = true;
+        }
+        preferences = value;
+        return;
+      }
+      detach(); preferences = value; this.attach(scene);
+    },
     attach(scene) { try { attach(scene); } catch { detach(); } },
     // Exploration has lower priority than portals/chests/harvest. It must not
     // advertise a lock that prevents those earlier handlers from starting.
     controls: (scene) => !!binding && binding.scene === scene && job !== null && !job.scout,
     movementOwned: (scene) => !!binding && binding.scene === scene && (job !== null || handoff !== null),
+    heldTarget: (scene) => binding?.scene === scene && scene.auto?.on ? binding.lock?.id ?? null : null,
     nativeHandling: (scene) => !!binding && binding.scene === scene && !!scene?.auto?.on && handoff !== null,
     mayMeditate(scene) {
       // Only an actual exhaustion/cooldown pause can yield to meditation.
@@ -749,7 +869,9 @@
         path: moving ? job.navigation.path : [], pathAt: job.navigation.pathAt,
         next: job.checkpoint ? { ...job.checkpoint } : null, waiting, moving };
     })() : null,
-    status: (scene) => binding && binding.scene === scene && scene.auto.on ? message : ""
+    status: (scene) => binding && binding.scene === scene && scene.auto.on
+      ? binding.releaseNote && scene.now() < binding.releaseNote.until
+        ? `Đã nhả mục tiêu: ${binding.releaseNote.reason}.` : message : ""
   };
   window.addEventListener("pagehide", () => { suspended = true; detach(); });
   window.addEventListener("pageshow", () => { suspended = false; GSTFarmMap.attach(sceneNow()); });

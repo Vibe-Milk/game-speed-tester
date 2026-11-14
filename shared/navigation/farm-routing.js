@@ -254,7 +254,11 @@
   }
   globalThis.GSTFarmRouting = {
     blocked,
-    configure(scene, value) { enabled = value.enabled === true; detach(); attach(scene); },
+    configure(scene, value) {
+      const next = value.enabled === true;
+      if (enabled !== next) { enabled = next; detach(); }
+      attach(scene);
+    },
     attach,
     rebaseNativeWalk,
     status: (scene) => binding && binding.scene === scene && scene?.auto?.on && scene.now() < binding.noteUntil ? binding.note : ""

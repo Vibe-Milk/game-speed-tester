@@ -210,7 +210,9 @@ function initializeMovementDiagnostics() {
         row.toId = Number.isSafeInteger(extra.toId) && extra.toId >= 0 ? extra.toId : null;
         row.switchSource = ["map", "radius"].includes(extra.switchSource) ? extra.switchSource : null;
         row.switchReason = ["boss_priority", "level_priority", "target_unavailable", "pick_failed",
-          "nearby_actionable", "active_close_fight", "distant_retained", "outside_circle", "candidates_deferred"]
+          "nearby_actionable", "active_close_fight", "distant_retained", "outside_circle", "candidates_deferred",
+          "observed_death", "identity_changed", "actor_unavailable", "enemy_unavailable", "invalid_position",
+          "target_ineligible", "route_unavailable", "manual_override", "map_changed"]
           .includes(extra.switchReason) ? extra.switchReason : null;
         append(row); appendIncident(row);
       } catch { /* A diagnostic must never change Auto Farm behavior. */ }

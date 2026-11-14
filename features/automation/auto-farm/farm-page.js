@@ -546,7 +546,7 @@
     owner.auto.think = 0;
   }
   function syncFilter(scene, guardOnly = false) {
-    const filteringActive = (ownerScene) => !guardOnly && (targetFilterActive()
+    const filteringActive = (ownerScene) => !guardOnly && (settings.enabled || targetFilterActive()
       || globalThis.GSTFarmBossSafety?.hasExclusions?.(ownerScene) === true);
     const boundaryActive = () => !guardOnly && settings.enabled && settings.searchScope === "radius";
     const filterHostActive = filteringActive(scene) || boundaryActive();
@@ -644,7 +644,8 @@
           // Native update can enter recovery after this host wrapper is created.
           if (this.auto?.resting) return enemies.filter((enemy) =>
             globalThis.GSTFarmBossSafety?.allowsTarget?.(this, enemy) !== false);
-          const filtered = enemies.filter(eligible);
+          const heldId = globalThis.GSTFarmMap?.heldTarget?.(this);
+          const filtered = enemies.filter((enemy) => eligible(enemy) && (heldId == null || enemy.id === heldId));
           return ranked() && !this.auto?.resting ? filtered.sort(comparePriority) : filtered;
         }, loot: () => {
           const loot = typeof host?.loot === "function" ? host.loot() : [];
@@ -659,6 +660,10 @@
   }
 
   function pickRanked(s, host, time, pos, candidates, moveCenter, searchRadius) {
+    const heldId = globalThis.GSTFarmMap?.heldTarget?.(s.scene);
+    if (heldId != null) return true;
+    const heldActor = s.scene.views?.get?.(heldId ?? s.auto.target);
+    if (heldActor?.k === "m" && !heldActor.dead && insideFarmBoundary(s.scene, heldActor)) return true;
     // Native combat may already be fighting a nearby attacker. Do not
     // repeatedly restore an old ranked target while that fight is active.
     const native = s.scene.views?.get?.(s.auto.target);
@@ -1325,6 +1330,7 @@
       configurationError = "";
       try {
       const scopeChanged = settings.searchScope !== (data.searchScope === "map" ? "map" : "radius");
+      const radiusChanged = settings.radius !== data.radius;
       const filterChanged = settings.searchScope !== data.searchScope || settings.targetMode !== targetMode(data.targetMode)
         || settings.targetLevel !== data.targetLevel
         || settings.targetMinLevel !== data.targetMinLevel || settings.targetMaxLevel !== data.targetMaxLevel
@@ -1409,6 +1415,16 @@
       if (settings.policyMode === "extended") clearExcludedBossTarget(sceneNow());
       if (session) {
         if (scopeChanged) { restore(session); session.at = -Infinity; }
+        if (radiusChanged && settings.searchScope === "radius") {
+          // Rebase only our shifted search center; the session origin stays fixed.
+          const aligned = globalThis.GSTFarmMap?.consumeCenter?.(session.scene);
+          if (aligned && session.auto.ax === aligned.x && session.auto.ay === aligned.y)
+            session.center = { ...aligned };
+          if (owned(session) && !session.auto.moved && !GSTFarmInput.movement(session.scene)
+              && session.scene.now() >= session.auto.pauseUntil) center(session, session.home);
+          session.at = -Infinity;
+          session.auto.think = 0;
+        }
         syncFilter(session.scene);
         if (filterChanged) { session.auto.think = 0; session.rankTarget = null; }
         if (!settings.enabled) restore(session);
