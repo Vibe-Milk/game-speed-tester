@@ -5,9 +5,10 @@
   const maxEvents = 80, maxIncidents = 24, events = [], incidents = [];
   const reasons = new Set(["boot", "attach", "state", "heartbeat", "death", "revived", "position_jump",
     "frame_gap", "visibility", "focus", "blur", "freeze", "resume", "pagehide", "pageshow",
-    "revive_request", "native_revive_attempt", "worker_failure", "detach"]);
-  const important = new Set(["boot", "death", "revived", "position_jump", "pagehide", "worker_failure", "frame_gap"]);
+    "revive_request", "native_revive_attempt", "worker_failure", "detach", "recovery"]);
+  const important = new Set(["boot", "death", "revived", "position_jump", "pagehide", "worker_failure", "frame_gap", "recovery"]);
   let binding = null, lastFrame = null, previous = "", lastAlive = null, lastObserved = null, generation = 1;
+  let recoveryOwner = null, recoveryState = "";
   const finite = Number.isFinite;
   const date = (value) => typeof value === "string"
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ? value : "";
@@ -41,7 +42,8 @@
     if (!reasons.has(row?.reason)) return null;
     const result = { at: date(row.at), reason: row.reason, generation: number(row.generation, 1e7) };
     for (const k of ["hidden", "focused", "auto", "dead", "connected", "reconnecting",
-      "displaced", "active", "paused", "loopRunning", "wasDiscarded"]) result[k] = row[k] === true;
+      "displaced", "active", "paused", "loopRunning", "wasDiscarded"])
+      result[k] = typeof row[k] === "boolean" ? row[k] : null;
     for (const k of ["gapMs", "sinceFrameMs", "positionDelta"]) result[k] = number(row[k]);
     result.hp = number(row.hp, 1e9); result.maxHp = number(row.maxHp, 1e9);
     result.hpPct = number(row.hpPct, 1);
@@ -53,6 +55,9 @@
       ? row.navigationType : null;
     result.redirectReason = row.redirectReason === "extension_timer" ? "extension_timer" : null;
     result.persisted = typeof row.persisted === "boolean" ? row.persisted : null;
+    for (const k of ["checkGapMs", "tickAgeMs", "inboundAgeMs"]) result[k] = number(row[k]);
+    for (const k of ["online", "ready", "closing", "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"])
+      result[k] = typeof row[k] === "boolean" ? row[k] : null;
     return result;
   }
   try {
@@ -131,8 +136,39 @@
     old.scene.events.off("shutdown", detach); old.scene.events.off("destroy", detach);
     lastFrame = null; previous = "";
   }
+  function recovery(data = {}) {
+    try {
+    const scene = data.scene, d = data.driver, now = performance.now();
+    if (!scene || !d) return;
+    if (recoveryOwner?.scene !== scene || recoveryOwner?.driver !== d) {
+      recoveryOwner = { scene, driver: d, checkAt: null }; recoveryState = "";
+    }
+    const owner = recoveryOwner, checkGapMs = owner.checkAt === null ? null : now - owner.checkAt;
+    owner.checkAt = now;
+    const lost = document.getElementById("lost");
+    const info = { checkGapMs,
+      tickAgeMs: Number.isFinite(d?.tickAt) && d.tickAt > 0 ? now - d.tickAt : null,
+      inboundAgeMs: Number.isFinite(data.lastInbound) ? now - data.lastInbound : null,
+      online: typeof d.online === "boolean" ? d.online : null, ready: typeof d.ready === "boolean" ? d.ready : null,
+      closing: typeof d.closing === "boolean" ? d.closing : null,
+      reconnecting: typeof d.reconnecting === "boolean" ? d.reconnecting : null,
+      handingOver: typeof d.handingOver === "boolean" ? d.handingOver : null,
+      displaced: typeof d.displaced === "boolean" ? d.displaced : null,
+      noticed: typeof d.noticed === "boolean" ? d.noticed : null,
+      eligible: typeof data.eligible === "boolean" ? data.eligible : null,
+      overlayPresent: lost ? lost.isConnected : false,
+      recoveryComplete: typeof data.recoveryComplete === "boolean" ? data.recoveryComplete : null };
+    const signature = JSON.stringify([info.online, info.ready, info.closing, info.reconnecting, info.handingOver,
+      info.displaced, info.noticed, info.eligible, info.overlayPresent, info.recoveryComplete]);
+    if (signature !== recoveryState || checkGapMs >= 5000 || data.recoveryComplete === true) {
+      recoveryState = signature;
+      const row = clean({ at: new Date().toISOString(), reason: "recovery", generation, ...state(scene), ...info });
+      if (row) { events.push(row); if (events.length > maxEvents) events.shift(); incidents.push(row); if (incidents.length > maxIncidents) incidents.shift(); persist(); }
+    }
+    } catch { /* Diagnostics must not interrupt reconnect. */ }
+  }
   globalThis.GSTBackgroundDiagnostics = {
-    record, clean,
+    record, clean, recovery,
     attach(scene) {
       try {
         if (binding?.scene === scene && scene) return;

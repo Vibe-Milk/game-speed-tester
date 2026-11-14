@@ -196,7 +196,7 @@
     if (typeof driver.receive !== "function" || typeof driver.onStatus !== "function") return null;
     const now = performance.now();
     const owner = {
-      scene, driver, lastInbound: now, waitingSince: null, downSince: null, downSinceWall: null,
+      scene, driver, lastInbound: null, inboundObserved: false, waitingSince: null, downSince: null, downSinceWall: null,
       healthySince: null, attempts: 0, lastAttempt: -Infinity, pending: false,
       nativeReconnectStarted: false,
       confirmed: false, receiveDescriptor: Object.getOwnPropertyDescriptor(driver, "receive"),
@@ -207,6 +207,7 @@
       // The original decoder handles all packets. Only observe arrival time.
       if (state === owner && this === driver && typeof args[0] === "string") {
         owner.lastInbound = performance.now();
+        owner.inboundObserved = true;
         owner.waitingSince = null;
         if (!driver.reconnecting && !driver.handingOver) {
           owner.healthySince ??= owner.lastInbound;
@@ -426,10 +427,19 @@
   function watch() {
     if (suspended) return;
     const scene = sceneNow();
-    if (!eligible(scene)) { detach(); return; }
+    if (!eligible(scene)) {
+      try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver: scene?.driver,
+        eligible: false, lastInbound: state?.scene === scene && state.inboundObserved ? state.lastInbound : null,
+        recoveryComplete: false }); } catch {}
+      detach(); return;
+    }
     const owner = attach(scene);
     if (!owner) return;
     const { driver } = owner, now = performance.now();
+    try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver, eligible: true,
+      lastInbound: owner.inboundObserved ? owner.lastInbound : null,
+      recoveryComplete: owner.confirmed === true && driver.link.open() === true
+        && !driver.reconnecting && !driver.handingOver && !driver.displaced }); } catch {}
     let open;
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;

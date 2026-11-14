@@ -104,11 +104,13 @@
     ["toOwners", "toOwners"], ["ownerScope", "ownerScope"]];
   const bgFlags = ["hidden", "focused", "auto", "dead", "connected", "reconnecting",
     "displaced", "active", "paused", "loopRunning", "wasDiscarded"];
+  const recoveryFlags = ["online", "ready", "closing", "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"];
   const vitalFlags = ["auto", "dead", "hidden", "connected"];
   const vitalFields = [["at", "t"], ["hp", "hp"], ["maxHp", "maxHp"], ["hpPct", "hpPct"],
     ["position", "pos"], ["serverPosition", "serverPos"], ["fix", "fix"]];
   const bgFields = [["at", "t"], ["reason", "event"], ["generation", "generation"],
     ["gapMs", "gapMs"], ["sinceFrameMs", "sinceFrameMs"], ["positionDelta", "positionDelta"],
+    ["checkGapMs", "checkGapMs"], ["tickAgeMs", "tickAgeMs"], ["inboundAgeMs", "inboundAgeMs"],
     ["hp", "hp"], ["maxHp", "maxHp"], ["hpPct", "hpPct"], ["position", "pos"],
     ["serverPosition", "serverPos"], ["previousPosition", "previousPos"],
     ["fix", "fix"], ["previousFix", "previousFix"], ["navigationType", "navigationType"],
@@ -121,6 +123,7 @@
   function move(row) { return pick(row, moveFields, moveFlags); }
   function background(row) {
     const result = pick(row, bgFields, bgFlags);
+    if (result) for (const key of recoveryFlags) result[key] = typeof row[key] === "boolean" ? row[key] : null;
     if (result && row.before) result.before = pick(row.before, vitalFields, vitalFlags);
     return result;
   }

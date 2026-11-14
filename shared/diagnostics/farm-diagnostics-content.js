@@ -34,12 +34,15 @@
   function cleanBackground(row) {
     const reasons = ["boot", "attach", "state", "heartbeat", "death", "revived", "position_jump",
       "frame_gap", "visibility", "focus", "blur", "freeze", "resume", "pagehide", "pageshow",
-      "revive_request", "native_revive_attempt", "worker_failure", "detach"];
+      "revive_request", "native_revive_attempt", "worker_failure", "detach", "recovery"];
     if (!reasons.includes(row?.reason)) return null;
     const result = { reason: row.reason, at: bgDate(row.at), generation: bgNumber(row.generation, 1e7) };
     for (const key of ["hidden", "focused", "auto", "dead", "connected", "reconnecting",
-      "displaced", "active", "paused", "loopRunning", "wasDiscarded"]) result[key] = row[key] === true;
-    for (const key of ["gapMs", "sinceFrameMs", "positionDelta"]) result[key] = bgNumber(row[key]);
+      "displaced", "active", "paused", "loopRunning", "wasDiscarded", "online", "ready", "closing",
+      "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"])
+      result[key] = typeof row[key] === "boolean" ? row[key] : null;
+    for (const key of ["gapMs", "sinceFrameMs", "positionDelta", "checkGapMs", "tickAgeMs", "inboundAgeMs"])
+      result[key] = bgNumber(row[key]);
     result.hp = bgNumber(row.hp, 1e9); result.maxHp = bgNumber(row.maxHp, 1e9);
     result.hpPct = bgNumber(row.hpPct, 1);
     result.position = bgPoint(row.position); result.serverPosition = bgPoint(row.serverPosition);
