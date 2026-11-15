@@ -111,6 +111,7 @@
   const bgFields = [["at", "t"], ["reason", "event"], ["generation", "generation"],
     ["gapMs", "gapMs"], ["sinceFrameMs", "sinceFrameMs"], ["positionDelta", "positionDelta"],
     ["checkGapMs", "checkGapMs"], ["tickAgeMs", "tickAgeMs"], ["inboundAgeMs", "inboundAgeMs"],
+    ["retryReason", "retryReason"],
     ["hp", "hp"], ["maxHp", "maxHp"], ["hpPct", "hpPct"], ["position", "pos"],
     ["serverPosition", "serverPos"], ["previousPosition", "previousPos"],
     ["fix", "fix"], ["previousFix", "previousFix"], ["navigationType", "navigationType"],
@@ -198,17 +199,110 @@
       void refreshSkillStatus();
   });
   void refreshSkillStatus();
+
+  let boundDocumentToken = null;
+  void globalThis.GSTPopupAccountContextPromise?.then(async () => {
+    const tabId = globalThis.GSTPopupAccountSession?.tabId?.();
+    if (Number.isInteger(tabId)) {
+      try {
+        const doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
+        if (doc?.documentToken) boundDocumentToken = doc.documentToken;
+      } catch {}
+    }
+  });
+
+  async function boundDiagnosticTarget() {
+    await globalThis.GSTPopupAccountContextPromise;
+    const session = globalThis.GSTPopupAccountSession;
+    const tabId = session?.tabId?.();
+    if (!Number.isInteger(tabId)) return { target: null, error: "no_bound_tab" };
+    try {
+      await chrome.tabs.get(tabId);
+    } catch {
+      return { target: null, error: "tab_closed_navigation" };
+    }
+    const expected = session?.current?.();
+    let freshContext = null;
+    try {
+      freshContext = await globalThis.GSTAccountProfiles?.contextForTab(tabId, { fresh: true });
+    } catch {
+      return { target: null, error: "tab_closed_navigation" };
+    }
+    if (!freshContext) return { target: null, error: "tab_closed_navigation" };
+    if (expected) {
+      if (expected.slot !== undefined && freshContext.slot !== expected.slot) {
+        return { target: null, error: "context_changed" };
+      }
+      if (expected.character && freshContext.character && expected.character !== freshContext.character) {
+        return { target: null, error: "context_changed" };
+      }
+      if (expected.accountId && freshContext.accountId && expected.accountId !== freshContext.accountId) {
+        return { target: null, error: "context_changed" };
+      }
+      if (expected.loginVisible !== true && freshContext.loginVisible === true) {
+        return { target: null, error: "context_changed" };
+      }
+    }
+    let doc = null;
+    try {
+      doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
+    } catch {
+      return { target: null, error: "tab_closed_navigation" };
+    }
+    if (!doc?.documentToken) return { target: null, error: "bridge_unavailable_timeout" };
+    if (boundDocumentToken === null) boundDocumentToken = doc.documentToken;
+    else if (boundDocumentToken !== doc.documentToken) return { target: null, error: "tab_closed_navigation" };
+    return { target: { tabId, documentToken: doc.documentToken }, error: null };
+  }
+
   button.addEventListener("click", async () => {
     button.disabled = true;
     try {
-      const target = await boundTarget();
-      if (!target) throw new Error("No verified tab");
+      const { target, error } = await boundDiagnosticTarget();
+      if (error === "no_bound_tab") {
+        feedback.textContent = "Không tìm thấy tab game được gắn kết để xuất chẩn đoán.";
+        return;
+      }
+      if (error === "tab_closed_navigation") {
+        feedback.textContent = "Tab game đã đóng hoặc đã chuyển sang trang khác; không thể xuất chẩn đoán.";
+        return;
+      }
+      if (error === "context_changed") {
+        feedback.textContent = "Tài khoản hoặc ngữ cảnh trong tab game đã thay đổi; đã dừng xuất.";
+        return;
+      }
+      if (error === "bridge_unavailable_timeout" || !target) {
+        feedback.textContent = "Cầu nối chẩn đoán trong tab không phản hồi hoặc đã quá thời gian chờ.";
+        return;
+      }
+
       let data = null, status = null;
-      try { data = await chrome.tabs.sendMessage(target.tabId, { type: "gst:farm-diagnostics" }); } catch {}
+      try {
+        data = await chrome.tabs.sendMessage(target.tabId, { type: "gst:farm-diagnostics" });
+      } catch {
+        feedback.textContent = "Cầu nối chẩn đoán trong tab không phản hồi hoặc đã quá thời gian chờ.";
+        return;
+      }
       try { status = await chrome.tabs.sendMessage(target.tabId, { type: "gst:farm-status" }); } catch {}
-      const available = data?.build === "farm-stop-1";
+
+      if (!data || typeof data !== "object") {
+        feedback.textContent = "Cầu nối chẩn đoán trong tab không phản hồi hoặc đã quá thời gian chờ.";
+        return;
+      }
+      if (data.documentToken && data.documentToken !== target.documentToken) {
+        feedback.textContent = "Tab game đã đóng hoặc đã chuyển sang trang khác; không thể xuất chẩn đoán.";
+        return;
+      }
+
+      const available = data.build === "farm-stop-1";
       const report = compact(available ? data : {});
       report.diagnosticsAvailable = available;
+      if (data.capture) {
+        report.capture = {
+          status: ["live", "stale", "unavailable"].includes(data.capture.status) ? data.capture.status : "unavailable",
+          capturedAt: typeof data.capture.capturedAt === "string" ? data.capture.capturedAt : null
+        };
+      }
       report.farmStatus = {
         autoOn: typeof status?.autoOn === "boolean" ? status.autoOn : null,
         configuration: status?.configuration ? {
@@ -220,8 +314,13 @@
         message: typeof status?.message === "string" ? status.message.slice(0, 240) : "Không nhận được trạng thái farm."
       };
       output.value = JSON.stringify(report); output.hidden = false;
-      const notice = !available ? "Chưa nhận được log MAIN; bản xuất chỉ có trạng thái cầu nối. "
-        : !data.tracking ? "Bộ theo dõi farm chưa hoạt động; đã xuất dữ liệu hiện có. " : "";
+      const notice = !available
+        ? "Chưa nhận được log MAIN và không có bản lưu an toàn; bản xuất chỉ có trạng thái cầu nối. "
+        : data.capture?.status === "stale"
+          ? `Đã xuất chẩn đoán từ bộ nhớ đệm (chụp lúc ${data.capture.capturedAt || "trước đó"}). `
+          : !data.tracking
+            ? "Bộ theo dõi farm chưa hoạt động; đã xuất dữ liệu hiện có. "
+            : "";
       let copied = false;
       try { copied = await globalThis.GSTClipboard?.write(output.value) === true; } catch {}
       if (copied) {

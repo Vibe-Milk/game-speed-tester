@@ -424,22 +424,37 @@
     if (owner.downSince !== null) return "Mạng: mất phản hồi; đang theo dõi kết nối.";
     return "";
   }
+  function retryReasonFor(owner, now) {
+    if (!preferencesReady || !preferences.autoReconnect) return "disabled";
+    if (owner.attempts >= retryDelays.length) return "exhausted";
+    const driver = owner.driver;
+    if (driver.displaced || (driver.noticed && !recoverableNetworkNotice())
+        || driver.reconnecting || driver.handingOver || navigator.onLine === false
+        || typeof driver.reconnect !== "function") return "blocked";
+    if (owner.pending || (owner.attempts > 0 && now - owner.lastAttempt < retryDelays[owner.attempts])
+        || (owner.attempts === 0 && owner.waitingSince !== null && now - owner.waitingSince < replyTimeout))
+      return "pending";
+    if (owner.downSince !== null || !driver.link?.open?.()) return "pending";
+    return null;
+  }
   function watch() {
     if (suspended) return;
     const scene = sceneNow();
     if (!eligible(scene)) {
       try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver: scene?.driver,
         eligible: false, lastInbound: state?.scene === scene ? state.diagnosticLastInbound : null,
-        recoveryComplete: false }); } catch {}
+        recoveryComplete: false, retryReason: "blocked" }); } catch {}
       detach(); return;
     }
     const owner = attach(scene);
     if (!owner) return;
     const { driver } = owner, now = performance.now();
+    const retryReason = retryReasonFor(owner, now);
     try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver, eligible: true,
       lastInbound: owner.diagnosticLastInbound,
       recoveryComplete: owner.confirmed === true && driver.link.open() === true
-        && !driver.reconnecting && !driver.handingOver && !driver.displaced }); } catch {}
+        && !driver.reconnecting && !driver.handingOver && !driver.displaced,
+      retryReason }); } catch {}
     let open;
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;

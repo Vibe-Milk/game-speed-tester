@@ -1,7 +1,28 @@
 (() => {
   "use strict";
   const origin = "https://nghichthienky.online", pending = new Map();
-  let sequence = 0;
+  let sequence = 0, cached = null, cacheIdentity = null;
+  const documentToken = crypto.randomUUID();
+  function contextKey(context) {
+    return context?.verified ? JSON.stringify([context.slot, context.profileKey, context.accountId,
+      context.character, context.classId, context.characterId]) : null;
+  }
+  function cacheAllowed() {
+    const context = globalThis.GSTAccountProfiles?.context?.()?.context;
+    if (!cacheIdentity || !context) return false;
+    const key = contextKey(context);
+    if (key) return key === cacheIdentity.key;
+    return context.slot === cacheIdentity.slot && context.loginVisible !== true
+      && context.reason === "character_unconfirmed";
+  }
+  globalThis.GSTAccountProfiles?.onContext?.((context) => {
+    if (!cached) return;
+    const key = contextKey(context);
+    if (key && key !== cacheIdentity?.key || !key && (!context || context.slot !== cacheIdentity?.slot
+        || context.loginVisible === true || context.reason !== "character_unconfirmed")) {
+      cached = null; cacheIdentity = null;
+    }
+  });
   const codes = ["shortcut", "restore", "native_game", "death_limit", "click_to_move", "state_changed",
     "background_click_blocked", "blocking_dialog", "displaced", "navigation"];
   function flags(value) {
@@ -53,6 +74,8 @@
       ? row.navigationType : null;
     result.redirectReason = row.redirectReason === "extension_timer" ? "extension_timer" : null;
     result.persisted = typeof row.persisted === "boolean" ? row.persisted : null;
+    const retryReasons = ["disabled", "pending", "exhausted", "blocked"];
+    result.retryReason = retryReasons.includes(row?.retryReason) ? row.retryReason : null;
     return result;
   }
   function cleanBossSafety(data) {
@@ -195,7 +218,7 @@
     if (!entry) return;
     pending.delete(event.data.requestId); clearTimeout(entry.timer);
     const data = event.data.diagnostics;
-    entry.respond({ build: data?.build === "farm-stop-1" ? data.build : "unknown", tracking: data?.tracking === true,
+    const result = { build: data?.build === "farm-stop-1" ? data.build : "unknown", tracking: data?.tracking === true,
       background: { build: ["background-log-1", "background-log-2"].includes(data?.background?.build)
           ? data.background.build : "unavailable",
         generation: bgNumber(data?.background?.generation, 1e7),
@@ -218,12 +241,25 @@
         incidents: (Array.isArray(data?.movement?.incidents) ? data.movement.incidents : [])
           .slice(-60).map(cleanMovement).filter(Boolean) },
       current: flags(data?.current), lastStop: clean(data?.lastStop),
-      events: (Array.isArray(data?.events) ? data.events : []).slice(-20).map(clean).filter(Boolean) });
+      events: (Array.isArray(data?.events) ? data.events : []).slice(-20).map(clean).filter(Boolean) };
+    const context = globalThis.GSTAccountProfiles?.context?.()?.context;
+    const key = contextKey(context), capturedAt = new Date().toISOString();
+    if (result.build === "farm-stop-1" && key) {
+      cached = { ...result, capturedAt }; cacheIdentity = { key, slot: context.slot };
+    }
+    entry.respond({ ...result, documentToken, capture: { status: "live", capturedAt } });
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (sender.id !== chrome.runtime.id || message?.type !== "gst:farm-diagnostics") return;
+    if (sender.id !== chrome.runtime.id) return;
+    if (message?.type === "gst:farm-diagnostics-document") { respond({ documentToken }); return; }
+    if (message?.type !== "gst:farm-diagnostics") return;
     const requestId = `farm-debug:${++sequence}`;
-    const timer = setTimeout(() => { pending.delete(requestId); respond({ build: "unavailable", tracking: false }); }, 800);
+    const timer = setTimeout(() => {
+      pending.delete(requestId);
+      respond(cached && cacheAllowed() ? { ...cached, documentToken,
+        capture: { status: "stale", capturedAt: cached.capturedAt } }
+        : { build: "unavailable", tracking: false, documentToken, capture: { status: "unavailable", capturedAt: null } });
+    }, 800);
     pending.set(requestId, { respond, timer });
     window.postMessage({ channel: "gst:farm-debug-request:v1", requestId }, origin);
     return true;
