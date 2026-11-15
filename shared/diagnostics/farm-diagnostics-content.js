@@ -3,23 +3,44 @@
   const origin = "https://nghichthienky.online", pending = new Map();
   let sequence = 0, cached = null, cacheIdentity = null;
   const documentToken = crypto.randomUUID();
+  const transientReasons = new Set([
+    "character_unconfirmed",
+    "game_bridge_unavailable",
+    "account_context_unavailable",
+    "offline_game"
+  ]);
   function contextKey(context) {
     return context?.verified ? JSON.stringify([context.slot, context.profileKey, context.accountId,
       context.character, context.classId, context.characterId]) : null;
   }
   function cacheAllowed() {
     const context = globalThis.GSTAccountProfiles?.context?.()?.context;
-    if (!cacheIdentity || !context) return false;
-    const key = contextKey(context);
-    if (key) return key === cacheIdentity.key;
-    return context.slot === cacheIdentity.slot && context.loginVisible !== true
-      && context.reason === "character_unconfirmed";
+    if (!cacheIdentity || !cached || !context) return false;
+    if (context.loginVisible === true) return false;
+    if (context.slot !== cacheIdentity.slot) return false;
+    if (context.verified) {
+      return contextKey(context) === cacheIdentity.key;
+    }
+    if (context.character && context.character !== cacheIdentity.character) return false;
+    if (context.accountId && cacheIdentity.accountId && context.accountId !== cacheIdentity.accountId) return false;
+    if (["unexpected_character", "native_login_required", "slot_not_managed"].includes(context.reason)) return false;
+    return transientReasons.has(context.reason);
   }
   globalThis.GSTAccountProfiles?.onContext?.((context) => {
-    if (!cached) return;
-    const key = contextKey(context);
-    if (key && key !== cacheIdentity?.key || !key && (!context || context.slot !== cacheIdentity?.slot
-        || context.loginVisible === true || context.reason !== "character_unconfirmed")) {
+    if (!cached || !cacheIdentity) return;
+    if (!context || context.loginVisible === true || context.slot !== cacheIdentity.slot) {
+      cached = null; cacheIdentity = null;
+      return;
+    }
+    if (context.verified) {
+      if (contextKey(context) !== cacheIdentity.key) {
+        cached = null; cacheIdentity = null;
+      }
+      return;
+    }
+    if (context.character && context.character !== cacheIdentity.character
+        || context.accountId && cacheIdentity.accountId && context.accountId !== cacheIdentity.accountId
+        || ["unexpected_character", "native_login_required", "slot_not_managed"].includes(context.reason)) {
       cached = null; cacheIdentity = null;
     }
   });
@@ -244,10 +265,19 @@
       events: (Array.isArray(data?.events) ? data.events : []).slice(-20).map(clean).filter(Boolean) };
     const context = globalThis.GSTAccountProfiles?.context?.()?.context;
     const key = contextKey(context), capturedAt = new Date().toISOString();
-    if (result.build === "farm-stop-1" && key) {
-      cached = { ...result, capturedAt }; cacheIdentity = { key, slot: context.slot };
+    if (result.build === "farm-stop-1" && key && context?.verified) {
+      cacheIdentity = {
+        key,
+        slot: context.slot ?? "",
+        profileKey: context.profileKey ?? "",
+        accountId: context.accountId ?? "",
+        character: context.character ?? "",
+        classId: context.classId ?? "",
+        characterId: context.characterId ?? ""
+      };
+      cached = { ...result, capturedAt, identity: cacheIdentity };
     }
-    entry.respond({ ...result, documentToken, capture: { status: "live", capturedAt } });
+    entry.respond({ ...result, documentToken, capture: { status: "live", capturedAt, identity: cacheIdentity } });
   });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
@@ -257,7 +287,7 @@
     const timer = setTimeout(() => {
       pending.delete(requestId);
       respond(cached && cacheAllowed() ? { ...cached, documentToken,
-        capture: { status: "stale", capturedAt: cached.capturedAt } }
+        capture: { status: "stale", capturedAt: cached.capturedAt, identity: cached.identity } }
         : { build: "unavailable", tracking: false, documentToken, capture: { status: "unavailable", capturedAt: null } });
     }, 800);
     pending.set(requestId, { respond, timer });
@@ -265,7 +295,10 @@
     return true;
   });
   window.addEventListener("pagehide", () => {
-    for (const { timer, respond } of pending.values()) { clearTimeout(timer); respond({ build: "navigating", tracking: false }); }
+    for (const { timer, respond } of pending.values()) {
+      clearTimeout(timer);
+      respond({ build: "navigating", tracking: false, documentToken, capture: { status: "unavailable", capturedAt: null } });
+    }
     pending.clear();
   });
 })();

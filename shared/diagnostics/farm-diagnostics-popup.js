@@ -200,15 +200,26 @@
   });
   void refreshSkillStatus();
 
-  let boundDocumentToken = null;
+  let boundDocumentToken = null, boundTokenQuery = null;
+  async function getOrInitDocumentToken(tabId) {
+    if (boundDocumentToken) return boundDocumentToken;
+    if (!boundTokenQuery) {
+      boundTokenQuery = (async () => {
+        try {
+          const doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
+          if (doc?.documentToken) {
+            if (boundDocumentToken === null) boundDocumentToken = doc.documentToken;
+            return boundDocumentToken;
+          }
+        } catch {}
+        return null;
+      })().finally(() => { boundTokenQuery = null; });
+    }
+    return boundTokenQuery;
+  }
   void globalThis.GSTPopupAccountContextPromise?.then(async () => {
     const tabId = globalThis.GSTPopupAccountSession?.tabId?.();
-    if (Number.isInteger(tabId)) {
-      try {
-        const doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
-        if (doc?.documentToken) boundDocumentToken = doc.documentToken;
-      } catch {}
-    }
+    if (Number.isInteger(tabId)) await getOrInitDocumentToken(tabId);
   });
 
   async function boundDiagnosticTarget() {
@@ -221,14 +232,27 @@
     } catch {
       return { target: null, error: "tab_closed_navigation" };
     }
+    const establishedToken = await getOrInitDocumentToken(tabId);
+    let doc = null;
+    try {
+      doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
+    } catch {
+      return { target: null, error: "tab_closed_navigation" };
+    }
+    if (!doc?.documentToken) return { target: null, error: "bridge_unavailable_timeout" };
+    if (!establishedToken) {
+      boundDocumentToken = doc.documentToken;
+    } else if (establishedToken !== doc.documentToken) {
+      return { target: null, error: "tab_closed_navigation" };
+    }
     const expected = session?.current?.();
     let freshContext = null;
     try {
       freshContext = await globalThis.GSTAccountProfiles?.contextForTab(tabId, { fresh: true });
     } catch {
-      return { target: null, error: "tab_closed_navigation" };
+      return { target: null, error: "bridge_unavailable_timeout" };
     }
-    if (!freshContext) return { target: null, error: "tab_closed_navigation" };
+    if (!freshContext) return { target: null, error: "bridge_unavailable_timeout" };
     if (expected) {
       if (expected.slot !== undefined && freshContext.slot !== expected.slot) {
         return { target: null, error: "context_changed" };
@@ -242,17 +266,11 @@
       if (expected.loginVisible !== true && freshContext.loginVisible === true) {
         return { target: null, error: "context_changed" };
       }
+      if (["unexpected_character", "native_login_required"].includes(freshContext.reason)) {
+        return { target: null, error: "context_changed" };
+      }
     }
-    let doc = null;
-    try {
-      doc = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-diagnostics-document" });
-    } catch {
-      return { target: null, error: "tab_closed_navigation" };
-    }
-    if (!doc?.documentToken) return { target: null, error: "bridge_unavailable_timeout" };
-    if (boundDocumentToken === null) boundDocumentToken = doc.documentToken;
-    else if (boundDocumentToken !== doc.documentToken) return { target: null, error: "tab_closed_navigation" };
-    return { target: { tabId, documentToken: doc.documentToken }, error: null };
+    return { target: { tabId, documentToken: doc.documentToken, expected, freshContext }, error: null };
   }
 
   button.addEventListener("click", async () => {
@@ -289,9 +307,34 @@
         feedback.textContent = "Cầu nối chẩn đoán trong tab không phản hồi hoặc đã quá thời gian chờ.";
         return;
       }
-      if (data.documentToken && data.documentToken !== target.documentToken) {
+      if (!data.documentToken || data.documentToken !== target.documentToken || data.build === "navigating") {
         feedback.textContent = "Tab game đã đóng hoặc đã chuyển sang trang khác; không thể xuất chẩn đoán.";
         return;
+      }
+      if (data.capture?.status === "stale") {
+        const cachedId = data.capture?.identity;
+        if (!cachedId || typeof cachedId !== "object") {
+          feedback.textContent = "Không thể xác minh danh tính bản ghi bộ nhớ đệm; đã dừng xuất.";
+          return;
+        }
+        if (target.expected) {
+          if (target.expected.slot !== undefined && cachedId.slot !== target.expected.slot) {
+            feedback.textContent = "Tài khoản hoặc ngữ cảnh trong tab game đã thay đổi; đã dừng xuất.";
+            return;
+          }
+          if (target.expected.character && cachedId.character !== target.expected.character) {
+            feedback.textContent = "Tài khoản hoặc ngữ cảnh trong tab game đã thay đổi; đã dừng xuất.";
+            return;
+          }
+          if (target.expected.accountId && cachedId.accountId !== target.expected.accountId) {
+            feedback.textContent = "Tài khoản hoặc ngữ cảnh trong tab game đã thay đổi; đã dừng xuất.";
+            return;
+          }
+          if (target.expected.profileKey && cachedId.profileKey !== target.expected.profileKey) {
+            feedback.textContent = "Tài khoản hoặc ngữ cảnh trong tab game đã thay đổi; đã dừng xuất.";
+            return;
+          }
+        }
       }
 
       const available = data.build === "farm-stop-1";
