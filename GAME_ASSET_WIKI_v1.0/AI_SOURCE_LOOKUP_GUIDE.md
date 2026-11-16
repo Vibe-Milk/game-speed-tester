@@ -71,16 +71,19 @@ This guide explains how an AI agent (ChatGPT, Gemini, Copilot, etc.) should effi
 
 | Source File | Size | Key Responsibility |
 |---|---|---|
-| `WorldScene-b_2tpaKT.js` | ~1.0 MB | Main game scene, rendering, game loop |
-| `sim-CvoxXTtu.js` | ~705 KB | Game simulation, physics, mechanics |
-| `phaser-DRI6y8R5.js` | ~1.2 MB | Phaser game engine library |
-| `trangbi-iyUH-plT.js` | ~255 KB | Equipment/gear system |
-| `ChieuMau-CEtRLp-4.js` | ~207 KB | Color/visual effects system |
-| `index-BIkbGDKp.js` | ~116 KB | Main entry point, initialization |
-| `Character-DhQJ_Q0g(1).js` | ~69 KB | Character classes and skills |
-| `items-nDkzNEls.js` | ~18 KB | Item definitions |
-| `tm-direct.js` | ~5 KB | WebSocket/network communication shim |
-| `tm-guard.js` | ~5 KB | UI guard/anti-macro popup |
+| `WorldScene-BY10JbnY.js` | ~1.06 MB | Main game scene, rendering, game loop, auto-farm |
+| `index-BFE6E5O-.js` | ~815 KB | Client bootstrap, networking protocol, auth, equipment/gear |
+| `sim-Bb1GWC1-.js` | ~363 KB | Game simulation, physics, spatial math, mechanics |
+| `phaser-DRI6y8R5.js` | ~1.2 MB | Bundled Phaser 2D game engine library |
+| `ChieuMau-BCbrESdy.js` | ~208 KB | Visual effects, skill particles, sprite catalog |
+| `Character-CL6MpdWh.js` | ~69 KB | Character presentation, animation, and audio |
+| `items-AU49CWua.js` | ~18 KB | Item definitions, inventory UI controls |
+| `donation-BLL6eTTD.js` | ~2.5 KB | Donation tiers, milestone rewards, incense duration |
+| `tm-direct.js` | ~5 KB | Direct WebSocket connection shim |
+| `tm-guard.js` | ~5 KB | Anti-macro challenge modal and mobile tribulation |
+
+> [!WARNING]
+> **Active Snapshot Notice:** The files listed above are the active source files in `source/`. The symbol positions, character offsets, and line ranges in `ASSET_INDEX.json` and `modules/*.md` were generated against the historical snapshot (`WorldScene-b_2tpaKT.js`, `index-BIkbGDKp.js`, `sim-CvoxXTtu.js`, `trangbi-iyUH-plT.js`, etc.) and are `[UNVERIFIED]` against the current active files. Always locate symbols directly in current `source/` files.
 
 
 ## Restored index lookup

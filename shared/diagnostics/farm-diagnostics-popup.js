@@ -142,6 +142,7 @@
         events: merged([movement.events, movement.incidents, movement.uiIncidents], move, true) },
       background: { build: bg.build, generation: bg.generation,
         current: background(bg.current),
+        recovery: background(bg.recovery),
         lastAlive: pick(bg.lastAlive, vitalFields, vitalFlags),
         lastObserved: pick(bg.lastObserved, vitalFields, vitalFlags),
         events: merged([bg.events, bg.incidents], background) },

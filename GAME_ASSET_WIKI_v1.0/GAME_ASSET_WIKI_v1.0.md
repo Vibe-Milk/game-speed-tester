@@ -16,22 +16,28 @@ This document synthesizes findings from ten independently analyzed JavaScript as
 
 ## 2. Asset Inventory & Source Verification
 
-Ten JavaScript assets constitute the client build, representing 3,623,626 total bytes (~3.62 MB) of untouched minified code:
+Ten JavaScript assets constitute the active client build in `source/`, representing 3,753,820 total bytes (~3.75 MB) of untouched minified code:
 
-| Asset Name | Canonical Alias | Package | Size (Bytes) | SHA-256 Hash | Primary Architecture Role |
+| Asset Name | Canonical Alias | Package / Provenance | Size (Bytes) | SHA-256 Hash | Primary Architecture Role |
 |---|---|---|---|---|---|
-| `Character-DhQJ_Q0g(1).js` | `Character-DhQJ_Q0g.js` | `Character-DhQJ_Q0g.zip` | 69,360 | `854dbfbd6105f551b6c110ef4895a5beedb0ddfd4afbbcc4f59c69809e7b67d1` | Player animations, weapon FX, audio |
-| `ChieuMau-CEtRLp-4.js` | `ChieuMau-CEtRLp-4.js` | `ChieuMau.zip` | 206,820 | `25f88bcc7f67f5ce1dab6426b995c3f7b1a82196690c62fde656fe9216407c4f` | Skill effect engine, sprite catalog |
-| `WorldScene-b_2tpaKT.js` | `WorldScene-b_2tpaKT.js` | `WorldScene.zip` | 1,037,432 | `5d5ede1b50cdcebed76efae6fea1836f067fc61f153cab5b02eb3f8a7cb29d18` | Master Phaser scene, auto-farm, entities |
-| `index-BIkbGDKp.js` | `index-BIkbGDKp.js` | `index-BIkbGDKp.zip` | 115,984 | `501ae57d733b2dd15554e606eb96352b4e6f1994e125890f32871dd411a78550` | Bootstrap, network protocol, auth |
-| `items-nDkzNEls.js` | `items-nDkzNEls.js` | `items-nDkzNEls.zip` | 18,028 | `5f77311ae9d6e9fab8eff378a809fcacf3f16af2304aa3f577bee1aab1d0b343` | Item metadata, inventory UI, icons |
-| `phaser-DRI6y8R5.js` | `phaser-DRI6y8R5.js` | `phaser.zip` | 1,205,225 | `5920a4fd5e79aa7f0f3f87a914b4591ba68a8a87a0f6a5c3d49005a870a5d7b1` | Bundled Phaser 2D game engine |
-| `sim-CvoxXTtu.js` | `sim-CvoxXTtu.js` | `sim-CvoxXTtu.zip` | 705,393 | `8ddd24caae7b39e86a6525117ef6619bba015d4698e3d09b2177af465fab9dc7` | Combat simulation, spatial grid, quests |
-| `tm-direct.js` | `tm-direct.js` | `tm_direct_guard.zip` | 5,362 | `ac013042e8be620365ae650b48d4da80c40f0efa3ac9a2d061d74372f01a3965` | WebSocket connection shim |
-| `tm-guard.js` | `tm-guard.js` | `tm_direct_guard.zip` | 5,286 | `4a9ef0f8ae1a11556ba4f3ef386de7bc0c76cf0fa32b97d5309db4dff9dada47` | WebSocket message interceptor: displays anti-macro guard alertdialog and toggles mobile tribulation trigger
-| `trangbi-iyUH-plT.js` | `trangbi-iyUH-plT.js` | `trangbi.zip` | 254,736 | `c591d321899db406ed7387c54c21e303582505396e6d815fe0441dcdc4f11cec` | Equipment, level scaling, formulas |
+| `Character-CL6MpdWh.js` | `Character-CL6MpdWh.js` | Current game asset snapshot | 69,325 | `24384560069ab9abcb95d49cf54b621795b626ec77e330e5954e1a26f4345b59` | Player animations, weapon FX, audio |
+| `ChieuMau-BCbrESdy.js` | `ChieuMau-BCbrESdy.js` | Current game asset snapshot | 207,944 | `fa1c6a964bf931f4b0a0b976a4ee6416443eb5735ce0d69fada07e7d9db39b81` | Skill effect engine, sprite catalog |
+| `WorldScene-BY10JbnY.js` | `WorldScene-BY10JbnY.js` | Current game asset snapshot | 1,061,908 | `9f0ed630e5fb8861e72b7bad33d6abc500fefb969d029a3609031beeda6f25e3` | Master Phaser scene, auto-farm, entities |
+| `donation-BLL6eTTD.js` | `donation-BLL6eTTD.js` | Current game asset snapshot | 2,495 | `5434b4c8dec2bb47ee54e843a1d30eb51fc20e4cd65f7b9bd09841100e50351c` | Donation packages, top-up rewards, milestone tiers |
+| `index-BFE6E5O-.js` | `index-BFE6E5O-.js` | Current game asset snapshot | 814,577 | `72914848af44332b105522bd77babf586b3db9ed8d54f14fcef2fc7a7207b0f9` | Bootstrap, network protocol, auth, equipment/gear registry |
+| `items-AU49CWua.js` | `items-AU49CWua.js` | Current game asset snapshot | 18,338 | `167181dec3f7abf2b6db15b2879c930f2a1df82f7599a57fd83488c969e64ecd` | Item metadata, inventory UI, icons |
+| `phaser-DRI6y8R5.js` | `phaser-DRI6y8R5.js` | `GAME_ASSET_WIKI_v1.0_phaser.zip` | 1,205,225 | `5920a4fd5e79aa7f0f3f87a914b4591ba68a8a87a0f6a5c3d49005a870a5d7b1` | Bundled Phaser 2D game engine |
+| `sim-Bb1GWC1-.js` | `sim-Bb1GWC1-.js` | Current game asset snapshot | 363,360 | `c21abd27af331f05226cc6620fa86c9f5ad344030ab127db88d1208ac739ea46` | Combat simulation, spatial grid, quests |
+| `tm-direct.js` | `tm-direct.js` | `GAME_ASSET_WIKI_v1.0_tm_direct_guard.zip` | 5,362 | `ac013042e8be620365ae650b48d4da80c40f0efa3ac9a2d061d74372f01a3965` | WebSocket connection shim |
+| `tm-guard.js` | `tm-guard.js` | `GAME_ASSET_WIKI_v1.0_tm_direct_guard.zip` | 5,286 | `4a9ef0f8ae1a11556ba4f3ef386de7bc0c76cf0fa32b97d5309db4dff9dada47` | WebSocket message interceptor: displays anti-macro guard alertdialog and toggles mobile tribulation trigger |
 
-*All extracted source files have been re-hashed and verified to match original archives with 100% byte fidelity.*
+*All extracted source files have been re-hashed and verified to match the active repository files with 100% byte fidelity.*
+
+> [!IMPORTANT]
+> **Active Snapshot vs. Historical Analysis Records:**
+> The active source files in `source/` are the updated snapshot assets listed above.
+> The historical detailed reports, per-module specifications in `modules/`, function maps, and `ASSET_INDEX.json` offsets were originally produced against earlier snapshot bundles (such as `WorldScene-b_2tpaKT.js`, `index-BIkbGDKp.js`, `sim-CvoxXTtu.js`, `trangbi-iyUH-plT.js`, `Character-DhQJ_Q0g(1).js`, and `items-nDkzNEls.js`).
+> **All historical character offsets, line numbers, and minified local identifiers from the prior snapshot are `[UNVERIFIED]` against the current active assets.** In particular, equipment and stats scaling logic previously isolated in `trangbi-iyUH-plT.js` is now integrated into `index-BFE6E5O-.js`, and milestone donation rewards are defined in `donation-BLL6eTTD.js`. Developers and AI agents must locate symbols directly in the active source files.
 
 ---
 
@@ -53,20 +59,20 @@ flowchart TD
     end
 
     subgraph Application_Core
-        Index["index-BIkbGDKp.js (Bootstrap & Protocol)"]
-        World["WorldScene-b_2tpaKT.js (Master Scene A3)"]
+        Index["index-BFE6E5O-.js (Bootstrap, Protocol, Equipment)"]
+        World["WorldScene-BY10JbnY.js (Master Scene)"]
     end
 
     subgraph Domain_Services
-        TrangBi["trangbi-iyUH-plT.js (Data & Formulas)"]
-        Sim["sim-CvoxXTtu.js (Simulation & Spatial)"]
-        Items["items-nDkzNEls.js (Items & HUD)"]
+        Donation["donation-BLL6eTTD.js (Donation & Milestones)"]
+        Sim["sim-Bb1GWC1-.js (Simulation & Spatial)"]
+        Items["items-AU49CWua.js (Items & HUD)"]
     end
 
     subgraph Visual_and_Audio_Engines
         Phaser["phaser-DRI6y8R5.js (2D Engine)"]
-        Char["Character-DhQJ_Q0g(1).js (Sprites & Audio)"]
-        Chieu["ChieuMau-CEtRLp-4.js (Visual FX)"]
+        Char["Character-CL6MpdWh.js (Sprites & Audio)"]
+        Chieu["ChieuMau-BCbrESdy.js (Visual FX)"]
     end
 
     DOM --> Index
@@ -78,7 +84,7 @@ flowchart TD
     Index --> World
     World --> Phaser
     World --> Sim
-    World --> TrangBi
+    World --> Donation
     World --> Items
     World --> Char
     World --> Chieu
@@ -88,13 +94,13 @@ flowchart TD
 
 ## 4. Module Responsibilities & Boundaries
 
-- **`WorldScene-b_2tpaKT.js` (The Hub):** Responsible for managing scene state, ticking the auto-farm engine, rendering entity pools, and handling snapshot deltas.
-- **`index-BIkbGDKp.js` (The Gateway):** Manages transport sockets, user session state, and responsive viewport sizing.
-- **`trangbi-iyUH-plT.js` (The Codex):** Static mathematical truths of the game: scaling curves, item definitions, skill trees, and enhancement requirements.
-- **`sim-CvoxXTtu.js` (The Predictor):** High-frequency spatial hash queries, collision geometry, and local combat damage prediction.
-- **`Character-DhQJ_Q0g(1).js` (The Puppet):** Visual representation of human characters, directional movement frames, weapon sockets, and sound triggers.
-- **`ChieuMau-CEtRLp-4.js` (The Pyrotechnic):** Particle cascades, geometric slashes, beam emitters, and skill sound synchronization.
-- **`items-nDkzNEls.js` (The Merchant/Backpack):** Tooltips, icon coordinate lookups, and inventory keyboard bindings.
+- **`WorldScene-BY10JbnY.js` (The Hub):** Responsible for managing scene state, ticking the auto-farm engine, rendering entity pools, and handling snapshot deltas.
+- **`index-BFE6E5O-.js` (The Gateway & Codex):** Manages transport sockets, user session state, responsive viewport sizing, and equipment/gear registries (previously standalone `trangbi`).
+- **`donation-BLL6eTTD.js` (The Benefactor):** Donation tiers, top-up reward packages, incense items, and milestone equipment rewards.
+- **`sim-Bb1GWC1-.js` (The Predictor):** High-frequency spatial hash queries, collision geometry, and local combat damage prediction.
+- **`Character-CL6MpdWh.js` (The Puppet):** Visual representation of human characters, directional movement frames, weapon sockets, and sound triggers.
+- **`ChieuMau-BCbrESdy.js` (The Pyrotechnic):** Particle cascades, geometric slashes, beam emitters, and skill sound synchronization.
+- **`items-AU49CWua.js` (The Merchant/Backpack):** Tooltips, icon coordinate lookups, and inventory keyboard bindings.
 - **`tm-direct.js` & `tm-guard.js` (The Armor):** WebSocket connection proxy (`tm-direct.js`) and anti-macro guard alertdialog with mobile tribulation trigger (`tm-guard.js`).
 - **`phaser-DRI6y8R5.js` (The Engine):** WebGL rendering, camera transformations, and audio playback.
 
@@ -102,21 +108,22 @@ flowchart TD
 
 ## 5. Feature-to-Asset Routing Matrix
 
-| Gameplay Feature | Primary Module | Key Classes / Functions | Primary Dependencies | Limitations & Authoritative Boundary |
+| Gameplay Feature | Primary Active Module | Historical Identifiers `[UNVERIFIED in current snapshot]` | Primary Dependencies | Limitations & Authoritative Boundary |
 |---|---|---|---|---|
-| **Auto-Farm Engine** | `WorldScene-b_2tpaKT.js` | `A3.autoFarm`, `rk`, `sk`, `A3.castAutoSkill` | `sim`, `trangbi`, `index` | Emits player commands; subject to server rate-limiting |
-| **Pathfinding & Navigation** | `WorldScene-b_2tpaKT.js` | `Tv.moveTo`, `ik`, `Wv` | `sim-CvoxXTtu.js` | Client path planning; server verifies final coordinates |
-| **Skill Particle FX** | `ChieuMau-CEtRLp-4.js` | `io`, `Po`, `ye`, `sprite_assets` | `phaser`, `Character` | Visual-only; does not determine combat hit outcomes |
-| **Character Direction & Mount** | `Character-DhQJ_Q0g(1).js` | `at`, `G`, `wt`, `ri`, `li`, `ui`, `vi` | `phaser-DRI6y8R5.js` | Purely visual representation on client |
-| **Spiritual Root Advancement** | `sim-CvoxXTtu.js` | `xm` (breakthrough table), `Dn` (root grades), `Hs = 30` (refining cost), `c1` (level-based Linh Thạch cost), `d1` (upgrade calculation) | Client cultivation state | Source confirms local configuration and calculations; authoritative server rules not established |
-| **Equipment & Stat Scaling** | `trangbi-iyUH-plT.js` | `ji`, `Cl`, `mt`, `Qu` | None (Leaf) | Canonical math tables; server enforces caps |
-| **Inventory UI & Hotkeys** | `items-nDkzNEls.js` | `M`, `Cn`, `Nn`, `N` | `trangbi`, `index` | UI rendering; server validates item ownership |
-| **WebSocket Networking** | `index-BIkbGDKp.js` | `io` (network client), `io.receive` (message handling), `eo.decode` (`snap2` decoding) | Browser WebSocket / RTC channel | Client transport and snapshot handling are visible; remote protocol authority remains unknown |
+| **Auto-Farm Engine** | `WorldScene-BY10JbnY.js` | `A3.autoFarm`, `rk`, `sk`, `A3.castAutoSkill` | `sim`, `index` | Emits player commands; subject to server rate-limiting |
+| **Pathfinding & Navigation** | `WorldScene-BY10JbnY.js` | `Tv.moveTo`, `ik`, `Wv` | `sim-Bb1GWC1-.js` | Client path planning; server verifies final coordinates |
+| **Skill Particle FX** | `ChieuMau-BCbrESdy.js` | `io`, `Po`, `ye`, `sprite_assets` | `phaser`, `Character` | Visual-only; does not determine combat hit outcomes |
+| **Character Direction & Mount** | `Character-CL6MpdWh.js` | `at`, `G`, `wt`, `ri`, `li`, `ui`, `vi` | `phaser-DRI6y8R5.js` | Purely visual representation on client |
+| **Spiritual Root Advancement** | `sim-Bb1GWC1-.js` | `xm` (breakthrough table), `Dn` (root grades), `Hs = 30` (refining cost), `c1`, `d1` | Client cultivation state | Source confirms local configuration and calculations; authoritative server rules not established |
+| **Equipment & Stat Scaling** | `index-BFE6E5O-.js` (formerly `trangbi`) | `ji`, `Cl`, `mt`, `Qu` | None (Leaf) | Canonical math tables integrated into index; server enforces caps |
+| **Donation & Milestone Rewards** | `donation-BLL6eTTD.js` | `h` (tiers), `r` (Tụ Linh Hương), `v` (incense timer) | None (Leaf) | Local reward configuration; server validates payment and grants |
+| **Inventory UI & Hotkeys** | `items-AU49CWua.js` | `M`, `Cn`, `Nn`, `N` | `index` | UI rendering; server validates item ownership |
+| **WebSocket Networking** | `index-BFE6E5O-.js` | `ey` (driver), `receive` (message handling), `snapshots.decode` (`snap2` decoding) | Browser WebSocket / RTC channel | Client transport and snapshot handling are visible; remote protocol authority remains unknown |
 | **Socket Interception** | `tm-direct.js` | `WebSocketShim`, `production` | Browser Globals | Client-side connection proxy |
 | **Anti-Macro Challenge & Mobile Tribulation** | `tm-guard.js` | `feed`, `show`, `tribButton` | WebSocket Streams | Server-authoritative challenges; local DOM presentation |
-| **Fishing Minigame** | `WorldScene-b_2tpaKT.js` / `sim-CvoxXTtu.js` | `tv` (scene-side fishing UI), `my` (sim-side fishing system) | Client scene / simulation | Scene presents fishing phases from incoming state; the provided source alone does not establish authoritative online catch rewards |
+| **Fishing Minigame** | `WorldScene-BY10JbnY.js` / `sim-Bb1GWC1-.js` | `tv` (scene-side fishing UI), `my` (sim-side fishing system) | Client scene / simulation | Scene presents fishing phases from incoming state; authoritative online catch rewards not established |
 
-**Source-identity note:** `index.Pt` is the loading overlay presenter `function Pt(t,e,o="Đang tiến vào")`. It does not implement WebSocket transport. `sim.xm` is a spiritual-root breakthrough table, `sim.Hs` is the numeric constant `30`, `sim.Dn` holds spiritual-root grades, and `sim.c1` calculates a clamped Linh Thạch refinement cost.
+**Source-identity note:** Historical symbol names and offsets listed above are preserved for navigation and historical cross-referencing. Because active asset hashes changed, developers must locate symbols directly in the active source files. In current `index-BFE6E5O-.js`, the driver class is minified as `ey` and snapshots are decoded by `Zp`.
 
 ---
 

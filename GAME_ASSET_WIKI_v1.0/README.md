@@ -23,17 +23,17 @@ GAME_ASSET_WIKI_v1.0_COMPLETE/
 ├── ANALYSIS_PROGRESS.json             # Consolidation completion status
 ├── SOURCE_MANIFEST.json               # Exact byte sizes, line counts, and SHA-256 hashes
 │
-├── source/                            # 10 untouched original minified JavaScript sources
-│   ├── Character-DhQJ_Q0g(1).js
-│   ├── ChieuMau-CEtRLp-4.js
-│   ├── WorldScene-b_2tpaKT.js
-│   ├── index-BIkbGDKp.js
-│   ├── items-nDkzNEls.js
+├── source/                            # 10 untouched original minified JavaScript sources (active snapshot)
+│   ├── Character-CL6MpdWh.js
+│   ├── ChieuMau-BCbrESdy.js
+│   ├── WorldScene-BY10JbnY.js
+│   ├── donation-BLL6eTTD.js
+│   ├── index-BFE6E5O-.js
+│   ├── items-AU49CWua.js
 │   ├── phaser-DRI6y8R5.js
-│   ├── sim-CvoxXTtu.js
+│   ├── sim-Bb1GWC1-.js
 │   ├── tm-direct.js
-│   ├── tm-guard.js
-│   └── trangbi-iyUH-plT.js
+│   └── tm-guard.js
 │
 ├── modules/                           # Standardized module specifications & deep submodules
 │   ├── 01_Character-DhQJ_Q0g.md
@@ -79,5 +79,7 @@ This release preserves the **nine original analysis indexes** and their associat
 Start with `ASSET_INDEX.json` for the unified view (**16,037 current entries**), `references/ORIGINAL_SYMBOL_LOOKUP.json` for source-qualified locations and JSON pointers, or `original_indexes/INDEX_REGISTRY.json` for source archives. Historical reports mentioning **8,526** entries describe the pre-restoration release, not this current index.
 
 Entries marked `source_anchor` verify only source text, not whole AST declaration ranges or behavior. `Phaser` module positions have been converted from Unicode code-point offsets to UTF-16. Never interpret `Character-DhQJ_Q0g.js` and `Character-DhQJ_Q0g(1).js` as runtime-equivalent without deployment evidence; see `references/SOURCE_FILENAME_ALIASES.json`.
+
+**Active Snapshot Notice:** The active files in `source/` match the updated game bundle snapshot (`Character-CL6MpdWh.js`, `ChieuMau-BCbrESdy.js`, `WorldScene-BY10JbnY.js`, `donation-BLL6eTTD.js`, `index-BFE6E5O-.js`, `items-AU49CWua.js`, `phaser-DRI6y8R5.js`, `sim-Bb1GWC1-.js`, `tm-direct.js`, `tm-guard.js`) with verified hashes in `SOURCE_MANIFEST.json`. Symbol offsets in historical indexes and module deep-dives were generated against earlier snapshots and are `[UNVERIFIED]` against the new bundles.
 
 See `RESTORATION_REPORT.md` for exact checks and remaining uncertainty.

@@ -246,6 +246,7 @@
           ? data.background.build : "unavailable",
         generation: bgNumber(data?.background?.generation, 1e7),
         current: cleanBackground(data?.background?.current),
+        recovery: cleanBackground(data?.background?.recovery),
         lastAlive: cleanVitals(data?.background?.lastAlive),
         lastObserved: cleanVitals(data?.background?.lastObserved),
         events: (Array.isArray(data?.background?.events) ? data.background.events : []).slice(-80).map(cleanBackground).filter(Boolean),

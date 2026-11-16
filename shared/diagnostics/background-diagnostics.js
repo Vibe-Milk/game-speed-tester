@@ -8,7 +8,7 @@
     "revive_request", "native_revive_attempt", "worker_failure", "detach", "recovery"]);
   const important = new Set(["boot", "death", "revived", "position_jump", "pagehide", "worker_failure", "frame_gap", "recovery"]);
   let binding = null, lastFrame = null, previous = "", lastAlive = null, lastObserved = null, generation = 1;
-  let recoveryOwner = null, recoveryState = "";
+  let recoveryOwner = null, recoveryState = "", lastRecovery = null;
   const finite = Number.isFinite;
   const date = (value) => typeof value === "string"
     && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ? value : "";
@@ -71,10 +71,11 @@
     if (Array.isArray(saved?.incidents)) incidents.push(...saved.incidents.slice(-maxIncidents).map(clean).filter(Boolean));
     lastAlive = compact(saved?.lastAlive);
     lastObserved = compact(saved?.lastObserved);
+    lastRecovery = clean(saved?.lastRecovery);
     generation = Math.min(1e7, Math.max(1, Math.floor(saved?.generation || 0) + 1));
   } catch { /* No prior log. */ }
   function persist() {
-    try { sessionStorage.setItem(key, JSON.stringify({ generation, events, incidents, lastAlive, lastObserved })); }
+    try { sessionStorage.setItem(key, JSON.stringify({ generation, events, incidents, lastAlive, lastObserved, lastRecovery })); }
     catch { /* Diagnostics are optional. */ }
   }
   function record(reason, scene = binding?.scene, gapMs = null, extra = {}) {
@@ -170,11 +171,12 @@
       eligible: typeof data.eligible === "boolean" ? data.eligible : null,
       overlayPresent: lost ? lost.isConnected : false,
       recoveryComplete: typeof data.recoveryComplete === "boolean" ? data.recoveryComplete : null };
+    lastRecovery = clean({ at: new Date().toISOString(), reason: "recovery", generation, ...state(scene), ...info });
     const signature = JSON.stringify([info.online, info.ready, info.closing, info.reconnecting, info.handingOver,
       info.displaced, info.noticed, info.eligible, info.overlayPresent, info.recoveryComplete, info.retryReason, info.attempts]);
     if (signature !== recoveryState || data.recoveryComplete === true) {
       recoveryState = signature;
-      const row = clean({ at: new Date().toISOString(), reason: "recovery", generation, ...state(scene), ...info });
+      const row = lastRecovery;
       if (row) { events.push(row); if (events.length > maxEvents) events.shift(); incidents.push(row); if (incidents.length > maxIncidents) incidents.shift(); persist(); }
     }
     } catch { /* Diagnostics must not interrupt reconnect. */ }
@@ -193,11 +195,35 @@
         scene.events.on("destroy", detach); record("attach", scene);
       } catch { detach(); }
     },
-    snapshot: () => ({ build: "background-log-2", generation,
-      current: clean({ at: new Date().toISOString(), reason: "state", generation,
-        ...state(binding?.scene), sinceFrameMs: lastFrame === null ? null : performance.now() - lastFrame }),
-      lastAlive: compact(lastAlive), lastObserved: compact(lastObserved),
-      events: [...events], incidents: [...incidents] })
+    snapshot: () => {
+      const rec = lastRecovery;
+      const current = clean({ at: new Date().toISOString(), reason: "state", generation,
+        ...state(binding?.scene), sinceFrameMs: lastFrame === null ? null : performance.now() - lastFrame,
+        ...(rec ? {
+          checkGapMs: rec.checkGapMs,
+          tickAgeMs: rec.tickAgeMs,
+          inboundAgeMs: rec.inboundAgeMs,
+          retryReason: rec.retryReason,
+          attempts: rec.attempts,
+          waitingMs: rec.waitingMs,
+          downMs: rec.downMs,
+          online: rec.online,
+          ready: rec.ready,
+          closing: rec.closing,
+          reconnecting: rec.reconnecting,
+          handingOver: rec.handingOver,
+          displaced: rec.displaced,
+          noticed: rec.noticed,
+          eligible: rec.eligible,
+          overlayPresent: rec.overlayPresent,
+          recoveryComplete: rec.recoveryComplete
+        } : {}) });
+      return { build: "background-log-2", generation,
+        current,
+        recovery: rec ? clean(rec) : null,
+        lastAlive: compact(lastAlive), lastObserved: compact(lastObserved),
+        events: [...events], incidents: [...incidents] };
+    }
   };
   // Distinguish an extension-initiated ?timer redirect without storing a URL.
   let redirectReason = null;
