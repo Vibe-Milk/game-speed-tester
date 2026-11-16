@@ -269,12 +269,15 @@
   }
   function recoverableNetworkNotice() {
     // The native retry loop emits this exact network error after exhaustion.
-    // An error received from the server can also set "noticed" for this text;
-    // that flag alone does not prove a permanently rejected session.
-    // Do not retry other errors, including rejection/other-login notices.
+    // Native reconnect failure bypasses receive() and directly invokes onMessage(),
+    // leaving driver.noticed unset (false). Check the error panel, button,
+    // and driver non-displaced/non-closing state directly.
+    const scene = sceneNow();
+    const driver = scene?.driver;
+    if (!driver || driver.displaced || driver.closing) return false;
     const panel = document.getElementById("lost");
     const button = panel?.querySelector("button");
-    return sceneNow()?.driver?.noticed === true && panel?.firstChild?.nodeType === Node.TEXT_NODE
+    return panel?.firstChild?.nodeType === Node.TEXT_NODE
       && panel.firstChild.textContent?.trim() === "Mất kết nối máy chủ"
       && panel.getClientRects?.().length > 0 && button?.getClientRects?.().length > 0
       && button.textContent?.trim() === "Kết nối lại";
@@ -426,16 +429,30 @@
   }
   function retryReasonFor(owner, now) {
     if (!preferencesReady || !preferences.autoReconnect) return "disabled";
-    if (owner.attempts >= retryDelays.length) return "exhausted";
     const driver = owner.driver;
-    if (driver.displaced || (driver.noticed && !recoverableNetworkNotice())
-        || driver.reconnecting || driver.handingOver || navigator.onLine === false
-        || typeof driver.reconnect !== "function") return "blocked";
-    if (owner.pending || (owner.attempts > 0 && now - owner.lastAttempt < retryDelays[owner.attempts])
-        || (owner.attempts === 0 && owner.waitingSince !== null && now - owner.waitingSince < replyTimeout))
+    if (driver.displaced || driver.closing || navigator.onLine === false
+        || typeof driver.reconnect !== "function"
+        || (driver.noticed && !recoverableNetworkNotice()))
+      return "blocked";
+    if (owner.pending) return "attempt_started";
+    if (driver.reconnecting || driver.handingOver) return "native_in_progress";
+    if (owner.confirmed === true && driver.link?.open?.() === true
+        && !driver.reconnecting && !driver.handingOver && !driver.displaced)
+      return "completed";
+    if (owner.attempts >= retryDelays.length) return "exhausted";
+    if (owner.waitingSince !== null) {
+      if (now - owner.waitingSince < replyTimeout) return "waiting";
       return "pending";
-    if (owner.downSince !== null || !driver.link?.open?.()) return "pending";
-    return null;
+    }
+    if (owner.attempts > 0 && now - owner.lastAttempt < retryDelays[owner.attempts])
+      return "pending";
+    if (owner.downSince !== null || !driver.link?.open?.()) {
+      if (recoverableNetworkNotice() && owner.attempts === 0 && owner.nativeReconnectStarted)
+        return "failed";
+      return "pending";
+    }
+    if (recoverableNetworkNotice()) return "failed";
+    return "idle";
   }
   function watch() {
     if (suspended) return;
@@ -443,7 +460,8 @@
     if (!eligible(scene)) {
       try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver: scene?.driver,
         eligible: false, lastInbound: state?.scene === scene ? state.diagnosticLastInbound : null,
-        recoveryComplete: false, retryReason: "blocked" }); } catch {}
+        recoveryComplete: false, retryReason: "blocked",
+        attempts: 0, waitingMs: null, downMs: null }); } catch {}
       detach(); return;
     }
     const owner = attach(scene);
@@ -454,7 +472,10 @@
       lastInbound: owner.diagnosticLastInbound,
       recoveryComplete: owner.confirmed === true && driver.link.open() === true
         && !driver.reconnecting && !driver.handingOver && !driver.displaced,
-      retryReason }); } catch {}
+      retryReason,
+      attempts: Number.isSafeInteger(owner.attempts) ? owner.attempts : 0,
+      waitingMs: owner.waitingSince !== null ? Math.max(0, now - owner.waitingSince) : null,
+      downMs: owner.downSince !== null ? Math.max(0, now - owner.downSince) : null }); } catch {}
     let open;
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;
@@ -462,7 +483,6 @@
     if (stable && owner.confirmed) {
       owner.confirmed = false;
       owner.nativeReconnectStarted = false;
-      owner.lastInbound = now;
       owner.waitingSince = null;
       owner.downSince = null;
       owner.downSinceWall = null;
@@ -485,10 +505,12 @@
 
     // The game may stop updating when idle, even if neither automation is ON.
     // Advance only the original network tick, never movement or gameplay.
-    if (navigator.onLine !== false && !driver.noticed && !driver.displaced && !owner.pending
-        && typeof driver.update === "function" && Number.isFinite(driver.tickAt)
-        && now - driver.tickAt >= 1700) {
-      try { driver.update(); } catch { /* Leave gameplay in control. */ }
+    if (navigator.onLine !== false && !driver.displaced && !driver.closing && !owner.pending
+        && typeof driver.update === "function") {
+      const lastTick = Number.isFinite(driver.tickAt) ? driver.tickAt : 0;
+      if (now - lastTick >= 1700) {
+        try { driver.update(); } catch { /* Leave gameplay in control. */ }
+      }
     }
 
     // Native update resets waitingSince after >2s between ticks. Track the

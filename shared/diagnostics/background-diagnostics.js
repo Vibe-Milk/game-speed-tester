@@ -55,9 +55,11 @@
       ? row.navigationType : null;
     result.redirectReason = row.redirectReason === "extension_timer" ? "extension_timer" : null;
     result.persisted = typeof row.persisted === "boolean" ? row.persisted : null;
-    const retryReasons = new Set(["disabled", "pending", "exhausted", "blocked"]);
+    const retryReasons = new Set(["idle", "waiting", "attempt_started", "native_in_progress",
+      "blocked", "exhausted", "completed", "failed", "disabled", "pending"]);
     result.retryReason = retryReasons.has(row?.retryReason) ? row.retryReason : null;
-    for (const k of ["checkGapMs", "tickAgeMs", "inboundAgeMs"]) result[k] = number(row[k]);
+    result.attempts = finite(row?.attempts) ? Math.max(0, Math.min(20, Math.floor(row.attempts))) : null;
+    for (const k of ["checkGapMs", "tickAgeMs", "inboundAgeMs", "waitingMs", "downMs"]) result[k] = number(row[k]);
     for (const k of ["online", "ready", "closing", "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"])
       result[k] = typeof row[k] === "boolean" ? row[k] : null;
     return result;
@@ -148,13 +150,17 @@
     const owner = recoveryOwner, checkGapMs = owner.checkAt === null ? null : now - owner.checkAt;
     owner.checkAt = now;
     const lost = document.getElementById("lost");
-    const retryReasons = new Set(["disabled", "pending", "exhausted", "blocked"]);
+    const retryReasons = new Set(["idle", "waiting", "attempt_started", "native_in_progress",
+      "blocked", "exhausted", "completed", "failed", "disabled", "pending"]);
     const retryReason = typeof data.retryReason === "string" && retryReasons.has(data.retryReason)
       ? data.retryReason : null;
+    const attempts = finite(data.attempts) ? Math.max(0, Math.min(20, Math.floor(data.attempts))) : null;
+    const waitingMs = number(data.waitingMs);
+    const downMs = number(data.downMs);
     const info = { checkGapMs,
       tickAgeMs: Number.isFinite(d?.tickAt) && d.tickAt > 0 ? now - d.tickAt : null,
       inboundAgeMs: Number.isFinite(data.lastInbound) ? now - data.lastInbound : null,
-      retryReason,
+      retryReason, attempts, waitingMs, downMs,
       online: typeof d.online === "boolean" ? d.online : null, ready: typeof d.ready === "boolean" ? d.ready : null,
       closing: typeof d.closing === "boolean" ? d.closing : null,
       reconnecting: typeof d.reconnecting === "boolean" ? d.reconnecting : null,
@@ -165,8 +171,8 @@
       overlayPresent: lost ? lost.isConnected : false,
       recoveryComplete: typeof data.recoveryComplete === "boolean" ? data.recoveryComplete : null };
     const signature = JSON.stringify([info.online, info.ready, info.closing, info.reconnecting, info.handingOver,
-      info.displaced, info.noticed, info.eligible, info.overlayPresent, info.recoveryComplete, info.retryReason]);
-    if (signature !== recoveryState || checkGapMs >= 5000 || data.recoveryComplete === true) {
+      info.displaced, info.noticed, info.eligible, info.overlayPresent, info.recoveryComplete, info.retryReason, info.attempts]);
+    if (signature !== recoveryState || data.recoveryComplete === true) {
       recoveryState = signature;
       const row = clean({ at: new Date().toISOString(), reason: "recovery", generation, ...state(scene), ...info });
       if (row) { events.push(row); if (events.length > maxEvents) events.shift(); incidents.push(row); if (incidents.length > maxIncidents) incidents.shift(); persist(); }

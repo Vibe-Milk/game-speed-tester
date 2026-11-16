@@ -111,7 +111,7 @@
   const bgFields = [["at", "t"], ["reason", "event"], ["generation", "generation"],
     ["gapMs", "gapMs"], ["sinceFrameMs", "sinceFrameMs"], ["positionDelta", "positionDelta"],
     ["checkGapMs", "checkGapMs"], ["tickAgeMs", "tickAgeMs"], ["inboundAgeMs", "inboundAgeMs"],
-    ["retryReason", "retryReason"],
+    ["retryReason", "retryReason"], ["attempts", "attempts"], ["waitingMs", "waitingMs"], ["downMs", "downMs"],
     ["hp", "hp"], ["maxHp", "maxHp"], ["hpPct", "hpPct"], ["position", "pos"],
     ["serverPosition", "serverPos"], ["previousPosition", "previousPos"],
     ["fix", "fix"], ["previousFix", "previousFix"], ["navigationType", "navigationType"],

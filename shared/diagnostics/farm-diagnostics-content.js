@@ -83,8 +83,9 @@
       "displaced", "active", "paused", "loopRunning", "wasDiscarded", "online", "ready", "closing",
       "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"])
       result[key] = typeof row[key] === "boolean" ? row[key] : null;
-    for (const key of ["gapMs", "sinceFrameMs", "positionDelta", "checkGapMs", "tickAgeMs", "inboundAgeMs"])
+    for (const key of ["gapMs", "sinceFrameMs", "positionDelta", "checkGapMs", "tickAgeMs", "inboundAgeMs", "waitingMs", "downMs"])
       result[key] = bgNumber(row[key]);
+    result.attempts = Number.isFinite(row?.attempts) ? Math.max(0, Math.min(20, Math.floor(row.attempts))) : null;
     result.hp = bgNumber(row.hp, 1e9); result.maxHp = bgNumber(row.maxHp, 1e9);
     result.hpPct = bgNumber(row.hpPct, 1);
     result.position = bgPoint(row.position); result.serverPosition = bgPoint(row.serverPosition);
@@ -95,7 +96,8 @@
       ? row.navigationType : null;
     result.redirectReason = row.redirectReason === "extension_timer" ? "extension_timer" : null;
     result.persisted = typeof row.persisted === "boolean" ? row.persisted : null;
-    const retryReasons = ["disabled", "pending", "exhausted", "blocked"];
+    const retryReasons = ["idle", "waiting", "attempt_started", "native_in_progress",
+      "blocked", "exhausted", "completed", "failed", "disabled", "pending"];
     result.retryReason = retryReasons.includes(row?.retryReason) ? row.retryReason : null;
     return result;
   }
