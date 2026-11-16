@@ -732,14 +732,8 @@ function syncBossTargetControls() {
     || farmPreferenceWritesPending > 0 || farmPolicyPending > 0;
   farmBossFilter.disabled = unavailable || excluded || ordinaryOnly;
   farmExcludeBoss.disabled = unavailable;
-  farmBossFilterHelp.textContent = excluded ? "Đang bỏ qua tất cả boss."
-    : ordinaryOnly ? "Chế độ này chỉ chọn quái thường; boss bị loại trừ."
-    : mode === "boss" ? "Chỉ đánh boss thuộc loại đã chọn."
-      : mode === "bossLevel" ? "Ưu tiên boss phù hợp, sau đó đánh quái thường."
-        : "Bộ lọc này chỉ giới hạn loại boss, không loại quái thường.";
-  farmExcludeBossHelp.textContent = farmConfirmed.excludeBoss
-    ? "Tự lưu · không chọn boss làm mục tiêu."
-    : "Tự lưu · tắt để cho phép các boss phù hợp với bộ lọc.";
+  farmBossFilterHelp.textContent = "";
+  farmExcludeBossHelp.textContent = "";
 }
 function farmSummaries() {
   const prefs = farmConfirmed, compatibility = farmCompatibility;

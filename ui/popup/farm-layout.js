@@ -116,8 +116,6 @@
   pair('farmShowRange', 'display');
   pair('farmAutoRespawn', 'revive');
   move([byId('farmReturnDeath').closest('div.separated')], 'revive');
-  pair('farmAllowPlayerTargets', 'targets');
-  move([byId('breakSeals').closest('div.separated')], 'targets');
   pair('farmAcceptPartyInvites', 'interaction');
   flatten(byId('farmEncounterSummary').closest('details'), 'interaction');
   flatten(byId('farmPreferLoot').closest('details'), 'interaction');
@@ -143,6 +141,8 @@
     column.querySelector('.farm-group-title')?.remove();
     move([column], key);
   }
+  pair('farmAllowPlayerTargets', 'targets');
+  move([byId('breakSeals').closest('div.separated')], 'targets');
   const idle = byId('farmIdleMode');
   move([idle.previousElementSibling, idle, idle.nextElementSibling], 'range');
   pair('farmKeepAcrossMaps', 'range');
