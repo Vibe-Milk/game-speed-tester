@@ -300,3 +300,20 @@ No OFF operation is presented as server cancellation. Movement release checks cu
 owners/manual movement as well as vector equality; Custom exposes `movementOwned(scene)`.
 Custom scene validation accepts verified legacy tabs without requiring a managed accountId,
 while slot-managed tabs still require their managed identity. Runtime remains unverified.
+
+### Harvest interaction position readiness
+
+Before the first native F/harvest action, `harvest-page.js` stops its own approach vector,
+uses native sendMove (without bypassing its throttle), and waits for a newer self snapshot
+than the stopped-position baseline. The actor must remain within 0.1 of that baseline for
+80 ms, the snapshot must be at most 250 ms old and within min(reach + 0.3, 1.5) of the node,
+and local/snapshot drift must be at most 0.45. Local approach reach is capped at 1.35,
+inside the snapshot's native 1.6 target-selection and 1.8 simulation interaction limits;
+these are conservative extension readiness margins, not modifications to game rules.
+Position readiness waits at most 2 seconds after first arrival and then releases with
+position_sync_timeout and no harvest request. Existing acknowledgement/observation deadlines
+remain for requests actually attempted; unknown requests are not blindly resent.
+History export `harvest-history-4` passes positionReadiness, positionWaitMs, positionAtArrival,
+and lastPositionCheck through the content allowlist in addition to requestPosition.
+These distinguish pre-interaction waiting from acknowledgement waiting. Snapshot position
+is client-observed evidence, not a server receipt or proof of live server acceptance.

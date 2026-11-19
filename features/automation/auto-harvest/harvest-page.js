@@ -27,7 +27,7 @@
   const recentAttempts = [];
   const observations = [];
   const failedCodes = new Set(["attack_timeout", "stalled", "approach_timeout", "no_path", "path_blocked",
-    "interaction_target_other", "interaction_cache_timeout", "interact_error"]);
+    "interaction_target_other", "interaction_cache_timeout", "position_sync_timeout", "interact_error"]);
   const unconfirmedCodes = new Set(["harvest_unconfirmed", "request_timeout", "node_unavailable_before_ack", "target_changed"]);
   const harvestOwnershipTimeoutMs = 15000;
   const summary = () => `Thành công ${totals.success} · Thất bại/bỏ qua ${totals.failed} · Chưa xác nhận ${totals.unconfirmed} · Hủy/nhường ${totals.canceled}`;
@@ -113,6 +113,39 @@
         ? number(Math.max(0, scene.now() - scene.selfAt) * 1000) : null,
       snapshotDistance: Number.isFinite(scene.self?.x) && Number.isFinite(scene.self?.y)
         ? number(Math.hypot(scene.self.x - node.x, scene.self.y - node.y)) : null };
+  }
+  function positionReadyForHarvest(scene, node, now, reach) {
+    job.positionWaitStartedAt ??= now;
+    job.positionAtArrival ??= positionSnapshot(scene, node);
+    const pos = { x: scene.px, y: scene.py };
+    if (!job.positionStop || Math.hypot(pos.x - job.positionStop.x, pos.y - job.positionStop.y) > 0.1) {
+      job.positionStop = { ...pos, at: now, snapshotAt: finite(scene.selfAt) ? scene.selfAt : -Infinity };
+    }
+    // Use the native movement service; do not bypass its rate limit or write native animation/snapshot fields.
+    if (now - (job.positionSyncAt ?? -Infinity) >= 100) {
+      job.positionSyncAt = now;
+      scene.sendMove();
+    }
+    const check = positionSnapshot(scene, node), gameTime = scene.now();
+    job.lastPositionCheck = check;
+    job.positionWaitMs = Math.round(now - job.positionWaitStartedAt);
+    const fresh = finite(scene.selfAt) && finite(gameTime) && gameTime >= scene.selfAt
+      && gameTime - scene.selfAt <= 0.25;
+    const drift = finite(scene.self?.x) && finite(scene.self?.y)
+      ? Math.hypot(pos.x - scene.self.x, pos.y - scene.self.y) : Infinity;
+    const ready = fresh && scene.selfAt > job.positionStop.snapshotAt
+      && now - job.positionStop.at >= 80 && finite(check.snapshotDistance)
+      && check.snapshotDistance <= Math.min(1.5, reach + 0.3) && drift <= 0.45;
+    job.positionReadiness = ready ? "ready" : "waiting_position";
+    if (ready) return true;
+    if (now - job.positionWaitStartedAt >= 2000) {
+      job.positionReadiness = "position_timeout";
+      release(job.requestedAt === undefined
+        ? "Chưa xác nhận vị trí đủ gần sau 2 giây; chưa gửi lệnh hái, tạm bỏ qua cây."
+        : "Chưa xác nhận lại vị trí đủ gần; không gửi thêm lệnh hái, tiếp tục quan sát yêu cầu cũ.",
+        20000, "position_sync_timeout");
+    } else message = "Đã tới cây; chờ snapshot vị trí đủ gần trước khi gửi lệnh hái (tối đa 2 giây).";
+    return false;
   }
   function observeReleased(scene) {
     for (let i = observations.length - 1; i >= 0; i--) {
@@ -364,8 +397,12 @@
         freshTarget: job.freshTarget ?? { type: "unobserved", node: null },
         cachedTarget: job.cachedTarget ?? { type: "unobserved", node: null },
         closerApproach: job.closerApproach === true,
-        requestedReach: job.interactionReach ?? settings.reach,
+        requestedReach: Math.min(job.interactionReach ?? settings.reach, 1.35),
         confirmationWaitMs: job.finishedAt === undefined || job.finishedAt === null ? null : Math.round(performance.now() - job.finishedAt),
+        positionReadiness: job.positionReadiness ?? "not_checked",
+        positionWaitMs: job.positionWaitMs ?? 0,
+        positionAtArrival: job.positionAtArrival ?? null,
+        lastPositionCheck: job.lastPositionCheck ?? null,
         requestPosition: job.requestPosition ?? null,
         endPosition: scene ? positionSnapshot(scene, job.node) : null,
         gameNotices: [...(job.notices ?? [])],
@@ -693,9 +730,10 @@
       return;
     }
     const pos = { x: scene.px, y: scene.py };
-    const interactionReach = job.interactionReach ?? settings.reach;
+    const interactionReach = Math.min(job.interactionReach ?? settings.reach, 1.35);
     if (dist(pos, node) <= interactionReach) {
       steer(scene, 0, 0);
+      if (!positionReadyForHarvest(scene, node, now, interactionReach)) return;
       const picked = scene.pickTarget();
       const cached = scene.target;
       job.freshTarget = targetInfo(picked); job.cachedTarget = targetInfo(cached);
@@ -742,6 +780,7 @@
       message = `Đã yêu cầu hái ${node.item}; chờ game xác nhận.`;
       return;
     }
+    job.positionStop = null;
     if (GSTNavigation.progressed(scene, job, job.path, node.x, node.y, 0.2)) job.progressAt = now;
     if (now - job.progressAt > 5000 || now - job.startAt > (settings.searchScope === "map" || settings.radius > 30 ? 120000 : 15000)) {
       release("Không tới được cây; tạm bỏ qua.", 20000, now - job.progressAt > 5000 ? "stalled" : "approach_timeout");

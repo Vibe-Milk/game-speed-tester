@@ -76,7 +76,7 @@
     if (!["failure", "harvest.release", "main.timeout"].includes(event)) return;
     if (event === "harvest.release" && !["node_unavailable_before_ack", "request_timeout",
       "interaction_target_other", "interaction_cache_timeout", "interact_error", "stalled",
-      "approach_timeout", "no_path", "path_blocked", "harvest_unconfirmed", "attack_timeout"].includes(detail?.code)) return;
+      "approach_timeout", "no_path", "path_blocked", "position_sync_timeout", "harvest_unconfirmed", "attack_timeout"].includes(detail?.code)) return;
     const key = JSON.stringify({ event, detail });
     const group = `${event}:${detail?.stage ?? ""}`;
     if (key === lastDebug.get(group)) return;
@@ -220,7 +220,7 @@
         "harvest_ended", "node_unavailable_before_ack", "request_timeout", "target_changed", "danger",
         "interaction_target_other", "interaction_cache_timeout", "pre_interaction_blocked", "interact_error",
         "stalled", "approach_timeout", "no_path", "path_blocked", "manual_pointer", "manual_key", "manual_skill",
-        "harvest_success", "harvest_unconfirmed", "attack_timeout"];
+        "harvest_success", "harvest_unconfirmed", "position_sync_timeout", "attack_timeout"];
       record(data.event, {
         code: codes.includes(data.code) ? data.code : "unknown",
         attempt: Number.isSafeInteger(data.attempt) && data.attempt > 0 ? data.attempt : null,
@@ -297,6 +297,10 @@
         closerApproach: row?.closerApproach === true,
         requestedReach: Number.isFinite(row?.requestedReach) ? row.requestedReach : null,
         confirmationWaitMs: Number.isFinite(row?.confirmationWaitMs) ? row.confirmationWaitMs : null,
+        positionReadiness: ["not_checked", "waiting_position", "ready", "position_timeout"].includes(row?.positionReadiness)
+          ? row.positionReadiness : "not_checked",
+        positionWaitMs: Number.isFinite(row?.positionWaitMs) ? Math.max(0, row.positionWaitMs) : null,
+        positionAtArrival: cleanPosition(row?.positionAtArrival), lastPositionCheck: cleanPosition(row?.lastPositionCheck),
         requestPosition: cleanPosition(row?.requestPosition), endPosition: cleanPosition(row?.endPosition),
         gameNotices: (Array.isArray(row?.gameNotices) ? row.gameNotices : []).slice(-3).map((notice) => ({
           type: notice?.type === "toast" ? "toast" : "note",

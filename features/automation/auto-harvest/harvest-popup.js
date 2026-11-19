@@ -102,7 +102,7 @@
     try {
       const data = await debugMessage("gst:harvest-history");
       if (!Array.isArray(data.recentAttempts)) throw new Error("History unavailable");
-      output.value = JSON.stringify({ build: "harvest-history-3", scope: "Last 10 completed attempts in this game tab; no runtime credentials", attempts: data.recentAttempts });
+      output.value = JSON.stringify({ build: "harvest-history-4", scope: "Last 10 completed attempts in this game tab; no runtime credentials", attempts: data.recentAttempts });
       if (!data.recentAttempts.length) { feedback.textContent = "Chưa có lượt kết thúc. Cho Thu hoạch chạy rồi sao chép lại."; return; }
       if (await GSTClipboard.write(output.value)) feedback.textContent = "Đã sao chép. Dán log vào chat để kiểm tra.";
       else { output.hidden = false; output.focus(); output.select(); feedback.textContent = "Đã chọn log; bấm Ctrl+C để sao chép."; }
