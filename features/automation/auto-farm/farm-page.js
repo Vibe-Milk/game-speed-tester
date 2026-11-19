@@ -29,7 +29,7 @@
   let lastTrustedInputAt = -Infinity;
   let gestureGeneration = 0, generationAt = 0, shortcutIntent = null;
   const farmGestures = new WeakMap();
-  function invalidateFarmGestures() { globalThis.GSTIntentAuthority?.invalidate?.(); gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
+  function invalidateFarmGestures() { gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
   function farmButton(target) { return target instanceof Element ? target.closest('[data-entry="auto"], [data-key="V"]') : null; }
   function rememberFarmGesture(event) {
     if (settings.policyMode !== "custom" || suspended || !event.isTrusted || document.hidden || event.repeat
@@ -155,6 +155,7 @@
   function clearActivationLock() {
     const old = activationLock; activationLock = null;
     if (!old) return;
+    globalThis.GSTIntentAuthority?.invalidate?.();
     if (old.scene === sceneNow()) invalidateFarmGestures();
     if (old.auto.toggle === old.wrapper) {
       if (old.descriptor) Object.defineProperty(old.auto, "toggle", old.descriptor);
@@ -162,7 +163,7 @@
     }
   }
   function needsActivationTracking() {
-    return identityBlocked || settings.policyMode === "disabled" || settings.policyMode === "custom"
+    return !!globalThis.GSTIntentAuthority || identityBlocked || settings.policyMode === "disabled" || settings.policyMode === "custom"
       || globalThis.GSTHarvest?.needsFarmCoordination?.() === true
       || globalThis.GSTMeditation?.wantsFarmActivationObserver?.() === true;
   }
@@ -203,6 +204,8 @@
         if (movement && scene.autoX === 0 && scene.autoY === 0
             && movement.every(finite) && (movement[0] !== 0 || movement[1] !== 0))
           [scene.autoX, scene.autoY] = movement;
+        const intentToken = wasOn !== (this.on === true)
+          ? globalThis.GSTIntentAuthority?.farmChanged?.(scene, this.on === true) : null;
         if (wasOn && this.on === false && settings.policyMode === "custom") {
           invalidateFarmGestures();
           globalThis.GSTCustomFarm?.setActivationIntent?.(scene, false);
@@ -215,7 +218,7 @@
           if (settings.policyMode === "custom") {
             if (freshIntent) globalThis.GSTCustomFarm?.setActivationIntent?.(scene, explicit);
           } else globalThis.GSTMeditation?.farmStarted?.(scene);
-          if (explicit) globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
+          if (explicit) globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, intentToken);
           owner.stopRequested = false;
         }
         return result;
@@ -249,7 +252,9 @@
     }
   }
   globalThis.GSTFarmActivation = Object.freeze({ sync: syncActivationTracking,
-    controllerDisposed(scene) { if (scene && sceneNow() === scene) invalidateFarmGestures(); } });
+    controllerDisposed(scene) { if (scene && sceneNow() === scene) {
+      globalThis.GSTIntentAuthority?.invalidate?.(); invalidateFarmGestures();
+    } } });
   function ensureCustomReady(scene) {
     try {
       if (!scene?.auto || globalThis.GSTFarmUpdate?.installGate?.(scene) !== true) return false;
@@ -1472,7 +1477,9 @@
           || settings.characterId !== (typeof data.accountCharacterId === "string" ? data.accountCharacterId : "")
           || settings.classId !== (typeof data.accountClassId === "string" ? data.accountClassId : "")
           || settings.identityVerified !== (data.identityVerified === true)
-          || identityBlocked !== (data.identityBlocked === true)) invalidateFarmGestures();
+          || identityBlocked !== (data.identityBlocked === true)) {
+        globalThis.GSTIntentAuthority?.invalidate?.(); invalidateFarmGestures();
+      }
       identityBlocked = data.identityBlocked === true;
       if (wasIdentityBlocked !== identityBlocked && activationLock) activationLock.stopRequested = false;
       settings = { policyMode: globalThis.GSTFarmPolicy?.normalize(data.policyMode) ?? "extended",

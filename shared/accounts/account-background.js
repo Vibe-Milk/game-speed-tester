@@ -249,6 +249,11 @@ async function launch(message, automaticTabId = null) {
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id) return;
+  if (message?.type === "gst:intent-tab") {
+    respond(Number.isInteger(sender.tab?.id) && sender.frameId === 0
+      && sender.url?.startsWith(origin + "/") ? { tabId: sender.tab.id, frameId: sender.frameId } : null);
+    return;
+  }
   if (message?.type === "gst:account-auto-login") {
     (async () => {
       const url = new URL(sender.url);

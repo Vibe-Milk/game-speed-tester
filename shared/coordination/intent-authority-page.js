@@ -5,6 +5,7 @@
   let identity = null, binding = null, nonce = "", sequence = 0, current = null;
   let disposed = false, proof = "", contextSession = "", contextRevision = -1;
   const clients = new Map();
+  let handshakeOrdinal = 0, handshakeBinding = null, applying = null;
   const sceneNow = () => window.game?.scene?.getScene?.("world")
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   function invalidate() {
@@ -12,7 +13,7 @@
       binding.scene.events?.off?.("shutdown", invalidate);
       binding.scene.events?.off?.("destroy", invalidate);
     }
-    binding = null; nonce = ""; proof = ""; identity = null; sequence = 0; current = null; clients.clear();
+    binding = null; nonce = ""; proof = ""; identity = null; sequence = 0; current = null; clients.clear(); handshakeOrdinal = 0; handshakeBinding = null;
     window.postMessage({ channel, type: "invalidated" }, origin);
   }
   // Issued only by the existing account snapshot path, before its asynchronous verification.
@@ -59,15 +60,21 @@
     const old = identity;
     if (old && JSON.stringify(old) !== JSON.stringify(next)) { invalidate(); return; }
     identity = { ...next };
-    live();
+    if (live()) window.postMessage({ channel, type: "ready", lifecycle: nonce,
+      session: contextSession, revision: contextRevision }, origin);
   }
-  function handshake(profileKey) {
+  function handshake(profileKey, lifecycle, ordinal) {
     if (!live()) return { ok: false, reason: "not_ready" };
-    if (profileKey !== identity.profileKey) return { ok: false, reason: "identity_mismatch" };
+    if (profileKey !== identity.profileKey || lifecycle !== nonce || !Number.isSafeInteger(ordinal)
+        || ordinal < handshakeOrdinal || ordinal < 1) return { ok: false, reason: "stale_handshake" };
+    if (ordinal === handshakeOrdinal) return handshakeBinding
+      ? { ok: true, binding: { ...handshakeBinding } } : { ok: false, reason: "stale_handshake" };
+    handshakeOrdinal = ordinal;
     if (clients.size >= maxClients) clients.delete(clients.keys().next().value);
     const client = crypto.randomUUID();
     clients.set(client, 0);
-    return { ok: true, binding: { lifecycle: nonce, client, profileKey: identity.profileKey } };
+    handshakeBinding = { lifecycle: nonce, client, profileKey: identity.profileKey };
+    return { ok: true, binding: { ...handshakeBinding } };
   }
   function reserve(requestBinding, ordinal, feature, enabled, profileKey) {
     if (!live()) return { ok: false, reason: "not_ready" };
@@ -78,10 +85,25 @@
       return { ok: false, reason: "stale_binding_or_request" };
     if (sequence >= Number.MAX_SAFE_INTEGER) return { ok: false, reason: "capacity" };
     clients.set(requestBinding.client, ordinal);
-    // Synchronous acceptance is the single page-local linearization point.
+    return issue(feature, enabled);
+  }
+  function issue(feature, enabled) {
+    if (sequence >= Number.MAX_SAFE_INTEGER) return { ok: false, reason: "capacity" };
     const token = { lifecycle: nonce, sequence: ++sequence, feature, enabled, profileKey: identity.profileKey };
     current = token;
+    window.postMessage({ channel, type: "reserved", token: { ...token } }, origin);
     return { ok: true, token: { ...token } };
+  }
+  function farmChanged(scene, enabled) {
+    // Harvest's native OFF is part of its existing intent, not a new Farm intent.
+    if (applying && validate(applying, applying.feature, applying.enabled, applying.profileKey)) return applying;
+    if (!live() || binding.scene !== scene) { invalidate(); return null; }
+    return issue("farm", enabled === true).token ?? null;
+  }
+  function withIntent(token, callback) {
+    if (!validate(token, token?.feature, token?.enabled, token?.profileKey)) return false;
+    const previous = applying; applying = token;
+    try { callback(); return true; } finally { applying = previous; }
   }
   function validate(token, feature, enabled, profileKey) {
     if (!live() || !current || !token || typeof token !== "object") return false;
@@ -91,7 +113,8 @@
       && token.enabled === current.enabled && token.profileKey === current.profileKey
       && token.profileKey === identity.profileKey;
   }
-  globalThis.GSTIntentAuthority = Object.freeze({ handshake, reserve, validate, invalidate, capture });
+  globalThis.GSTIntentAuthority = Object.freeze({ handshake, reserve, validate, invalidate, capture, farmChanged, withIntent,
+    hasIntent: () => !!current && live(), current: () => live() && current ? { ...current } : null });
   function onMessage(event) {
     if (event.source !== window || event.origin !== origin) return;
     const data = event.data;
@@ -102,7 +125,7 @@
         || typeof data.requestId !== "string") return;
     const currentContext = data.session === contextSession && data.revision === contextRevision;
     const result = !currentContext ? { ok: false, reason: "context_changed" }
-      : data.type === "handshake" ? handshake(data.profileKey)
+      : data.type === "handshake" ? handshake(data.profileKey, data.lifecycle, data.handshakeOrdinal)
       : data.type === "reserve" ? reserve(data.binding, data.ordinal, data.feature, data.enabled, data.profileKey)
       : { ok: validate(data.token, data.feature, data.enabled, data.profileKey), reason: "not_current" };
     // A remote validation is a snapshot only. Page action handlers must validate synchronously at application.

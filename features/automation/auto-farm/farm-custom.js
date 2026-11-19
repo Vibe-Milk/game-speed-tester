@@ -105,7 +105,7 @@
       && !scene.leaving && !!scene.self && finite(gameTime) && finite(scene.selfAt)
       && gameTime >= scene.selfAt && gameTime - scene.selfAt <= 3
       && !settings?.identityBlocked && settings?.identityVerified === true
-      && !!settings.accountProfileKey && !!settings.accountId && !!settings.characterId
+      && !!settings.accountProfileKey && (!!settings.accountId || !settings.slot) && !!settings.characterId
       && !!driver && !driver.closing && !driver.reconnecting && !driver.displaced
       && (driver.online === false || (typeof driver.link?.open === "function" && driver.link.open() === true));
   }
@@ -319,6 +319,8 @@
   }
   globalThis.GSTCustomFarm=Object.freeze({configure,update,states,state(scene){return sessions.get(scene)?.state??"OFF";},
     pauseOwnership,
+    movementOwned(scene){const s=sessions.get(scene);return !!s?.steer && scene.auto===s.auto
+      && scene.autoX===s.steer[0] && scene.autoY===s.steer[1];},
     status(scene){return sessions.get(scene)?.message??"Custom Farm chưa được cấu hình.";},
     stats(scene){const s=sessions.get(scene);return s?.statsEnabled&&s.stats?{...s.stats,xpPerMinute:null,potions:null}:null;},
     active(scene){const s=sessions.get(scene);return !!s&&s.settings.policyMode==="custom"&&scene.auto?.on===true&&s.authorized===true;},

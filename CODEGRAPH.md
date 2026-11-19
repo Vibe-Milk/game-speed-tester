@@ -254,26 +254,49 @@ Tự tìm/mở rương, lịch sử rương/cổng và đồng hồ/thông báo 
 
 `ui/popup/feature-sections.js` chuyển các nhóm Auto Quest và Kết nối sang thẻ thu gọn, đồng thời lưu trạng thái các thẻ của Quest, Kết nối và Giao diện trong khóa UI riêng `popupSectionOpen:v1:*`. `popup-search.js` mở thẻ tương ứng trước khi cuộn tới kết quả. Các control gốc và sở hữu cấu hình không đổi.
 
-## Intent authority infrastructure (not yet connected to Farm/Harvest actions)
+## Farm/Harvest intent ordering and request observation
 
-`shared/coordination/intent-authority-page.js` loads before the Farm dispatcher in MAIN;
-`intent-authority-content.js` loads after account profiles/content in ISOLATED.
-`GSTIntentAuthority.capture(scene, snapshot)` is called by the existing account status snapshot
-before asynchronous account verification. Its cloneable `intentStamp` travels through account-content
-and setContext listeners; the authority accepts verified identity only with its still-current stamp,
-never from delayed Farm configuration. Context session/revision bind bridge requests to accepted
-verification. A failed/stale stamp cannot recreate a retired lifecycle. Unverified context retires it.
-Account-switch stop, Farm gesture/controller lifecycle invalidation (including policy/identity
-transitions and same-scene Custom disposal), and the owned Custom auto setter invalidate authority.
-Snapshots additionally detect supported scene/auto/native identity changes; shutdown/destroy and
-pagehide/pageshow retire stamps. No arbitrary external A→B→A mutation invisible to these owners is
-intercepted. MAIN invalidation drains content pending work and client ordinals through the bridge.
+`shared/coordination/intent-authority-page.js` loads before the MAIN Farm dispatcher;
+`intent-authority-content.js` loads after ISOLATED account profiles/content. Account snapshot
+stamps (`GSTIntentAuthority.capture`) bind verified contexts to page/controller lifecycle.
+The page accepts context session/revision and sends `gst:intent-authority:v1` readiness;
+content acquires and caches a cloneable lifecycle/client binding before user operations.
+Handshake ordinals make duplicate delivery idempotent and reject older handshakes; reservation
+ordinals reject replay, with bounded clients and pending requests. Expired operations never
+silently obtain a fresh binding. Repeated identical verified configuration preserves the binding.
 
-Candidate APIs: page `handshake(profileKey)`, `reserve(binding, ordinal, feature, enabled, profileKey)`,
-`validate(token, feature, enabled, profileKey)`, `capture`, `invalidate`; content `handshake(identity)`,
-`reserve(binding, feature, enabled, identity)`, `validate(token, feature, enabled, identity)`.
-Reservation sequence allocation is the page-local ordering point. Tokens/bindings cross structured
-cloning by scalar fields; scene/controller objects remain private. Remote validation is only a snapshot.
-Receiving-tab verification and duplicate handshake handling remain pending; feature-origin wiring,
-stale completion/causal OFF application, outstanding Harvest observations and movement release are
-not implemented by this infrastructure. Source review is not runtime verification.
+Popup `harvest-popup.js` sends `gst:intent-begin` at the enabled checkbox action, before its
+preference queue; the Harvest shortcut calls `GSTIntentBridge.begin` before updateFeature.
+Page reservation allocation is the ordering point. Tokens are carried unchanged through
+storage completion and configuration. Content checks its ordered token mirror and page apply
+validates synchronously. `farm-page.js` observes native toggle results in all supported modes,
+records Farm ON/OFF through `farmChanged`, and coordinates exclusion OFF even if Harvest was
+already OFF. `withIntent` keeps the native Farm OFF caused by Harvest under the original Harvest
+intent instead of minting a competing Farm intent. Ordinary OFF never enables the other feature.
+Controller/mode/identity disposal invalidates lifecycle; a normal toggle retires input gestures
+without retiring the authority's newly accepted intent.
+
+The service worker handles read-only `gst:intent-tab` using sender.tab.id and sender.frameId;
+the content bridge verifies runtime targetTabId against this receiving tab and current account.
+No new permission is required. Popup `gst:intent-validate` is a remote snapshot, not final action
+authority. `gst:harvest-intent:v1` carries causal tokens for accepted Harvest state and automatic
+exclusion OFF; content rejects superseded messages before setting tab intent. A tokenless OFF
+is accepted only before any token is known, for startup safety. Configuration refreshes change
+options but preserve the applied ON/OFF state for an already bound identity; identity changes
+still apply the freshly verified tab profile. Redirect to timer mode after explicit ON waits
+until page acceptance and the tab intent write, so reload retains the accepted choice.
+
+Page APIs: `handshake`, `reserve`, `validate`, `capture`, `invalidate`, `farmChanged`, `withIntent`,
+`current`, `hasIntent`; content APIs: `begin`, `validate`, `isCurrent`, `current`, `targetMatches`.
+Scene/controller objects stay private; cross-world tokens contain scalar lifecycle/sequence/
+feature/state/profile fields. The supported lifecycle contract does not intercept arbitrary
+external defineProperty tampering or unobservable third-party replacement-and-restoration.
+
+Harvest observations of issued requests now retain their own scene and verified identity and
+bounded deadlines independently of controller attachment. detach releases control but leaves
+read-only observation until confirmation, context loss or expiry; account switching consults
+these live observations. A new native request for the same item is treated as ambiguous.
+No OFF operation is presented as server cancellation. Movement release checks current feature
+owners/manual movement as well as vector equality; Custom exposes `movementOwned(scene)`.
+Custom scene validation accepts verified legacy tabs without requiring a managed accountId,
+while slot-managed tabs still require their managed identity. Runtime remains unverified.

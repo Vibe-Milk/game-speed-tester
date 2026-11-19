@@ -39,18 +39,13 @@
     if (pendingObserver !== null) return;
     pendingObserver = setInterval(() => {
       const scene = binding?.scene;
-      if (!scene) { stopPendingObserver(); return; }
-      if (sceneNow() !== scene || !compatible(scene) || !identityMatches(scene)) {
-        stopPendingObserver();
-        detach();
-        return;
-      }
-      observeReleased(scene);
-      if (job?.observingOutstanding || (!settings.enabled && job?.requestedAt !== undefined))
+      for (const observed of new Set(observations.map((entry) => entry.scene))) observeReleased(observed);
+      if (scene && (sceneNow() !== scene || !compatible(scene) || !identityMatches(scene))) detach();
+      else if (scene && (job?.observingOutstanding || (!settings.enabled && job?.requestedAt !== undefined)))
         observeOutstandingRequest(scene, performance.now(), job?.observationCause ?? "harvest_disabled");
-      if (!job && !observations.some((observation) => observation.scene === scene)) {
+      if (!job && !observations.length) {
         stopPendingObserver();
-        if (!settings.enabled) detach();
+        if (!settings.enabled && binding) detach();
       }
     }, 250);
   }
@@ -58,11 +53,12 @@
     ? { x: job.node.x, y: job.node.y, path: job.path } : null;
   GSTHarvest.isEnabled = () => settings.enabled;
   function hasLiveObservations(scene = binding?.scene, now = performance.now()) {
-    if (scene && binding?.scene === scene && identityMatches(scene)) observeReleased(scene);
+    for (const observed of new Set(observations.map((entry) => entry.scene)))
+      if (!scene || observed === scene) observeReleased(observed);
     for (let i = observations.length - 1; i >= 0; i--) {
       const observation = observations[i];
       if (scene && observation.scene !== scene) continue;
-      if (scene && observation.scene === scene && !identityMatches(scene)) {
+      if (scene && observation.scene === scene && !identityMatches(scene, observation.identity)) {
         observation.row.followUp = "scene_observation_ended";
         observations.splice(i, 1);
       } else if (now >= observation.until) {
@@ -121,11 +117,11 @@
   function observeReleased(scene) {
     for (let i = observations.length - 1; i >= 0; i--) {
       const observation = observations[i], row = observation.row;
-      if (!recentAttempts.includes(row)) { observations.splice(i, 1); continue; }
-      if (binding?.scene !== observation.scene) {
+      if (observation.scene !== scene) continue;
+      if (sceneNow() !== scene || !scene?.sys?.isActive?.() || !identityMatches(scene, observation.identity)) {
         row.followUp = "scene_observation_ended"; observations.splice(i, 1); continue;
       }
-      if (job?.requestedAt !== undefined && job.node.item === row.item) {
+      if (binding?.scene === scene && job?.requestedAt !== undefined && job.node.item === row.item) {
         row.followUp = "ambiguous_new_attempt"; observations.splice(i, 1); continue;
       }
       // Do not attach a later native harvest on this node to an already-released request.
@@ -262,7 +258,13 @@
     if (!owner) return;
     if (owner.navigation) GSTNavigation.cancel(scene, owner.navigation);
     owner.navigation = null; owner.path = [];
-    if (owner.steer && scene.autoX === owner.steer[0] && scene.autoY === owner.steer[1]) {
+    const foreignOwner = [globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense, globalThis.GSTMapTravel,
+      globalThis.GSTQuest, globalThis.GSTFarmSeals, globalThis.GSTRealm, globalThis.GSTChest,
+      globalThis.GSTFarmMap, globalThis.GSTFarmBehavior, globalThis.GSTCustomFarm]
+      .some((feature) => { try { return feature?.movementOwned?.(scene) === true || feature?.controls?.(scene) === true; }
+        catch { return true; } });
+    if (!foreignOwner && !manualMovement(scene) && !globalThis.GSTFarmInput?.movement?.(scene)
+        && owner.steer && scene.autoX === owner.steer[0] && scene.autoY === owner.steer[1]) {
       scene.autoX = 0; scene.autoY = 0;
     }
     owner.steer = null;
@@ -332,8 +334,7 @@
       const scene = binding?.scene;
       const requestSent = job.requestedAt !== undefined;
       if (scene?.harvesting && scene.harvestNode === job.index) job.acknowledged = true;
-      const hasObservationContext = requestSent && scene && scene.nodes?.[job.index] === job.node
-        && finite(job.inventoryBefore) && inventoryCount(scene, job.node.item) !== null;
+      const hasObservationContext = requestSent && scene && accountIdentity?.verified === true;
       const result = code === "harvest_success" ? "success" : requestSent ? "unconfirmed"
         : failedCodes.has(code) ? "failed" : unconfirmedCodes.has(code) ? "unconfirmed" : "canceled";
       if (result === "success") totals.success++;
@@ -380,7 +381,9 @@
             : observationCause === "harvest_disabled" ? "watching_after_harvest_disabled"
               : "watching_after_auto_farm_activated"
           : "watching_after_request_yield";
-        observations.push({ row, node: job.node, scene, until: performance.now() + 8000 });
+        observations.push({ row, node: job.node, scene, identity: { ...accountIdentity },
+          until: Math.min(performance.now() + 8000, job.requestedAt + harvestOwnershipTimeoutMs + 8000) });
+        observePendingUntilSettled();
       }
       if (recentAttempts.length > 10) recentAttempts.shift();
     }
@@ -395,14 +398,13 @@
     if (reason) message = reason;
   }
   function detach() {
-    stopPendingObserver();
     globalThis.GSTHarvestVisual?.configure(null, false);
     release(undefined, 0, "detach");
     window.removeEventListener("keydown", onKey, true);
     const old = binding;
-    for (const observation of observations) observation.row.followUp = "scene_observation_ended";
-    observations.length = 0;
     binding = null;
+    if (observations.length) observePendingUntilSettled();
+    else stopPendingObserver();
     if (!old) return;
     old.scene.events.off("preupdate", onFrame);
     old.scene.events.off("shutdown", onShutdown);
@@ -865,7 +867,8 @@
       available: names.size > 0, mapAvailable,
       catalog: [...names].slice(0, 200).map((name) => ({ name, inMap: here.has(name), kind: types.get(name) === 2 ? "ore" : types.get(name) === 3 ? "both" : "plant" })) }, origin);
   }
-  function applyPreferences(value, { explicitIntent = false, profileIdentity = accountIdentity } = {}) {
+  function applyPreferences(value, { explicitIntent = false, profileIdentity = accountIdentity, intentToken = null, configurationRefresh = false } = {}) {
+    if (explicitIntent && !globalThis.GSTIntentAuthority?.validate?.(intentToken, "harvest", value?.enabled === true, profileIdentity?.profileKey)) return false;
     const previous = settings;
     const next = GSTHarvest.normalize(value);
     const oldIdentity = accountIdentity;
@@ -882,24 +885,31 @@
     }
     accountIdentity = nextIdentity;
     const scene = binding?.scene ?? sceneNow();
+    // Configuration refreshes carry options, not a new ON/OFF instruction.
+    if (configurationRefresh && !explicitIntent && JSON.stringify(oldIdentity) === JSON.stringify(nextIdentity))
+      next.enabled = previous.enabled;
     const permissionRevokedWhileBothOn = previous.allowFarm && !next.allowFarm
       && next.enabled && scene?.auto?.on === true && identityMatches(scene, nextIdentity);
     if (permissionRevokedWhileBothOn) {
       next.enabled = false;
       window.postMessage({ channel: "gst:harvest-intent:v1", enabled: false,
-        profileKey: nextIdentity.profileKey, characterId: nextIdentity.characterId }, origin);
+        profileKey: nextIdentity.profileKey, characterId: nextIdentity.characterId,
+        intentToken: globalThis.GSTIntentAuthority?.current?.() }, origin);
     }
     const changed = JSON.stringify(next) !== JSON.stringify(settings);
     const behaviorChanged = JSON.stringify({ ...next, showTargetLine: false }) !== JSON.stringify({ ...settings, showTargetLine: false });
     settings = next;
     globalThis.GSTFarmActivation?.sync?.();
-    if (explicitIntent && !previous.enabled && settings.enabled && settings.allowFarm !== true
+    if (explicitIntent && settings.enabled && settings.allowFarm !== true
         && scene?.auto?.on === true && identityMatches(scene)) {
       try {
         globalThis.GSTFarmSession?.forget?.(scene);
-        if (scene.auto.on && typeof scene.toggleAutoFarm === "function") scene.toggleAutoFarm();
+        if (scene.auto.on && typeof scene.toggleAutoFarm === "function")
+          globalThis.GSTIntentAuthority.withIntent(intentToken, () => scene.toggleAutoFarm());
       } catch { /* The native toggle path remains authoritative. */ }
     }
+    if (explicitIntent) window.postMessage({ channel: "gst:harvest-intent:v1", enabled: settings.enabled,
+      profileKey: accountIdentity.profileKey, characterId: accountIdentity.characterId, intentToken }, origin);
     window.__gstHarvestAppliedEnabled = settings.enabled;
     globalThis.GSTFeatureToast?.setHarvestApplied?.(settings.enabled);
     publishBackgroundDemand();
@@ -948,12 +958,12 @@
     }
     safeSince = null;
   }
-  GSTHarvest.coordinateFarmEnable = (scene) => {
-    if (!scene || sceneNow() !== scene || !identityMatches(scene)
-        || settings.allowFarm === true || !settings.enabled) return;
-    applyPreferences({ ...settings, enabled: false });
+  GSTHarvest.coordinateFarmEnable = (scene, intentToken = globalThis.GSTIntentAuthority?.current?.()) => {
+    if (!scene || sceneNow() !== scene || !identityMatches(scene) || settings.allowFarm === true) return;
+    if (settings.enabled) applyPreferences({ ...settings, enabled: false }, { intentToken });
+    // Even when already OFF, invalidate pending Harvest enables and synchronize tab intent.
     window.postMessage({ channel: "gst:harvest-intent:v1", enabled: false,
-      profileKey: accountIdentity.profileKey, characterId: accountIdentity.characterId }, origin);
+      profileKey: accountIdentity.profileKey, characterId: accountIdentity.characterId, intentToken }, origin);
   };
   GSTHarvest.needsFarmCoordination = () => settings.enabled === true && settings.allowFarm !== true;
   window.addEventListener("message", (event) => {
@@ -977,7 +987,7 @@
         // A synchronized read applies the stored intent before reporting state
         // in this same handler; ordinary overlay status requests remain read-only.
         if (event.data.type === "synchronize") applyPreferences(event.data.preferences,
-          { profileIdentity: event.data.profileIdentity });
+          { profileIdentity: event.data.profileIdentity, configurationRefresh: true });
         status(event.data.requestId);
       } catch {
         window.postMessage({ channel: "gst:harvest-status:v1", requestId: event.data.requestId,
@@ -988,7 +998,7 @@
     }
     if (event.data.type !== "configure") return;
     applyPreferences(event.data.preferences, { explicitIntent: event.data.explicitIntent === true,
-      profileIdentity: event.data.profileIdentity });
+      profileIdentity: event.data.profileIdentity, intentToken: event.data.intentToken, configurationRefresh: true });
     window.postMessage({ channel: "gst:harvest-status:v1", type: "configured", requestId: event.data.requestId,
       enabled: settings.enabled, configKey: JSON.stringify(settings) }, origin);
   });

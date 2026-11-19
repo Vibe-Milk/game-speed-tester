@@ -208,6 +208,12 @@
       updateMessage();
       return Promise.resolve(false);
     }
+    const intentTabId = harvestAccountSession?.tabId?.() ?? expectedContext?.tabId;
+    const intentReservation = field === "enabled" && expectedContext?.verified && Number.isInteger(intentTabId)
+      ? chrome.tabs.sendMessage(intentTabId, { type: "gst:intent-begin", feature: "harvest", enabled: activeEnabled,
+          targetTabId: intentTabId, profileIdentity: GSTAccountProfiles.identity(expectedContext),
+          lifecycle: expectedContext.intentStamp?.lifecycle }).catch(() => ({ ok: false }))
+      : Promise.resolve(null);
     userEditRevision++;
     preferenceReadRevision++;
     pending.push(action); derivePreferences(); renderList();
@@ -221,12 +227,23 @@
           || (harvestProfileBindingRequired && binding.context?.verified !== true))
         throw new Error("Account identity changed or is not confirmed.");
       const context = binding.context;
+      const reservation = await intentReservation;
+      if (field === "enabled" && context?.verified && !reservation?.ok)
+        throw new Error("Intent authority not ready or superseded.");
+      const intentToken = reservation?.token ?? null;
+      const intentCurrent = async () => {
+        if (!intentToken) return true;
+        const result = await chrome.tabs.sendMessage(binding.tabId, { type: "gst:intent-validate", token: intentToken,
+          feature: "harvest", enabled: activeEnabled, targetTabId: binding.tabId,
+          profileIdentity: GSTAccountProfiles.identity(context) });
+        return result?.ok === true;
+      };
       const stored = await GSTAccountProfiles.updateFeature(context, "harvest",
         (saved) => action(GSTHarvest.normalize(saved)), async () => {
           const latest = harvestAccountSession
             ? await harvestAccountSession.validate(expectedContext, expectedVersion)
             : { valid: harvestAccountContext === expectedContext };
-          return latest.valid && (!harvestProfileBindingRequired || latest.context?.verified === true);
+          return latest.valid && (!harvestProfileBindingRequired || latest.context?.verified === true) && await intentCurrent();
         });
       const applied = GSTHarvest.normalize({ ...stored, enabled: activeEnabled });
       let resultMessage = "Đã lưu cài đặt trên máy.";
@@ -238,7 +255,7 @@
         if (!context?.verified || !Number.isInteger(binding.tabId)) throw new Error("Verified tab unavailable.");
         const result = await chrome.tabs.sendMessage(binding.tabId, { type: "gst:harvest-configure",
           preferences: applied, targetTabId: binding.tabId,
-          profileIdentity: GSTAccountProfiles.identity(context), explicitIntent: field === "enabled" });
+          profileIdentity: GSTAccountProfiles.identity(context), explicitIntent: field === "enabled", intentToken });
         if (result?.navigating) resultMessage = "Đã lưu; game đang tải lại để áp dụng.";
         else if (result?.accepted && result.applied) resultMessage = "Đã lưu và game xác nhận áp dụng.";
         else resultMessage = "Đã lưu; game chưa xác nhận áp dụng.";

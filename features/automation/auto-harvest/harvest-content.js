@@ -32,19 +32,20 @@
     }
     const expectedIdentity = GSTAccountProfiles.identity(context);
     const nextEnabled = !(GSTAccountProfiles.tabIntent(context, "harvest") ?? false);
-    GSTAccountProfiles.updateFeature(context, "harvest", () => ({ enabled: nextEnabled }), () => {
+    void (async () => {
+      const reservation = await globalThis.GSTIntentBridge?.begin("harvest", nextEnabled, expectedIdentity);
+      const token = reservation?.token;
+      if (!reservation?.ok || !globalThis.GSTIntentBridge.isCurrent(token)) return;
+      await GSTAccountProfiles.updateFeature(context, "harvest", () => ({ enabled: nextEnabled }), () => {
+        const latest = GSTAccountProfiles.context();
+        return globalThis.GSTIntentBridge.isCurrent(token) && latest.ready && latest.context?.verified === true
+          && GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId);
+      });
       const latest = GSTAccountProfiles.context();
-      return latest.ready && latest.context?.verified === true
-        && GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId);
-    }).then(() => {
-      const latest = GSTAccountProfiles.context();
-      if (latest.ready && latest.context?.verified === true
-          && GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId)
-          && GSTAccountProfiles.setTabIntent(latest.context, "harvest", nextEnabled)) {
-        preferences = { ...(preferences ?? {}), enabled: nextEnabled };
-        configure(preferences, null, true);
-      }
-    }).catch((error) => { failure("shortcut.toggle", error); }).finally(() => { shortcutBusy = false; });
+      if (!latest.ready || !GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId)
+          || !globalThis.GSTIntentBridge.isCurrent(token)) return;
+      configure({ ...(preferences ?? {}), enabled: nextEnabled }, null, true, token);
+    })().catch((error) => { failure("shortcut.toggle", error); }).finally(() => { shortcutBusy = false; });
   }, true);
   let debugEnabled = false;
   const debugRows = [];
@@ -108,7 +109,7 @@
     if (debugEnabled) record("debug.enabled", moduleState());
     else { debugRows.length = 0; lastFailure = null; mainSnapshot = null; }
   }
-  function configure(value, respond, explicitIntent = false) {
+  function configure(value, respond, explicitIntent = false, intentToken = null) {
     const next = GSTHarvest.normalize(value);
     const state = GSTAccountProfiles.context();
     if (!explicitIntent) next.enabled = accountProfileVerified && state.context?.verified === true
@@ -117,7 +118,7 @@
     preferences = next;
     record("configure", { enabled: preferences.enabled, helper: typeof globalThis.GSTHarvest?.normalize });
     const url = new URL(location.href);
-    if (preferences.enabled && !url.searchParams.has("timer")) {
+    if (!explicitIntent && preferences.enabled && !url.searchParams.has("timer")) {
       if (!navigating) {
         navigating = true;
         url.search += `${url.search ? "&" : "?"}timer`;
@@ -138,7 +139,7 @@
     const profileIdentity = accountProfileVerified && state.context?.verified === true
       ? { ...GSTAccountProfiles.identity(state.context), verified: true } : null;
     window.postMessage({ channel: "gst:harvest:v1", type: "configure", preferences, requestId,
-      explicitIntent, profileIdentity }, origin);
+      explicitIntent, intentToken, profileIdentity }, origin);
   }
   function repair(data) {
     if (!preferences || navigating || data.type === "configured" || typeof data.configKey !== "string") return false;
@@ -192,10 +193,17 @@
     if (event.source === window && event.origin === origin && event.data?.channel === "gst:harvest-intent:v1"
         && typeof event.data.enabled === "boolean") {
       const state = GSTAccountProfiles.context();
+      const ordered = globalThis.GSTIntentBridge?.isCurrent(event.data.intentToken)
+        || (!event.data.intentToken && event.data.enabled === false && !globalThis.GSTIntentBridge?.current?.());
       if (accountProfileVerified && state.context?.verified === true
-          && state.context.profileKey === event.data.profileKey
-          && state.context.characterId === event.data.characterId)
-        GSTAccountProfiles.setTabIntent(state.context, "harvest", event.data.enabled);
+          && state.context.profileKey === event.data.profileKey && state.context.characterId === event.data.characterId
+          && ordered && GSTAccountProfiles.setTabIntent(state.context, "harvest", event.data.enabled)) {
+        preferences = { ...(preferences ?? {}), enabled: event.data.enabled };
+        if (event.data.enabled && !new URL(location.href).searchParams.has("timer") && !navigating) {
+          navigating = true;
+          const url = new URL(location.href); url.searchParams.set("timer", ""); location.replace(url.href);
+        }
+      }
       return;
     }
     if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:harvest-status:v1") return;
@@ -335,19 +343,21 @@
       const context = GSTAccountProfiles.context();
       if (!accountProfileReady || !accountProfileVerified
           || !Number.isInteger(message.targetTabId)
-          || message.profileIdentity?.tabId !== message.targetTabId
+          || !globalThis.GSTIntentBridge?.targetMatches(message.targetTabId, message.profileIdentity)
           || !GSTAccountProfiles.matchesIdentity(context.context, message.profileIdentity, message.targetTabId)) {
         respond({ accepted: false, applied: false, reason: "account_identity_mismatch" });
         return;
       }
       revision++;
       try {
-        if (message.explicitIntent === true && typeof message.preferences?.enabled === "boolean")
-          GSTAccountProfiles.setTabIntent(context.context, "harvest", message.preferences.enabled);
+        if (message.explicitIntent === true && (!globalThis.GSTIntentBridge.isCurrent(message.intentToken)
+            || message.intentToken?.feature !== "harvest" || message.intentToken.enabled !== message.preferences?.enabled)) {
+          respond({ accepted: false, applied: false, reason: "superseded" }); return;
+        }
         const activeIntent = GSTAccountProfiles.tabIntent(context.context, "harvest") ?? false;
         configure({ ...message.preferences,
           enabled: message.explicitIntent === true ? message.preferences.enabled === true : activeIntent },
-        respond, message.explicitIntent === true);
+        respond, message.explicitIntent === true, message.intentToken);
       }
       catch (error) {
         failure("runtime.configure", error);
