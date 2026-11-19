@@ -178,6 +178,7 @@
         ? slot + ":" + snapshot.character + ":" + snapshot.characterId + ":" + snapshot.classId
         : "unverified:" + slot + ":" + reason;
       const context = {
+        intentStamp: snapshot?.intentStamp ?? null,
         verified, profileKey: key, slot, launchAttemptId: attemptId, defaultLoginEligible,
         character: verified ? snapshot.character : "",
         classId: verified ? snapshot.classId : "", characterId: verified ? snapshot.characterId : "",

@@ -253,3 +253,27 @@ Tự tìm/mở rương, lịch sử rương/cổng và đồng hồ/thông báo 
 `ui/popup/harvest-layout.js` nạp sau các popup feature, di chuyển control Thu hoạch hiện có sang bốn nhóm mà vẫn giữ ID/listener và ranh giới fieldset. Trạng thái mở/thu gọn lưu riêng theo ID trong `chrome.storage.local` (`harvestSectionOpen:v1:*`), độc lập với cấu hình gameplay. `ui/popup/popup-search.js` mở nhóm Thu hoạch tương ứng trước khi cuộn tới kết quả.
 
 `ui/popup/feature-sections.js` chuyển các nhóm Auto Quest và Kết nối sang thẻ thu gọn, đồng thời lưu trạng thái các thẻ của Quest, Kết nối và Giao diện trong khóa UI riêng `popupSectionOpen:v1:*`. `popup-search.js` mở thẻ tương ứng trước khi cuộn tới kết quả. Các control gốc và sở hữu cấu hình không đổi.
+
+## Intent authority infrastructure (not yet connected to Farm/Harvest actions)
+
+`shared/coordination/intent-authority-page.js` loads before the Farm dispatcher in MAIN;
+`intent-authority-content.js` loads after account profiles/content in ISOLATED.
+`GSTIntentAuthority.capture(scene, snapshot)` is called by the existing account status snapshot
+before asynchronous account verification. Its cloneable `intentStamp` travels through account-content
+and setContext listeners; the authority accepts verified identity only with its still-current stamp,
+never from delayed Farm configuration. Context session/revision bind bridge requests to accepted
+verification. A failed/stale stamp cannot recreate a retired lifecycle. Unverified context retires it.
+Account-switch stop, Farm gesture/controller lifecycle invalidation (including policy/identity
+transitions and same-scene Custom disposal), and the owned Custom auto setter invalidate authority.
+Snapshots additionally detect supported scene/auto/native identity changes; shutdown/destroy and
+pagehide/pageshow retire stamps. No arbitrary external A→B→A mutation invisible to these owners is
+intercepted. MAIN invalidation drains content pending work and client ordinals through the bridge.
+
+Candidate APIs: page `handshake(profileKey)`, `reserve(binding, ordinal, feature, enabled, profileKey)`,
+`validate(token, feature, enabled, profileKey)`, `capture`, `invalidate`; content `handshake(identity)`,
+`reserve(binding, feature, enabled, identity)`, `validate(token, feature, enabled, identity)`.
+Reservation sequence allocation is the page-local ordering point. Tokens/bindings cross structured
+cloning by scalar fields; scene/controller objects remain private. Remote validation is only a snapshot.
+Receiving-tab verification and duplicate handshake handling remain pending; feature-origin wiring,
+stale completion/causal OFF application, outstanding Harvest observations and movement release are
+not implemented by this infrastructure. Source review is not runtime verification.

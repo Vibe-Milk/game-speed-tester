@@ -29,7 +29,7 @@
   let lastTrustedInputAt = -Infinity;
   let gestureGeneration = 0, generationAt = 0, shortcutIntent = null;
   const farmGestures = new WeakMap();
-  function invalidateFarmGestures() { gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
+  function invalidateFarmGestures() { globalThis.GSTIntentAuthority?.invalidate?.(); gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
   function farmButton(target) { return target instanceof Element ? target.closest('[data-entry="auto"], [data-key="V"]') : null; }
   function rememberFarmGesture(event) {
     if (settings.policyMode !== "custom" || suspended || !event.isTrusted || document.hidden || event.repeat

@@ -66,6 +66,7 @@
         return gate.value;
       };
       gate.set = function (next) {
+        if (next !== gate.value) globalThis.GSTIntentAuthority?.invalidate?.();
         if (globalThis.GSTFarmPolicy?.isCustom?.() && next !== gate.value) {
           if (!secure(next)) {
             globalThis.GSTCustomFarm?.pauseOwnership?.(scene, "Custom Farm từ chối controller thay thế không tương thích.");

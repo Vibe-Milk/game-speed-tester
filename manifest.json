@@ -33,6 +33,7 @@
         "shared/diagnostics/background-diagnostics.js",
         "shared/diagnostics/movement-log-schema.js",
         "shared/diagnostics/movement-diagnostics.js",
+        "shared/coordination/intent-authority-page.js",
         "shared/coordination/farm-update.js",
         "features/automation/auto-potion/potion-page.js",
         "features/automation/auto-farm/farm-combat.js",
@@ -85,6 +86,7 @@
       "js": [
         "shared/accounts/account-profiles.js",
         "shared/accounts/account-content.js",
+        "shared/coordination/intent-authority-content.js",
         "ui/interface/feature-toasts.js",
         "features/automation/auto-harvest/harvest-options.js",
         "core/content.js",

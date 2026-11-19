@@ -21,7 +21,7 @@
     const scene = sceneNow(), profile = scene?.profile;
     const active = !!scene?.sys?.isActive?.() && connected(scene);
     const loginError = document.querySelector("#login .err");
-    return {
+    const result = {
       slot: new URLSearchParams(location.search).get("slot") ?? "",
       connected: active,
       character: active && typeof profile?.name === "string" ? profile.name.normalize("NFC") : "",
@@ -33,6 +33,8 @@
       offline: new URL(location.href).searchParams.get("online") === "0",
       launchUrl: location.origin === origin ? launchUrl() : ""
     };
+    result.intentStamp = globalThis.GSTIntentAuthority?.capture?.(scene, result) ?? null;
+    return result;
   }
   function openSettingsForLogout(data) {
     const scene = sceneNow();
@@ -54,6 +56,7 @@
     return { ready: true, settingsOpen: true };
   }
   async function stopForSwitch() {
+    globalThis.GSTIntentAuthority?.invalidate?.();
     const scene = sceneNow();
     const offline = new URL(location.href).searchParams.get("online") === "0";
     const loginVisible = !!document.querySelector("#login form")?.getClientRects?.().length;
