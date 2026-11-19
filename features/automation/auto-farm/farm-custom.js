@@ -5,14 +5,14 @@
   const sceneNow = () => window.game?.scene?.getScene?.("world") ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   function note(s, text) { s.message = text; }
-  function release(s) {
+  function release(s, keepLeg = false) {
     const {scene,auto} = s;
     const otherOwner = [globalThis.GSTHarvest,globalThis.GSTFarmBossSafety,globalThis.GSTFarmDefense,
       globalThis.GSTMapTravel,globalThis.GSTQuest,globalThis.GSTFarmSeals,globalThis.GSTRealm,globalThis.GSTChest]
       .some((owner)=>{try{return owner?.controls?.(scene)===true;}catch{return false;}});
     if (scene?.auto === auto && !otherOwner && s.steer && scene.autoX === s.steer[0] && scene.autoY === s.steer[1]) scene.autoX = scene.autoY = 0;
     s.steer = null; s.path=[];
-    try { globalThis.GSTNavigation?.cancel?.(scene,s); globalThis.GSTNavigation?.resetLeg?.(s); } catch {}
+    try { globalThis.GSTNavigation?.cancel?.(scene,s); if (!keepLeg) globalThis.GSTNavigation?.resetLeg?.(s); } catch {}
   }
   function transition(s, state, message) {
     if (!states.includes(state)) state = "WAITING_FOR_DATA";
@@ -133,7 +133,7 @@
   }
   function steerTo(s, host, goal, reach=1.2) {
     const scene=s.scene, settings=s.settings, now=scene.now?.();
-    if (!finite(goal?.x)||!finite(goal?.y)||!finite(now)||typeof host.clear!=="function"||typeof host.route!=="function") return false;
+    if (!finite(goal?.x)||!finite(goal?.y)||!finite(now)||typeof host?.clear!=="function"||typeof host?.route!=="function") { release(s); return false; }
     const allowed=(p)=> {
       if (!finite(p?.x)||!finite(p?.y)) return false;
       if (settings.searchScope === "map") {
@@ -142,16 +142,19 @@
       } else if (s.origin && Math.hypot(p.x-s.origin.x,p.y-s.origin.y)>settings.radius+0.25) return false;
       return globalThis.GSTFarmBossSafety?.allowsTarget?.(scene,p) !== false;
     };
-    if (!allowed(goal)) return false;
+    if (!allowed(goal)) { release(s); return false; }
     const point=globalThis.GSTNavigation?.leg?.(scene,s,host,goal.x,goal.y,allowed);
-    if (!point || !finite(point.x)||!finite(point.y)) { release(s); return false; }
-    if (globalThis.GSTFarmBossSafety?.allowsSegment?.(scene,{x:scene.px,y:scene.py},point) === false) {
-      globalThis.GSTNavigation?.resetLeg?.(s,true); return false;
-    }
-    const dx=point.x-scene.px,dy=point.y-scene.py,d=Math.hypot(dx,dy);
-    if (!finite(d)||d<0.15) { release(s); return Math.hypot(goal.x-scene.px,goal.y-scene.py)<=reach; }
+    if (!point || !finite(point.x)||!finite(point.y)) { release(s,true); return false; }
+    const step=globalThis.GSTNavigation?.customStep?.(scene,s,host,now,point.x,point.y,
+      Math.hypot(point.x-goal.x,point.y-goal.y)<0.01?reach:0.25,allowed);
+    if (!step || step.arrived) { release(s,!step); return !!step?.arrived && Math.hypot(goal.x-scene.px,goal.y-scene.py)<=reach; }
+    const dx=step.point[0]-scene.px,dy=step.point[1]-scene.py,d=Math.hypot(dx,dy);
+    if (!finite(d)||d<0.05) { release(s); return false; }
+    if (globalThis.GSTFarmBossSafety?.allowsSegment?.(scene,{x:scene.px,y:scene.py},
+        {x:step.point[0],y:step.point[1]}) === false) { release(s); return false; }
     const x=dx/d,y=dy/d;
-    scene.autoX=x; scene.autoY=y; s.steer=[x,y]; s.legGoal={...goal}; s.path=[[point.x,point.y]]; globalThis.GSTNavigation?.schedule?.(scene,s,goal.x,goal.y,reach);
+    scene.autoX=x; scene.autoY=y; s.steer=[x,y]; s.legGoal={...goal}; globalThis.GSTNavigation?.schedule?.(scene,s,point.x,point.y,
+      Math.hypot(point.x-goal.x,point.y-goal.y)<0.01?reach:0.25);
     if (!s.lastPos || Math.hypot(scene.px-s.lastPos.x,scene.py-s.lastPos.y)>=0.5) {
       s.lastPos={x:scene.px,y:scene.py}; s.progressAt=performance.now();
     }

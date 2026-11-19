@@ -1,7 +1,54 @@
 (() => {
   "use strict";
   const previous = new WeakMap(), progress = new WeakMap(), finite = Number.isFinite;
-  const movers = new Map();
+  const movers = new Map(), customRoutes = new WeakMap(), customVectors = new WeakMap();
+  const validPoint = (p) => Array.isArray(p) && p.length === 2 && p.every(finite);
+  // Route points come from the game collision query; never steer across a
+  // segment unless the same collision-clear contract currently permits it.
+  function customStep(scene, nav, host, time, gx, gy, reach, allowed = () => true) {
+    const x = scene?.px, y = scene?.py;
+    if (!nav || ![x, y, time, gx, gy, reach].every(finite) || reach < 0
+        || typeof host?.clear !== "function" || typeof host?.route !== "function") return null;
+    const clear = (px, py) => {
+      try { return host.clear(x, y, px, py) === true; } catch { return false; }
+    };
+    if (Math.hypot(gx - x, gy - y) <= reach) {
+      customRoutes.delete(nav); nav.path = []; return { arrived: true };
+    }
+    if (clear(gx, gy) && allowed({ x: gx, y: gy })) {
+      customRoutes.delete(nav); nav.path = [[gx, gy]];
+      return { point: nav.path[0] };
+    }
+    let route = customRoutes.get(nav);
+    if (!route || route.gx !== gx || route.gy !== gy || route.fix !== scene.self?.fix || time < route.at) {
+      const retryAt = route && time >= route.at ? route.retryAt : -Infinity;
+      route = { gx, gy, fix: scene.self?.fix, at: -Infinity, retryAt, path: [] };
+      customRoutes.set(nav, route);
+    }
+    while (route.path.length && Math.hypot(route.path[0][0] - x, route.path[0][1] - y) < 0.25) route.path.shift();
+    if (route.path.length && (!allowed({ x: route.path[0][0], y: route.path[0][1] })
+        || !clear(route.path[0][0], route.path[0][1]))) route.path = [];
+    if ((!route.path.length || time - route.at >= 2) && time >= route.retryAt) {
+      route.at = time; route.retryAt = time + 0.9;
+      let found = null;
+      try { found = host.route(x, y, gx, gy); } catch {}
+      route.path = Array.isArray(found) && found.length && found.every((p) => validPoint(p)
+        && allowed({ x: p[0], y: p[1] })) ? found.map((p) => [...p]) : [];
+      while (route.path.length && Math.hypot(route.path[0][0] - x, route.path[0][1] - y) < 0.25) route.path.shift();
+    }
+    const point = route.path[0];
+    if (!point || !clear(point[0], point[1])) { route.path = []; nav.path = []; return null; }
+    nav.path = route.path;
+    return { point };
+  }
+  function stopCustom(scene, nav) {
+    const vector = customVectors.get(nav);
+    if (vector && scene.autoX === vector[0] && scene.autoY === vector[1] && !GSTFarmInput.movement(scene))
+      scene.autoX = scene.autoY = 0;
+    customVectors.delete(nav);
+    const entry = movers.get(scene);
+    if (entry?.intent?.nav === nav) entry.intent = null;
+  }
   function detach(scene) {
     const entry = movers.get(scene); if (!entry) return;
     entry.intent = null;
@@ -169,10 +216,11 @@
     owner.checkpointRetryAt = -Infinity;
   }
   globalThis.GSTNavigation = {
-    schedule, leg, resetLeg,
+    schedule, leg, resetLeg, customStep,
     cancel(scene, nav) {
       const entry = movers.get(scene);
       if (entry?.intent?.nav === nav) entry.intent = null;
+      customVectors.delete(nav);
     },
     progressed(scene, owner, path, gx, gy, threshold = 0.5) {
       const x = scene.px, y = scene.py, fix = scene.self?.fix;
@@ -200,15 +248,16 @@
     },
     walk(scene, nav, host, time, x, y, gx, gy, reach) {
       if (globalThis.GSTFarmPolicy?.isCustom?.()) {
-        if (!scene || GSTFarmInput.movement(scene)) return false;
-        const point = leg(scene, nav, host, gx, gy);
-        if (!point) { nav.path = []; return false; }
-        const dx = point.x - scene.px, dy = point.y - scene.py, d = Math.hypot(dx, dy);
-        if (!finite(d) || d < 0.05) return false;
+        if (!scene || !nav) return false;
+        if (GSTFarmInput.movement(scene)) { customVectors.delete(nav); return false; }
+        const step = customStep(scene, nav, host, time, gx, gy, reach);
+        if (!step || step.arrived) { stopCustom(scene, nav); return !!step?.arrived; }
+        const dx = step.point[0] - scene.px, dy = step.point[1] - scene.py, d = Math.hypot(dx, dy);
+        if (!finite(d) || d < 0.05) { stopCustom(scene, nav); return false; }
         scene.autoX = dx / d; scene.autoY = dy / d;
-        nav.path = [[point.x, point.y]];
+        customVectors.set(nav, [scene.autoX, scene.autoY]);
         schedule(scene, nav, gx, gy, reach);
-        previous.set(nav, { x: scene.px, y: scene.py, fix: scene.self?.fix, path: nav.path });
+        previous.set(nav, { x: scene.px, y: scene.py, fix: scene.self?.fix, path: nav.path, goal: [gx, gy] });
         return true;
       }
       if (nav === scene.auto) return scene.auto.walk.call(nav, host, time, x, y, gx, gy, reach);
@@ -220,10 +269,11 @@
       return result;
     },
     arrived(scene, nav, host, gx, gy, reach) {
+      if (!scene || !nav || ![scene.px, scene.py, gx, gy, reach].every(finite) || reach < 0) return false;
       if (Math.hypot(scene.px - gx, scene.py - gy) <= reach) return true;
       const old = previous.get(nav);
-      return !!old && old.goal[0] === gx && old.goal[1] === gy && crossed(scene, nav, [gx, gy], reach)
-        && typeof host.clear === "function" && host.clear(scene.px, scene.py, gx, gy);
+      return !!old && validPoint(old.goal) && old.goal[0] === gx && old.goal[1] === gy && crossed(scene, nav, [gx, gy], reach)
+        && typeof host?.clear === "function" && host.clear(scene.px, scene.py, gx, gy);
     },
     prune
   };
