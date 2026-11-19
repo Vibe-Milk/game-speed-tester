@@ -67,7 +67,7 @@
     }
     if (!s) {
       s = { scene, auto:scene.auto, identity:nextIdentity, settings:{}, removeUpdate:null, state:"OFF", stateAt:performance.now(),
-        authorized:activation.get(scene) === true, origin:null, targetId:null, targetSince:0, legGoal:null, path:[], lastPos:null, progressAt:performance.now(), unreachable:new Map(),
+        authorized:!!activation.get(scene), origin:null, targetId:null, targetSince:0, legGoal:null, path:[], lastPos:null, progressAt:performance.now(), unreachable:new Map(),
         pending:null, attempts:new Map(), lootSkips:new Map(), lootAttempts:new Map(), countedDeaths:new Set(), steer:null, removeInput:null, manualUntil:0, lastDecision:-Infinity,
         lastAction:-Infinity, lastDeath:false, statsEnabled:false, stats:null, fault:"", message:"Custom Farm đang tắt." };
       if (settings.policyMode === "custom") {
@@ -322,9 +322,11 @@
     status(scene){return sessions.get(scene)?.message??"Custom Farm chưa được cấu hình.";},
     stats(scene){const s=sessions.get(scene);return s?.statsEnabled&&s.stats?{...s.stats,xpPerMinute:null,potions:null}:null;},
     active(scene){const s=sessions.get(scene);return !!s&&s.settings.policyMode==="custom"&&scene.auto?.on===true&&s.authorized===true;},
-    setActivationIntent(scene,enabled){activation.set(scene,enabled===true);const s=sessions.get(scene);if(s)s.authorized=enabled===true;},
+    setActivationIntent(scene,enabled){const token=enabled===true?{}:false;activation.set(scene,token);const s=sessions.get(scene);if(s)s.authorized=!!token;return token;},
+    ownsActivationIntent(scene,token){return !!token && activation.get(scene)===token;},
+    revokeActivationIntent(scene,token){if(this.ownsActivationIntent(scene,token))this.setActivationIntent(scene,false);},
     compatible(scene){const s=sessions.get(scene);return !!s&&!!s.removeUpdate&&globalThis.GSTFarmUpdate.gateReady(scene)&&globalThis.GSTFarmUpdate.attached(scene);},
-    authorized(scene){return activation.get(scene)===true&&this.compatible(scene);},
+    authorized(scene){return !!activation.get(scene)&&this.compatible(scene);},
     stop(scene){if(!scene)return;const s=sessions.get(scene);activation.set(scene,false);if(!s)return;s.authorized=false;s.fault="";release(s);transition(s,"OFF","Custom Farm đang tắt.");saveStats(s);},
     reset(scene){cleanup(scene);},});
 })();

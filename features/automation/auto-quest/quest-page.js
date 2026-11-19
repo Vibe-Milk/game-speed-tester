@@ -439,10 +439,22 @@
           if (s.auto.on) { stop("Auto Farm bị bật ngoài lượt quest; đã dừng để tránh xung đột."); return false; }
           run.phase = "farm";
           GSTFarmQuest.prepare(s);
-          if (globalThis.GSTFarmPolicy?.isCustom?.()) globalThis.GSTCustomFarm?.setActivationIntent?.(s,true);
-          s.toggleAutoFarm();
-          if (!s.auto.on) { stop("Chưa bật được Auto Farm gốc; kiểm tra điều kiện trong game."); return false; }
-          run.ownedAuto = true;
+          const attemptRun = run, attemptAuto = s.auto;
+          const custom = globalThis.GSTFarmPolicy?.isCustom?.() === true;
+          const farm = globalThis.GSTCustomFarm;
+          const intent = custom ? farm?.setActivationIntent?.(s,true) : null;
+          let enabled = false;
+          try {
+            s.toggleAutoFarm();
+            if (custom && (run !== attemptRun || sceneNow() !== s || binding?.scene !== s || binding?.auto !== attemptAuto
+                || s.auto !== attemptAuto || globalThis.GSTFarmPolicy?.isCustom?.() !== true
+                || !farm?.ownsActivationIntent?.(s,intent) || farm?.authorized?.(s) !== true)) return false;
+            if (!s.auto.on) { stop("Chưa bật được Auto Farm gốc; kiểm tra điều kiện trong game."); return false; }
+            run.ownedAuto = true;
+            enabled = true;
+          } finally {
+            if (!enabled && intent) farm?.revokeActivationIntent?.(s,intent);
+          }
         }
         message = `Đang làm quest: ${q.title}. ${globalThis.GSTFarmPolicy?.isCustom?.() ? "Custom Farm đang chạy." : "Dùng Auto Farm gốc trong phạm vi đã cài."}`;
         return false;

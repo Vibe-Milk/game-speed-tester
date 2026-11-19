@@ -183,9 +183,10 @@
         const wasOn = this.on === true;
         const shortcut = shortcutIntent && shortcutIntent.generation === gestureGeneration
           && shortcutIntent.scene === scene && shortcutIntent.auto === this;
+        const freshIntent = settings.policyMode === "custom" && !wasOn
+          && (shortcut || validFarmGesture(window.event, scene, true));
         const customIntent = settings.policyMode === "custom" && !wasOn
-          && (shortcut || validFarmGesture(window.event, scene, true)
-            || globalThis.GSTCustomFarm?.authorized?.(scene) === true)
+          && (freshIntent || globalThis.GSTCustomFarm?.authorized?.(scene) === true)
           && globalThis.GSTFarmSession?.restoring?.(scene) !== true;
         if (settings.policyMode === "custom" && !wasOn && !customIntent) {
           message = "Custom Farm yêu cầu thao tác bật mới trong tab này."; return undefined;
@@ -211,8 +212,9 @@
         if (!wasOn && this.on === true) {
           const explicit = (settings.policyMode === "custom" ? customIntent : performance.now() - lastTrustedInputAt < 700)
             && globalThis.GSTFarmSession?.restoring?.(scene) !== true;
-          if (settings.policyMode === "custom") globalThis.GSTCustomFarm?.setActivationIntent?.(scene, explicit);
-          else globalThis.GSTMeditation?.farmStarted?.(scene);
+          if (settings.policyMode === "custom") {
+            if (freshIntent) globalThis.GSTCustomFarm?.setActivationIntent?.(scene, explicit);
+          } else globalThis.GSTMeditation?.farmStarted?.(scene);
           if (explicit) globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
           owner.stopRequested = false;
         }
