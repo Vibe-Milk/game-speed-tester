@@ -57,17 +57,34 @@
   GSTHarvest.journey = (scene) => binding?.scene === scene && job && !job.observingOutstanding
     ? { x: job.node.x, y: job.node.y, path: job.path } : null;
   GSTHarvest.isEnabled = () => settings.enabled;
+  function hasLiveObservations(scene = binding?.scene, now = performance.now()) {
+    if (scene && binding?.scene === scene && identityMatches(scene)) observeReleased(scene);
+    for (let i = observations.length - 1; i >= 0; i--) {
+      const observation = observations[i];
+      if (scene && observation.scene !== scene) continue;
+      if (scene && observation.scene === scene && !identityMatches(scene)) {
+        observation.row.followUp = "scene_observation_ended";
+        observations.splice(i, 1);
+      } else if (now >= observation.until) {
+        observation.row.followUp = "unconfirmed_after_8s";
+        observations.splice(i, 1);
+      }
+    }
+    return observations.some((observation) => (!scene || observation.scene === scene)
+      && observation.until > now);
+  }
   GSTHarvest.canSwitchAccount = (scene) => {
-    if (!scene) return !binding && !job && observations.length === 0;
-    if (binding?.scene !== scene) return !binding && !scene.harvesting && observations.length === 0;
-    return !scene?.harvesting && job?.requestedAt === undefined
-      && !observations.some((observation) => observation.scene === scene);
+    const observedScene = scene ?? binding?.scene;
+    const hasLiveObservation = hasLiveObservations(observedScene);
+    if (!scene) return !binding && !job && !hasLiveObservation;
+    if (binding?.scene !== scene) return !binding && !scene.harvesting && !hasLiveObservation;
+    return !scene?.harvesting && job?.requestedAt === undefined && !hasLiveObservation;
   };
   GSTHarvest.prepareAccountSwitch = (scene) => {
     if (!scene && binding) return false;
     if (binding?.scene === scene
         && (scene.harvesting || job?.requestedAt !== undefined
-          || observations.some((observation) => observation.scene === scene))) return false;
+          || hasLiveObservations(scene))) return false;
     if (job && binding?.scene === scene) {
       release("Đã dừng điều khiển trước khi đổi tài khoản.", 0, "yield");
     }
@@ -114,7 +131,7 @@
       // Do not attach a later native harvest on this node to an already-released request.
       const count = inventoryCount(scene, row.item);
       row.inventoryAfter = count;
-      if (row.result === "unconfirmed" && row.acknowledged === true
+      if (performance.now() < observation.until && row.result === "unconfirmed" && row.acknowledged === true
           && Number.isFinite(row.inventoryBefore) && count !== null && count > row.inventoryBefore
           && scene.nodes?.[row.node] === observation.node && !observation.node.ready) {
         if (row.result === "canceled") totals.canceled--;
@@ -781,15 +798,22 @@
           observePendingUntilSettled();
           return;
         }
+        if (hasLiveObservations(scene)) {
+          observePendingUntilSettled();
+          return;
+        }
         detach(); message = "Tạm dừng: scene hoặc kết nối thay đổi."; watch(); return;
       }
       observeReleased(scene);
       if (!settings.enabled) {
         if (job?.requestedAt !== undefined) observeOutstandingRequest(scene, performance.now(), "harvest_disabled");
-        if (!job && !observations.some((observation) => observation.scene === scene)) detach();
+        const hasLiveObservation = hasLiveObservations(scene);
+        if (!job && !hasLiveObservation) detach();
+        else if (hasLiveObservation) observePendingUntilSettled();
         return;
       }
-      if (!job && observations.some((observation) => observation.scene === scene)) {
+      if (!job && hasLiveObservations(scene)) {
+        observePendingUntilSettled();
         message = "Đang theo dõi yêu cầu hái cũ; chưa gửi yêu cầu mới.";
         return;
       }
@@ -895,15 +919,23 @@
       recovery = null;
       lastResult = null;
       clearInterval(watcher); watcher = null;
-      if (job?.requestedAt !== undefined && binding?.scene) {
-        observeOutstandingRequest(binding.scene, performance.now(), "harvest_disabled");
+      const scene = binding?.scene;
+      if (scene && identityMatches(scene)) observeReleased(scene);
+      if (job?.requestedAt !== undefined && scene && identityMatches(scene)) {
+        observeOutstandingRequest(scene, performance.now(), "harvest_disabled");
+      } else {
+        release("Thu hoạch đã tắt.", 0, "yield");
+      }
+      const trackingOutstanding = scene && identityMatches(scene)
+        && (job?.requestedAt !== undefined || hasLiveObservations(scene));
+      if (trackingOutstanding) {
         if (job) {
           job.observingOutstanding = true;
           job.observationCause = "harvest_disabled";
-          relinquishMovement(binding.scene);
+          relinquishMovement(scene);
         }
+        observePendingUntilSettled();
       } else {
-        release("Thu hoạch đã tắt.", 0, "yield");
         detach();
       }
       message = "Thu hoạch đã tắt; không hủy yêu cầu đã gửi tới game.";

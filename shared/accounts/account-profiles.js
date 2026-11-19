@@ -91,14 +91,14 @@
       if (scoped && feature === "harvest") current.enabled = tabIntent(context, feature) ?? false;
       const patch = typeof update === "function" ? update(current) : update;
       const value = { ...current, ...patch };
-      const persistedEnabled = storage[profilesKey]?.[context.profileKey]?.[feature]?.enabled
-        ?? storage[globalKey]?.enabled;
-      const persisted = scoped && feature === "harvest"
-        ? { ...value, enabled: persistedEnabled === true } : value;
       if (!scoped) {
         await chrome.storage.local.set({ [globalKey]: value });
         return value;
       }
+      const persistedEnabled = storage[profilesKey]?.[context.profileKey]?.[feature]?.enabled
+        ?? storage[globalKey]?.enabled;
+      const persisted = feature === "harvest"
+        ? { ...value, enabled: persistedEnabled === true } : value;
       const profiles = { ...(storage[profilesKey] ?? {}) };
       const record = { ...(profiles[context.profileKey] ?? {}) };
       record[feature] = persisted;
