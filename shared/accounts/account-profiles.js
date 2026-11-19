@@ -2,6 +2,7 @@
   "use strict";
   const accountsKey = "gstAccounts:v1";
   const profilesKey = "gstAccountProfiles:v1";
+  const tabIntentKey = "gst:automation-intent:v1";
   const locks = new Map();
   const listeners = new Set();
   let contextState = { ready: false, context: null };
@@ -16,7 +17,28 @@
     const base = storage[globalKey] ?? {};
     if (!context?.verified || !context.profileKey) return base;
     if (feature === "connectionRecovery" && !context.accountId) return base;
-    return { ...base, ...(storage[profilesKey]?.[context.profileKey]?.[feature] ?? {}) };
+    const value = { ...base, ...(storage[profilesKey]?.[context.profileKey]?.[feature] ?? {}) };
+    if (feature === "harvest") value.enabled = tabIntent(context, feature) ?? false;
+    return value;
+  }
+  function tabIntent(context, feature) {
+    if (!context?.verified || !context.profileKey || feature !== "harvest") return null;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(tabIntentKey) ?? "{}");
+      const value = saved?.[context.profileKey]?.[feature];
+      return typeof value === "boolean" ? value : null;
+    } catch { return null; }
+  }
+  function setTabIntent(context, feature, enabled) {
+    if (!context?.verified || !context.profileKey || feature !== "harvest"
+        || typeof enabled !== "boolean") return false;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(tabIntentKey) ?? "{}");
+      const profiles = saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+      profiles[context.profileKey] = { ...(profiles[context.profileKey] ?? {}), [feature]: enabled };
+      sessionStorage.setItem(tabIntentKey, JSON.stringify(profiles));
+      return true;
+    } catch { return false; }
   }
   function identity(context) {
     if (!context?.verified || !context.profileKey) return null;
@@ -55,6 +77,7 @@
       : feature === "harvest" ? "harvestPreferences" : "connectionRecoveryPreferences";
     const scoped = !!context?.verified && !!context.profileKey
       && (feature !== "connectionRecovery" || !!context.accountId);
+    if (context?.slot && !context.verified) throw new Error("Managed account identity is not verified.");
     const lockName = scoped ? "gst:account-profiles"
       : feature === "farm" ? "gst:farm-preferences"
         : feature === "harvest" ? "gst:harvest-preferences" : "gst:connection-recovery-preferences";
@@ -65,18 +88,24 @@
       const current = scoped
         ? { ...(storage[globalKey] ?? {}), ...(storage[profilesKey]?.[context.profileKey]?.[feature] ?? {}) }
         : { ...(storage[globalKey] ?? {}) };
+      if (scoped && feature === "harvest") current.enabled = tabIntent(context, feature) ?? false;
       const patch = typeof update === "function" ? update(current) : update;
       const value = { ...current, ...patch };
+      const persistedEnabled = storage[profilesKey]?.[context.profileKey]?.[feature]?.enabled
+        ?? storage[globalKey]?.enabled;
+      const persisted = scoped && feature === "harvest"
+        ? { ...value, enabled: persistedEnabled === true } : value;
       if (!scoped) {
         await chrome.storage.local.set({ [globalKey]: value });
         return value;
       }
       const profiles = { ...(storage[profilesKey] ?? {}) };
       const record = { ...(profiles[context.profileKey] ?? {}) };
-      record[feature] = value;
+      record[feature] = persisted;
       profiles[context.profileKey] = record;
       await chrome.storage.local.set({ [profilesKey]: profiles });
-      return value;
+      return { ...value, enabled: Object.hasOwn(patch, "enabled") ? patch.enabled === true
+        : tabIntent(context, feature) ?? current.enabled === true };
     }));
     locks.set(lockName, save);
     try { return await save; }
@@ -89,7 +118,7 @@
     }
   }
   const api = {
-    accountsKey, profilesKey, profileKey, currentProfile, updateFeature,
+    accountsKey, profilesKey, profileKey, currentProfile, updateFeature, tabIntent, setTabIntent,
     identity, matchesIdentity, contextForTab, captureActiveContext,
     context: () => contextState,
     onContext(listener) { listeners.add(listener); return () => listeners.delete(listener); },

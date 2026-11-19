@@ -70,7 +70,8 @@
       ? { ...(storage.farmPreferences ?? {}), ...(profile?.farm ?? {}) }
       : { ...(storage.farmPreferences ?? {}), enabled: false, autoRespawn: false, breakSeals: false };
     const harvestPreferences = verified
-      ? { ...(storage.harvestPreferences ?? {}), ...(profile?.harvest ?? {}) }
+      ? { ...(storage.harvestPreferences ?? {}), ...(profile?.harvest ?? {}),
+        enabled: GSTAccountProfiles.tabIntent(context, "harvest") ?? false }
       : { ...(storage.harvestPreferences ?? {}), enabled: false };
     const recoveryProfileKey = verified ? key
       : slot && account?.expectedCharacter ? GSTAccountProfiles.profileKey(slot, account.expectedCharacter) : "";

@@ -105,7 +105,8 @@
   }
   function updateResourceLabels(owner) {
     const scene = owner.scene;
-    if (!on("hideResourceVisuals") || !Array.isArray(scene.nodes)) return;
+    const hideVisuals = on("hideResourceVisuals"), hideNames = on("hideResourceNames");
+    if ((!hideVisuals && !hideNames) || !Array.isArray(scene.nodes)) return;
     const camera = scene.cameras.main, view = camera.worldView;
     const now = performance.now();
     if (owner.resourceNodes !== scene.nodes || owner.resourceNodeCount !== scene.nodes.length
@@ -118,8 +119,10 @@
     const margin = 128;
     for (const node of scene.nodes) {
       if (!node) continue;
-      mask(owner, node.img);
-      mask(owner, node.glow);
+      if (hideVisuals) {
+        mask(owner, node.img);
+        mask(owner, node.glow);
+      }
       let label = owner.labels.get(node);
       let point = owner.points.get(node);
       if (!point) { point = scene.toPx(node.x, node.y); owner.points.set(node, point); }
@@ -128,7 +131,8 @@
         && x >= view.x - margin && x <= view.right + margin
         && y >= view.y - margin && y <= view.bottom + margin;
       if (!inView) { if (label?.visible) label.setVisible(false); continue; }
-      if (on("hideResourceNames")) {
+      // The extension label replaces native resource art only when names are kept.
+      if (!hideVisuals || hideNames) {
         if (label?.visible) label.setVisible(false);
         continue;
       }

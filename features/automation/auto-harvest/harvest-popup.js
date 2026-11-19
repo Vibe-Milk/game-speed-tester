@@ -200,6 +200,8 @@
   function save(action, field) {
     const expectedContext = harvestAccountContext;
     const expectedVersion = harvestAccountContextVersion;
+    const activeEnabled = field === "enabled"
+      ? action(GSTHarvest.normalize(confirmed)).enabled === true : confirmed.enabled === true;
     if ((expectedContext && expectedContext.verified !== true)
         || (harvestProfileBindingRequired && expectedContext?.verified !== true)) {
       saveMessage = "Chưa xác nhận nick trong tab game; chưa lưu cài đặt.";
@@ -219,13 +221,14 @@
           || (harvestProfileBindingRequired && binding.context?.verified !== true))
         throw new Error("Account identity changed or is not confirmed.");
       const context = binding.context;
-      const applied = GSTHarvest.normalize(await GSTAccountProfiles.updateFeature(context, "harvest",
+      const stored = await GSTAccountProfiles.updateFeature(context, "harvest",
         (saved) => action(GSTHarvest.normalize(saved)), async () => {
           const latest = harvestAccountSession
             ? await harvestAccountSession.validate(expectedContext, expectedVersion)
             : { valid: harvestAccountContext === expectedContext };
           return latest.valid && (!harvestProfileBindingRequired || latest.context?.verified === true);
-        }));
+        });
+      const applied = GSTHarvest.normalize({ ...stored, enabled: activeEnabled });
       let resultMessage = "Đã lưu cài đặt trên máy.";
       const latest = harvestAccountSession
         ? await harvestAccountSession.validate(expectedContext, expectedVersion)
@@ -235,7 +238,7 @@
         if (!context?.verified || !Number.isInteger(binding.tabId)) throw new Error("Verified tab unavailable.");
         const result = await chrome.tabs.sendMessage(binding.tabId, { type: "gst:harvest-configure",
           preferences: applied, targetTabId: binding.tabId,
-          profileIdentity: GSTAccountProfiles.identity(context) });
+          profileIdentity: GSTAccountProfiles.identity(context), explicitIntent: field === "enabled" });
         if (result?.navigating) resultMessage = "Đã lưu; game đang tải lại để áp dụng.";
         else if (result?.accepted && result.applied) resultMessage = "Đã lưu và game xác nhận áp dụng.";
         else resultMessage = "Đã lưu; game chưa xác nhận áp dụng.";
@@ -340,6 +343,11 @@
       const tabId = harvestAccountSession?.tabId?.();
       if (!Number.isInteger(tabId)) throw new Error("No bound game tab");
       const data = await chrome.tabs.sendMessage(tabId, { type: "gst:harvest-status" });
+      if (data.applied === true && typeof data.enabled === "boolean" && !pending.length) {
+        confirmed = GSTHarvest.normalize({ ...confirmed, enabled: data.enabled });
+        preferences = confirmed;
+        enabled.checked = data.enabled;
+      }
       if (typeof data.applied !== "boolean") {
         status.textContent = "Tab game vẫn dùng cầu nối cũ. Tải lại extension tại chrome://extensions, rồi tải lại trang game.";
       } else if (typeof data.enabled !== "boolean") {

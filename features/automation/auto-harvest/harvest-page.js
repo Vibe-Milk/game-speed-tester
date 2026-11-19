@@ -2,10 +2,12 @@
   "use strict";
   const origin = "https://nghichthienky.online";
   let settings = GSTHarvest.normalize(null);
+  let accountIdentity = null;
   let binding = null;
   let recovery = null;
   let job = null;
   let watcher = null;
+  let pendingObserver = null;
   let suspended = false;
   let message = "Thu hoạch đang tắt.";
   let safeSince = null;
@@ -29,6 +31,29 @@
   const unconfirmedCodes = new Set(["harvest_unconfirmed", "request_timeout", "node_unavailable_before_ack", "target_changed"]);
   const harvestOwnershipTimeoutMs = 15000;
   const summary = () => `Thành công ${totals.success} · Thất bại/bỏ qua ${totals.failed} · Chưa xác nhận ${totals.unconfirmed} · Hủy/nhường ${totals.canceled}`;
+  function stopPendingObserver() {
+    if (pendingObserver === null) return;
+    clearInterval(pendingObserver); pendingObserver = null;
+  }
+  function observePendingUntilSettled() {
+    if (pendingObserver !== null) return;
+    pendingObserver = setInterval(() => {
+      const scene = binding?.scene;
+      if (!scene) { stopPendingObserver(); return; }
+      if (sceneNow() !== scene || !compatible(scene) || !identityMatches(scene)) {
+        stopPendingObserver();
+        detach();
+        return;
+      }
+      observeReleased(scene);
+      if (job?.observingOutstanding || (!settings.enabled && job?.requestedAt !== undefined))
+        observeOutstandingRequest(scene, performance.now(), job?.observationCause ?? "harvest_disabled");
+      if (!job && !observations.some((observation) => observation.scene === scene)) {
+        stopPendingObserver();
+        if (!settings.enabled) detach();
+      }
+    }, 250);
+  }
   GSTHarvest.journey = (scene) => binding?.scene === scene && job && !job.observingOutstanding
     ? { x: job.node.x, y: job.node.y, path: job.path } : null;
   GSTHarvest.isEnabled = () => settings.enabled;
@@ -126,6 +151,15 @@
     return !!d && !d.closing && !d.reconnecting && !d.displaced
       && (d.online === false || d.link?.open?.() === true);
   };
+  function identityMatches(scene, expected = accountIdentity) {
+    if (!expected?.verified || typeof expected.profileKey !== "string" || !expected.profileKey
+        || typeof expected.character !== "string" || typeof expected.classId !== "string"
+        || typeof expected.characterId !== "string") return false;
+    const slot = new URLSearchParams(location.search).get("slot") ?? "";
+    return slot === (expected.slot ?? "")
+      && scene?.profile?.name?.normalize?.("NFC") === expected.character
+      && scene?.profile?.classId === expected.classId && String(scene?.you) === expected.characterId;
+  }
   function compatible(scene) {
     return scene?.sys?.isActive?.() && scene.self && scene.views instanceof Map
       && Array.isArray(scene.nodes) && typeof scene.auto?.update === "function"
@@ -217,6 +251,7 @@
     owner.steer = null;
   }
   function observeOutstandingRequest(scene, now, cause = "allow_farm_revoked") {
+    if (!job || job.requestedAt === undefined || binding?.scene !== scene) return;
     if (!job.observingOutstanding) {
       relinquishMovement(scene);
       job.observingOutstanding = true; job.observationCause = cause;
@@ -247,6 +282,7 @@
     }
     message = job.acknowledged ? `Đang quan sát kết quả hái ${job.node.item}; không điều khiển di chuyển.`
       : "Đang chờ xác nhận yêu cầu hái đã gửi; không phát thêm thao tác.";
+    observePendingUntilSettled();
   }
   function fighting(scene) {
     if (!scene.auto.on || !scene.auto.target) return false;
@@ -323,7 +359,9 @@
       if (hasObservationContext && result !== "success") {
         row.endedBy = manualYield ? code : watchAfterObservation ? observationCause : "native_request_yield";
         row.followUp = manualYield ? "watching_after_yield" : watchAfterObservation
-          ? observationCause === "allow_farm_revoked" ? "watching_after_permission_revoke" : "watching_after_auto_farm_activated"
+          ? observationCause === "allow_farm_revoked" ? "watching_after_permission_revoke"
+            : observationCause === "harvest_disabled" ? "watching_after_harvest_disabled"
+              : "watching_after_auto_farm_activated"
           : "watching_after_request_yield";
         observations.push({ row, node: job.node, scene, until: performance.now() + 8000 });
       }
@@ -340,6 +378,7 @@
     if (reason) message = reason;
   }
   function detach() {
+    stopPendingObserver();
     globalThis.GSTHarvestVisual?.configure(null, false);
     release(undefined, 0, "detach");
     window.removeEventListener("keydown", onKey, true);
@@ -724,10 +763,36 @@
     try {
       const scene = binding?.scene;
       if (sceneNow() !== scene || !compatible(scene) || scene.auto !== binding.auto
-          || !GSTFarmUpdate.attached(scene) || !connected(scene) || scene.leaving) {
+          || !GSTFarmUpdate.attached(scene) || scene.leaving) {
+        detach(); message = "Tạm dừng: scene hoặc kết nối thay đổi."; watch(); return;
+      }
+      if (!identityMatches(scene)) {
+        detach();
+        for (let i = observations.length - 1; i >= 0; i--) {
+          if (observations[i].scene !== scene) continue;
+          observations[i].row.followUp = "scene_observation_ended";
+          observations.splice(i, 1);
+        }
+        message = "Tạm dừng: danh tính tài khoản đã thay đổi."; watch(); return;
+      }
+      if (!connected(scene)) {
+        if (job?.requestedAt !== undefined) {
+          observeOutstandingRequest(scene, performance.now(), "harvest_disabled");
+          observePendingUntilSettled();
+          return;
+        }
         detach(); message = "Tạm dừng: scene hoặc kết nối thay đổi."; watch(); return;
       }
       observeReleased(scene);
+      if (!settings.enabled) {
+        if (job?.requestedAt !== undefined) observeOutstandingRequest(scene, performance.now(), "harvest_disabled");
+        if (!job && !observations.some((observation) => observation.scene === scene)) detach();
+        return;
+      }
+      if (!job && observations.some((observation) => observation.scene === scene)) {
+        message = "Đang theo dõi yêu cầu hái cũ; chưa gửi yêu cầu mới.";
+        return;
+      }
       if (scene.self.dead) {
         recovery = { scene, home: { ...binding.home }, aliveAt: null };
         lastResult = null;
@@ -776,11 +841,41 @@
       available: names.size > 0, mapAvailable,
       catalog: [...names].slice(0, 200).map((name) => ({ name, inMap: here.has(name), kind: types.get(name) === 2 ? "ore" : types.get(name) === 3 ? "both" : "plant" })) }, origin);
   }
-  function applyPreferences(value) {
+  function applyPreferences(value, { explicitIntent = false, profileIdentity = accountIdentity } = {}) {
+    const previous = settings;
     const next = GSTHarvest.normalize(value);
+    const oldIdentity = accountIdentity;
+    const nextIdentity = profileIdentity?.verified === true ? profileIdentity : null;
+    if (binding && JSON.stringify(oldIdentity) !== JSON.stringify(nextIdentity)
+        && !identityMatches(binding.scene, nextIdentity)) {
+      const oldScene = binding.scene;
+      detach();
+      for (let i = observations.length - 1; i >= 0; i--) {
+        if (observations[i].scene !== oldScene) continue;
+        observations[i].row.followUp = "scene_observation_ended";
+        observations.splice(i, 1);
+      }
+    }
+    accountIdentity = nextIdentity;
+    const scene = binding?.scene ?? sceneNow();
+    const permissionRevokedWhileBothOn = previous.allowFarm && !next.allowFarm
+      && next.enabled && scene?.auto?.on === true && identityMatches(scene, nextIdentity);
+    if (permissionRevokedWhileBothOn) {
+      next.enabled = false;
+      window.postMessage({ channel: "gst:harvest-intent:v1", enabled: false,
+        profileKey: nextIdentity.profileKey, characterId: nextIdentity.characterId }, origin);
+    }
     const changed = JSON.stringify(next) !== JSON.stringify(settings);
     const behaviorChanged = JSON.stringify({ ...next, showTargetLine: false }) !== JSON.stringify({ ...settings, showTargetLine: false });
     settings = next;
+    globalThis.GSTFarmActivation?.sync?.();
+    if (explicitIntent && !previous.enabled && settings.enabled && settings.allowFarm !== true
+        && scene?.auto?.on === true && identityMatches(scene)) {
+      try {
+        globalThis.GSTFarmSession?.forget?.(scene);
+        if (scene.auto.on && typeof scene.toggleAutoFarm === "function") scene.toggleAutoFarm();
+      } catch { /* The native toggle path remains authoritative. */ }
+    }
     window.__gstHarvestAppliedEnabled = settings.enabled;
     globalThis.GSTFeatureToast?.setHarvestApplied?.(settings.enabled);
     publishBackgroundDemand();
@@ -797,11 +892,21 @@
       observeOutstandingRequest(binding.scene, performance.now(), "allow_farm_revoked");
     }
     if (!settings.enabled) {
-      detach();
       recovery = null;
       lastResult = null;
       clearInterval(watcher); watcher = null;
-      message = "Thu hoạch đã tắt; không hủy lượt hái game đã bắt đầu.";
+      if (job?.requestedAt !== undefined && binding?.scene) {
+        observeOutstandingRequest(binding.scene, performance.now(), "harvest_disabled");
+        if (job) {
+          job.observingOutstanding = true;
+          job.observationCause = "harvest_disabled";
+          relinquishMovement(binding.scene);
+        }
+      } else {
+        release("Thu hoạch đã tắt.", 0, "yield");
+        detach();
+      }
+      message = "Thu hoạch đã tắt; không hủy yêu cầu đã gửi tới game.";
     } else {
       // Keep an outstanding F request until its acknowledgement/timeout even
       // when options change, so toggling a checkbox cannot resend it early.
@@ -811,6 +916,14 @@
     }
     safeSince = null;
   }
+  GSTHarvest.coordinateFarmEnable = (scene) => {
+    if (!scene || sceneNow() !== scene || !identityMatches(scene)
+        || settings.allowFarm === true || !settings.enabled) return;
+    applyPreferences({ ...settings, enabled: false });
+    window.postMessage({ channel: "gst:harvest-intent:v1", enabled: false,
+      profileKey: accountIdentity.profileKey, characterId: accountIdentity.characterId }, origin);
+  };
+  GSTHarvest.needsFarmCoordination = () => settings.enabled === true && settings.allowFarm !== true;
   window.addEventListener("message", (event) => {
     if (event.source === window && event.origin === origin && event.data?.channel === "gst:background-harvest-ready:v1") {
       publishBackgroundDemand();
@@ -831,7 +944,8 @@
       try {
         // A synchronized read applies the stored intent before reporting state
         // in this same handler; ordinary overlay status requests remain read-only.
-        if (event.data.type === "synchronize") applyPreferences(event.data.preferences);
+        if (event.data.type === "synchronize") applyPreferences(event.data.preferences,
+          { profileIdentity: event.data.profileIdentity });
         status(event.data.requestId);
       } catch {
         window.postMessage({ channel: "gst:harvest-status:v1", requestId: event.data.requestId,
@@ -841,7 +955,8 @@
       return;
     }
     if (event.data.type !== "configure") return;
-    applyPreferences(event.data.preferences);
+    applyPreferences(event.data.preferences, { explicitIntent: event.data.explicitIntent === true,
+      profileIdentity: event.data.profileIdentity });
     window.postMessage({ channel: "gst:harvest-status:v1", type: "configured", requestId: event.data.requestId,
       enabled: settings.enabled, configKey: JSON.stringify(settings) }, origin);
   });

@@ -31,13 +31,19 @@
       return;
     }
     const expectedIdentity = GSTAccountProfiles.identity(context);
-    GSTAccountProfiles.updateFeature(context, "harvest", (saved) => {
-      const previous = GSTHarvest.normalize(saved);
-      return { enabled: !previous.enabled };
-    }, () => {
+    const nextEnabled = !(GSTAccountProfiles.tabIntent(context, "harvest") ?? false);
+    GSTAccountProfiles.updateFeature(context, "harvest", () => ({ enabled: nextEnabled }), () => {
       const latest = GSTAccountProfiles.context();
       return latest.ready && latest.context?.verified === true
         && GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId);
+    }).then(() => {
+      const latest = GSTAccountProfiles.context();
+      if (latest.ready && latest.context?.verified === true
+          && GSTAccountProfiles.matchesIdentity(latest.context, expectedIdentity, expectedIdentity.tabId)
+          && GSTAccountProfiles.setTabIntent(latest.context, "harvest", nextEnabled)) {
+        preferences = { ...(preferences ?? {}), enabled: nextEnabled };
+        configure(preferences, null, true);
+      }
     }).catch((error) => { failure("shortcut.toggle", error); }).finally(() => { shortcutBusy = false; });
   }, true);
   let debugEnabled = false;
@@ -102,8 +108,11 @@
     if (debugEnabled) record("debug.enabled", moduleState());
     else { debugRows.length = 0; lastFailure = null; mainSnapshot = null; }
   }
-  function configure(value, respond) {
+  function configure(value, respond, explicitIntent = false) {
     const next = GSTHarvest.normalize(value);
+    const state = GSTAccountProfiles.context();
+    if (!explicitIntent) next.enabled = accountProfileVerified && state.context?.verified === true
+      ? GSTAccountProfiles.tabIntent(state.context, "harvest") ?? false : false;
     if (respond || JSON.stringify(next) !== JSON.stringify(preferences)) repairedKey = null;
     preferences = next;
     record("configure", { enabled: preferences.enabled, helper: typeof globalThis.GSTHarvest?.normalize });
@@ -126,7 +135,10 @@
       }, 800);
       pending.set(requestId, { timer, respond, kind: "configure", key: JSON.stringify(preferences) });
     }
-    window.postMessage({ channel: "gst:harvest:v1", type: "configure", preferences, requestId }, origin);
+    const profileIdentity = accountProfileVerified && state.context?.verified === true
+      ? { ...GSTAccountProfiles.identity(state.context), verified: true } : null;
+    window.postMessage({ channel: "gst:harvest:v1", type: "configure", preferences, requestId,
+      explicitIntent, profileIdentity }, origin);
   }
   function repair(data) {
     if (!preferences || navigating || data.type === "configured" || typeof data.configKey !== "string") return false;
@@ -170,10 +182,20 @@
       accountProfileReady = true;
       accountProfileVerified = event.data.verified === true;
       revision++;
-      const value = accountProfileVerified ? event.data.harvestPreferences
+      const value = accountProfileVerified ? { ...(event.data.harvestPreferences ?? {}),
+        enabled: GSTAccountProfiles.tabIntent(state.context, "harvest") ?? false }
         : { ...(event.data.harvestPreferences ?? {}), enabled: false };
       try { configure(value); }
       catch (error) { failure("account-profile.configure", error); }
+      return;
+    }
+    if (event.source === window && event.origin === origin && event.data?.channel === "gst:harvest-intent:v1"
+        && typeof event.data.enabled === "boolean") {
+      const state = GSTAccountProfiles.context();
+      if (accountProfileVerified && state.context?.verified === true
+          && state.context.profileKey === event.data.profileKey
+          && state.context.characterId === event.data.characterId)
+        GSTAccountProfiles.setTabIntent(state.context, "harvest", event.data.enabled);
       return;
     }
     if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:harvest-status:v1") return;
@@ -272,8 +294,8 @@
           type: notice?.type === "toast" ? "toast" : "note",
           text: typeof notice?.text === "string" ? notice.text.slice(0, 180) : ""
         })),
-        endedBy: ["manual_key", "manual_skill", "manual_pointer", "allow_farm_revoked", "auto_farm_activated", "native_request_yield"].includes(row?.endedBy) ? row.endedBy : null,
-        followUp: ["watching_after_yield", "watching_after_permission_revoke", "watching_after_auto_farm_activated", "watching_after_request_yield", "success", "unconfirmed_after_8s", "scene_observation_ended", "ambiguous_new_attempt"].includes(row?.followUp) ? row.followUp : null,
+        endedBy: ["manual_key", "manual_skill", "manual_pointer", "allow_farm_revoked", "auto_farm_activated", "harvest_disabled", "native_request_yield"].includes(row?.endedBy) ? row.endedBy : null,
+        followUp: ["watching_after_yield", "watching_after_permission_revoke", "watching_after_auto_farm_activated", "watching_after_harvest_disabled", "watching_after_request_yield", "success", "unconfirmed_after_8s", "scene_observation_ended", "ambiguous_new_attempt"].includes(row?.followUp) ? row.followUp : null,
         serverRejectionObserved: false,
         requested: row?.requested === true, acknowledged: row?.acknowledged === true,
         attacked: row?.attacked === true, ready: row?.ready === true, fixChanged: row?.fixChanged === true,
@@ -319,7 +341,14 @@
         return;
       }
       revision++;
-      try { configure(message.preferences, respond); }
+      try {
+        if (message.explicitIntent === true && typeof message.preferences?.enabled === "boolean")
+          GSTAccountProfiles.setTabIntent(context.context, "harvest", message.preferences.enabled);
+        const activeIntent = GSTAccountProfiles.tabIntent(context.context, "harvest") ?? false;
+        configure({ ...message.preferences,
+          enabled: message.explicitIntent === true ? message.preferences.enabled === true : activeIntent },
+        respond, message.explicitIntent === true);
+      }
       catch (error) {
         failure("runtime.configure", error);
         readError = typeof globalThis.GSTHarvest?.normalize === "function" ? "HS-CONFIGURE" : "HS-OPTIONS";
@@ -355,7 +384,11 @@
           enabled: null, applied: false, catalog: [], available: false });
       }, 800);
       pending.set(requestId, { timer, respond });
-      window.postMessage({ channel: "gst:harvest:v1", type: "synchronize", preferences, requestId }, origin);
+      const context = GSTAccountProfiles.context();
+      const profileIdentity = accountProfileVerified && context.context?.verified === true
+        ? { ...GSTAccountProfiles.identity(context.context), verified: true } : null;
+      window.postMessage({ channel: "gst:harvest:v1", type: "synchronize", preferences,
+        profileIdentity, requestId }, origin);
     });
     return true;
   });

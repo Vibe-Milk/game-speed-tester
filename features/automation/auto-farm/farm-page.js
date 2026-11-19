@@ -25,6 +25,12 @@
   let configurationReceived = false;
   let activationLock = null;
   let activationWatcher = null;
+  let lastTrustedInputAt = -Infinity;
+  const noteTrustedInput = (event) => {
+    if (event.isTrusted && !event.repeat && !document.hidden) lastTrustedInputAt = performance.now();
+  };
+  window.addEventListener("pointerdown", noteTrustedInput, true);
+  window.addEventListener("keydown", noteTrustedInput, true);
   const finite = (value) => typeof value === "number" && Number.isFinite(value);
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const nativeEligible = (enemy) => enemy?.hostile === true || enemy?.aggro === false;
@@ -132,6 +138,7 @@
   }
   function needsActivationTracking() {
     return identityBlocked || settings.policyMode === "disabled"
+      || globalThis.GSTHarvest?.needsFarmCoordination?.() === true
       || globalThis.GSTMeditation?.wantsFarmActivationObserver?.() === true;
   }
   function maintainActivationLock() {
@@ -152,7 +159,12 @@
         }
         const wasOn = this.on === true;
         const result = original.apply(this, args);
-        if (!wasOn && this.on === true) globalThis.GSTMeditation?.farmStarted?.(scene);
+        if (!wasOn && this.on === true) {
+          globalThis.GSTMeditation?.farmStarted?.(scene);
+          if (performance.now() - lastTrustedInputAt < 700
+              && globalThis.GSTFarmSession?.restoring?.(scene) !== true)
+            globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
+        }
         return result;
       };
       try { scene.auto.toggle = owner.wrapper; }
@@ -243,6 +255,8 @@
     if (wasOn === false && session) stop("Đã kết thúc phiên hỗ trợ cũ trước khi bật lại Auto Farm.");
     if (globalThis.GSTFarmDiagnostics) GSTFarmDiagnostics.toggleByUser(scene);
     else scene.toggleAutoFarm();
+    if (wasOn === false && scene.auto?.on === true)
+      globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
     if (wasOn === false && scene.auto === previousAuto && scene.auto.on) {
       // An explicit new session must not inherit the old extension block or
       // native navigation failure counters left behind by native toggle().
@@ -1477,6 +1491,8 @@
   });
   window.addEventListener("pagehide", () => {
     window.removeEventListener("keydown", guardFarmKey, true);
+    window.removeEventListener("pointerdown", noteTrustedInput, true);
+    window.removeEventListener("keydown", noteTrustedInput, true);
     suspended = true;
     configurationReceived = false;
     globalThis.GSTFarmConfigurationReady = false;
@@ -1492,6 +1508,8 @@
     stop("Page left; extended range stopped.");
   });
   window.addEventListener("pageshow", () => {
+    window.addEventListener("pointerdown", noteTrustedInput, true);
+    window.addEventListener("keydown", noteTrustedInput, true);
     syncFarmKeyGuard();
     suspended = false;
     syncActivationTracking();
