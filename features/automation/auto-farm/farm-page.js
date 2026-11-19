@@ -27,6 +27,29 @@
   let activationLock = null;
   let activationWatcher = null;
   let lastTrustedInputAt = -Infinity;
+  let gestureGeneration = 0, generationAt = 0, shortcutIntent = null;
+  const farmGestures = new WeakMap();
+  function invalidateFarmGestures() { gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
+  function farmButton(target) { return target instanceof Element ? target.closest('[data-entry="auto"], [data-key="V"]') : null; }
+  function rememberFarmGesture(event) {
+    if (settings.policyMode !== "custom" || suspended || !event.isTrusted || document.hidden || event.repeat
+        || event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
+    const button = farmButton(event.target), scene = sceneNow();
+    if (!button || !scene?.auto || event.timeStamp < generationAt) return;
+    farmGestures.set(button, { generation: gestureGeneration, scene, auto: scene.auto,
+      kind: event.type === "keydown" ? "keyboard" : "pointer", pointerId: event.pointerId, startedAt: event.timeStamp });
+  }
+  function validFarmGesture(event, scene, consume = false) {
+    const button = farmButton(event?.target), gesture = button && farmGestures.get(button);
+    if (consume && button) farmGestures.delete(button);
+    return !!gesture && event.isTrusted === true && event.type === "click" && !document.hidden
+      && gesture.generation === gestureGeneration && gesture.scene === scene && gesture.auto === scene?.auto
+      && event.timeStamp >= gesture.startedAt && event.timeStamp >= generationAt
+      && (event.detail === 0 ? gesture.kind === "keyboard" : gesture.kind === "pointer"
+        && (event.pointerId == null || gesture.pointerId == null || event.pointerId === gesture.pointerId));
+  }
+  window.addEventListener("pointerdown", rememberFarmGesture, true);
+  window.addEventListener("keydown", rememberFarmGesture, true);
   const noteTrustedInput = (event) => {
     if (event.isTrusted && !event.repeat && !document.hidden) lastTrustedInputAt = performance.now();
   };
@@ -132,6 +155,7 @@
   function clearActivationLock() {
     const old = activationLock; activationLock = null;
     if (!old) return;
+    if (old.scene === sceneNow()) invalidateFarmGestures();
     if (old.auto.toggle === old.wrapper) {
       if (old.descriptor) Object.defineProperty(old.auto, "toggle", old.descriptor);
       else delete old.auto.toggle;
@@ -154,11 +178,22 @@
       const descriptor = Object.getOwnPropertyDescriptor(scene.auto, "toggle");
       const owner = { scene, auto: scene.auto, original, descriptor, stopRequested: false };
       owner.wrapper = function (...args) {
+        if (settings.policyMode === "custom" && (activationLock !== owner || sceneNow() !== scene
+            || scene.auto !== owner.auto || this !== owner.auto)) return undefined;
+        const wasOn = this.on === true;
+        const shortcut = shortcutIntent && shortcutIntent.generation === gestureGeneration
+          && shortcutIntent.scene === scene && shortcutIntent.auto === this;
+        const customIntent = settings.policyMode === "custom" && !wasOn
+          && (shortcut || validFarmGesture(window.event, scene, true)
+            || globalThis.GSTCustomFarm?.authorized?.(scene) === true)
+          && globalThis.GSTFarmSession?.restoring?.(scene) !== true;
+        if (settings.policyMode === "custom" && !wasOn && !customIntent) {
+          message = "Custom Farm yêu cầu thao tác bật mới trong tab này."; return undefined;
+        }
         if ((identityBlocked || settings.policyMode === "disabled" || settings.policyMode === "custom" && !globalThis.GSTCustomFarm?.compatible?.(scene)) && this.on === false) {
           message = identityBlocked ? "Auto Farm đang chờ xác nhận đúng tài khoản." : settings.policyMode === "custom" ? "Custom Farm không khả dụng; không bật native Farm dự phòng." : "Auto Farm đang bị khóa bởi chế độ Disabled. Hãy đổi chế độ rồi bật lại bằng tay.";
           return undefined;
         }
-        const wasOn = this.on === true;
         const foreignMovement = [globalThis.GSTHarvest, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense,
           globalThis.GSTMapTravel, globalThis.GSTQuest, globalThis.GSTFarmSeals, globalThis.GSTRealm, globalThis.GSTChest]
           .some((owner) => { try { return owner?.controls?.(scene) === true; } catch { return false; } });
@@ -168,13 +203,13 @@
             && movement.every(finite) && (movement[0] !== 0 || movement[1] !== 0))
           [scene.autoX, scene.autoY] = movement;
         if (wasOn && this.on === false && settings.policyMode === "custom") {
+          invalidateFarmGestures();
           globalThis.GSTCustomFarm?.setActivationIntent?.(scene, false);
           globalThis.GSTCustomFarm?.stop?.(scene);
           owner.stopRequested = false;
         }
         if (!wasOn && this.on === true) {
-          const explicit = (performance.now() - lastTrustedInputAt < 700
-            || settings.policyMode === "custom" && globalThis.GSTCustomFarm?.authorized?.(scene) === true)
+          const explicit = (settings.policyMode === "custom" ? customIntent : performance.now() - lastTrustedInputAt < 700)
             && globalThis.GSTFarmSession?.restoring?.(scene) !== true;
           if (settings.policyMode === "custom") globalThis.GSTCustomFarm?.setActivationIntent?.(scene, explicit);
           else globalThis.GSTMeditation?.farmStarted?.(scene);
@@ -211,7 +246,8 @@
       clearInterval(activationWatcher); activationWatcher = null;
     }
   }
-  globalThis.GSTFarmActivation = Object.freeze({ sync: syncActivationTracking });
+  globalThis.GSTFarmActivation = Object.freeze({ sync: syncActivationTracking,
+    controllerDisposed(scene) { if (scene && sceneNow() === scene) invalidateFarmGestures(); } });
   function ensureCustomReady(scene) {
     try {
       if (!scene?.auto || globalThis.GSTFarmUpdate?.installGate?.(scene) !== true) return false;
@@ -224,8 +260,15 @@
     if (settings.policyMode !== "custom" || !(event.target instanceof Element)
         || !event.target.closest('[data-entry="auto"], [data-key="V"]')) return;
     const scene = sceneNow();
-    if (scene?.auto?.on === true || ensureCustomReady(scene)) return;
-    message = "Custom Farm không khả dụng: không bảo vệ được controller.";
+    if (scene?.auto?.on === true) return;
+    const button = farmButton(event.target), gesture = button && farmGestures.get(button);
+    if (gesture) setTimeout(() => { if (farmGestures.get(button) === gesture) farmGestures.delete(button); }, 0);
+    if (!validFarmGesture(event, scene)) {
+      message = "Thao tác Farm đã cũ; hãy bấm lại.";
+      event.stopImmediatePropagation(); event.preventDefault(); return;
+    }
+    if (ensureCustomReady(scene) && validFarmGesture(event, scene)) return;
+    message = "Custom Farm chưa sẵn sàng; hãy bấm lại sau khi controller ổn định.";
     event.stopImmediatePropagation(); event.preventDefault();
   }, true);
 
@@ -251,6 +294,7 @@
         || node.matches("input, textarea, select, [role='textbox']")));
     const ignored = document.hidden || !document.hasFocus() || editing || event.isComposing
       || event.repeat || event.ctrlKey || event.altKey || event.metaKey || !event.isTrusted
+      || settings.policyMode === "custom" && event.timeStamp < generationAt
       || (shortcut !== null && event.shiftKey);
     if (ignored) {
       // Block background/editing events without cancelling normal text entry.
@@ -292,8 +336,12 @@
     const previousAuto = scene.auto;
     const wasOn = previousAuto?.on;
     if (wasOn === false && session) stop("Đã kết thúc phiên hỗ trợ cũ trước khi bật lại Auto Farm.");
-    if (globalThis.GSTFarmDiagnostics) GSTFarmDiagnostics.toggleByUser(scene);
-    else scene.toggleAutoFarm();
+    const attempt = settings.policyMode === "custom" ? { generation: gestureGeneration, scene, auto: scene.auto } : null;
+    shortcutIntent = attempt;
+    try {
+      if (globalThis.GSTFarmDiagnostics) GSTFarmDiagnostics.toggleByUser(scene);
+      else scene.toggleAutoFarm();
+    } finally { if (shortcutIntent === attempt) shortcutIntent = null; }
     if (wasOn === false && scene.auto?.on === true)
       globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
     if (wasOn === false && scene.auto === previousAuto && scene.auto.on) {
@@ -1413,6 +1461,16 @@
         && Number.isSafeInteger(recoveryHpPercent) && retreatHpPercent < recoveryHpPercent && recoveryHpPercent <= 100
         ? { retreatHpPercent, recoveryHpPercent } : { retreatHpPercent: 40, recoveryHpPercent: 100 };
       const wasIdentityBlocked = identityBlocked;
+      const nextMode = globalThis.GSTFarmPolicy?.normalize(data.policyMode) ?? "extended";
+      if (configuredPolicyMode !== null && configuredPolicyMode !== nextMode
+          || settings.accountProfileKey !== (typeof data.accountProfileKey === "string" ? data.accountProfileKey : "")
+          || settings.accountId !== (typeof data.accountId === "string" ? data.accountId : "")
+          || settings.slot !== (typeof data.accountSlot === "string" ? data.accountSlot : "")
+          || settings.character !== (typeof data.accountCharacter === "string" ? data.accountCharacter : "")
+          || settings.characterId !== (typeof data.accountCharacterId === "string" ? data.accountCharacterId : "")
+          || settings.classId !== (typeof data.accountClassId === "string" ? data.accountClassId : "")
+          || settings.identityVerified !== (data.identityVerified === true)
+          || identityBlocked !== (data.identityBlocked === true)) invalidateFarmGestures();
       identityBlocked = data.identityBlocked === true;
       if (wasIdentityBlocked !== identityBlocked && activationLock) activationLock.stopRequested = false;
       settings = { policyMode: globalThis.GSTFarmPolicy?.normalize(data.policyMode) ?? "extended",
@@ -1568,6 +1626,7 @@
     }
   });
   window.addEventListener("pagehide", () => {
+    invalidateFarmGestures();
     window.removeEventListener("keydown", guardFarmKey, true);
     window.removeEventListener("pointerdown", noteTrustedInput, true);
     window.removeEventListener("keydown", noteTrustedInput, true);

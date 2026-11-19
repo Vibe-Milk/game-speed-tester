@@ -46,8 +46,9 @@
       paused:s.stats.paused, stuck:s.stats.stuck, observedDeaths:s.stats.observedDeaths,
       observedKills:s.stats.observedKills, xpPerMinute:null, potions:null, at:Date.now()})); } catch {}
   }
-  function cleanup(scene) {
-    const s=sessions.get(scene); if (!s) return;
+  function cleanup(scene, expected = null) {
+    const s=sessions.get(scene); if (!s || expected && expected !== s) return;
+    globalThis.GSTFarmActivation?.controllerDisposed?.(scene);
     activation.set(scene,false); release(s); saveStats(s);
     try { s.removeInput?.(); } finally { s.removeUpdate?.(); }
     scene.events?.off?.("shutdown",s.cleanup); scene.events?.off?.("destroy",s.cleanup);
@@ -74,7 +75,7 @@
         scene.auto.target=0; scene.auto.think=0; scene.auto.path=[];
         scene.auto.goalX=NaN; scene.auto.goalY=NaN;
       }
-      s.cleanup=()=>cleanup(scene);
+      s.cleanup=()=>cleanup(scene,s);
       s.removeInput=globalThis.GSTFarmInput?.add?.(scene,(accepted)=>{if(accepted)s.manualUntil=performance.now()+700;})??null;
       scene.events?.on?.("shutdown",s.cleanup); scene.events?.on?.("destroy",s.cleanup);
       sessions.set(scene,s); activeScenes.add(scene);
