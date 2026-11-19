@@ -10,7 +10,8 @@
     const otherOwner = [globalThis.GSTHarvest,globalThis.GSTFarmBossSafety,globalThis.GSTFarmDefense,
       globalThis.GSTMapTravel,globalThis.GSTQuest,globalThis.GSTFarmSeals,globalThis.GSTRealm,globalThis.GSTChest]
       .some((owner)=>{try{return owner?.controls?.(scene)===true;}catch{return false;}});
-    if (scene?.auto === auto && !otherOwner && s.steer && scene.autoX === s.steer[0] && scene.autoY === s.steer[1]) scene.autoX = scene.autoY = 0;
+    if (scene?.auto === auto && !otherOwner && !globalThis.GSTFarmInput?.movement?.(scene)
+        && s.steer && scene.autoX === s.steer[0] && scene.autoY === s.steer[1]) scene.autoX = scene.autoY = 0;
     s.steer = null; s.path=[];
     try { globalThis.GSTNavigation?.cancel?.(scene,s); if (!keepLeg) globalThis.GSTNavigation?.resetLeg?.(s); } catch {}
   }
@@ -47,17 +48,19 @@
   }
   function cleanup(scene) {
     const s=sessions.get(scene); if (!s) return;
-    activation.set(scene,false); release(s); saveStats(s); s.removeUpdate?.();
+    activation.set(scene,false); release(s); saveStats(s);
+    try { s.removeInput?.(); } finally { s.removeUpdate?.(); }
     scene.events?.off?.("shutdown",s.cleanup); scene.events?.off?.("destroy",s.cleanup);
     sessions.delete(scene); activeScenes.delete(scene);
   }
   function configure(scene, settings) {
     if (!scene?.auto) return false;
+    if (settings.policyMode === "custom" && globalThis.GSTFarmUpdate?.gateReady?.(scene) !== true) return false;
     let s = sessions.get(scene);
     if (settings.policyMode !== "custom" && !s) return false;
     const nextIdentity = identity(settings, scene, scene.autoHost?.() ?? {});
     if (s && (s.auto !== scene.auto || s.identity !== nextIdentity)) {
-      const wasActive = s.settings.policyMode === "custom" && scene.auto.on === true;
+      const wasActive = s.auto === scene.auto && s.settings.policyMode === "custom" && scene.auto.on === true;
       activation.set(scene,false); cleanup(scene); s = null;
       if (wasActive && typeof scene.toggleAutoFarm === "function") scene.toggleAutoFarm();
     }
@@ -65,7 +68,7 @@
       s = { scene, auto:scene.auto, identity:nextIdentity, settings:{}, removeUpdate:null, state:"OFF", stateAt:performance.now(),
         authorized:activation.get(scene) === true, origin:null, targetId:null, targetSince:0, legGoal:null, path:[], lastPos:null, progressAt:performance.now(), unreachable:new Map(),
         pending:null, attempts:new Map(), lootSkips:new Map(), lootAttempts:new Map(), countedDeaths:new Set(), steer:null, removeInput:null, manualUntil:0, lastDecision:-Infinity,
-        lastAction:-Infinity, lastDeath:false, statsEnabled:false, stats:null, message:"Custom Farm đang tắt." };
+        lastAction:-Infinity, lastDeath:false, statsEnabled:false, stats:null, fault:"", message:"Custom Farm đang tắt." };
       if (settings.policyMode === "custom") {
         // These are stale native-selector hints only; custom intent lives in s.targetId/state.
         scene.auto.target=0; scene.auto.think=0; scene.auto.path=[];
@@ -189,6 +192,7 @@
     if (!s) return false;
     const settings=s.settings, now=performance.now(), dt=clamp(finite(delta)?delta:0,0,1000);
     if (settings.policyMode!=="custom" || !scene.auto?.on) { release(s); transition(s,"OFF","Custom Farm đang tắt."); saveStats(s); return false; }
+    if (s.fault) { release(s); transition(s,"WAITING_FOR_DATA",s.fault); stat(s,"paused",dt); return true; }
     if (s.authorized !== true) { release(s); transition(s,"PAUSED","Custom Farm chưa được bật trực tiếp trong tab này."); stat(s,"paused",dt); return true; }
     if (!s.removeUpdate || !globalThis.GSTFarmUpdate.attached(scene)) { release(s); transition(s,"WAITING_FOR_DATA","Custom Farm đã tạm dừng: dispatcher không khả dụng."); stat(s,"paused",dt); return true; }
     if (!validScene(s)) { release(s); transition(s,"WAITING_FOR_DATA","Đang chờ xác nhận lại tài khoản, nhân vật và scene."); stat(s,"paused",dt); return true; }
@@ -308,13 +312,18 @@
   document.addEventListener("keydown",manualKey,true);
   document.addEventListener("pointerdown",manualPointer,true);
   window.addEventListener("pagehide",()=>{ for (const scene of [...activeScenes]) cleanup(scene); });
+  function pauseOwnership(scene, reason) {
+    const s=scene && sessions.get(scene); if(!s)return;
+    activation.set(scene,false); s.authorized=false; s.fault=reason; release(s); transition(s,"WAITING_FOR_DATA",reason);
+  }
   globalThis.GSTCustomFarm=Object.freeze({configure,update,states,state(scene){return sessions.get(scene)?.state??"OFF";},
+    pauseOwnership,
     status(scene){return sessions.get(scene)?.message??"Custom Farm chưa được cấu hình.";},
     stats(scene){const s=sessions.get(scene);return s?.statsEnabled&&s.stats?{...s.stats,xpPerMinute:null,potions:null}:null;},
     active(scene){const s=sessions.get(scene);return !!s&&s.settings.policyMode==="custom"&&scene.auto?.on===true&&s.authorized===true;},
     setActivationIntent(scene,enabled){activation.set(scene,enabled===true);const s=sessions.get(scene);if(s)s.authorized=enabled===true;},
-    compatible(scene){const s=sessions.get(scene);return !!s&&!!s.removeUpdate&&globalThis.GSTFarmUpdate.attached(scene);},
+    compatible(scene){const s=sessions.get(scene);return !!s&&!!s.removeUpdate&&globalThis.GSTFarmUpdate.gateReady(scene)&&globalThis.GSTFarmUpdate.attached(scene);},
     authorized(scene){return activation.get(scene)===true&&this.compatible(scene);},
-    stop(scene){const s=sessions.get(scene);activation.set(scene,false);if(!s)return;s.authorized=false;release(s);transition(s,"OFF","Custom Farm đang tắt.");saveStats(s);},
+    stop(scene){if(!scene)return;const s=sessions.get(scene);activation.set(scene,false);if(!s)return;s.authorized=false;s.fault="";release(s);transition(s,"OFF","Custom Farm đang tắt.");saveStats(s);},
     reset(scene){cleanup(scene);},});
 })();

@@ -212,6 +212,22 @@
     }
   }
   globalThis.GSTFarmActivation = Object.freeze({ sync: syncActivationTracking });
+  function ensureCustomReady(scene) {
+    try {
+      if (!scene?.auto || globalThis.GSTFarmUpdate?.installGate?.(scene) !== true) return false;
+      globalThis.GSTCustomFarm?.configure?.(scene, settings);
+      syncActivationTracking();
+      return globalThis.GSTCustomFarm?.compatible?.(scene) === true;
+    } catch { return false; }
+  }
+  window.addEventListener("click", (event) => {
+    if (settings.policyMode !== "custom" || !(event.target instanceof Element)
+        || !event.target.closest('[data-entry="auto"], [data-key="V"]')) return;
+    const scene = sceneNow();
+    if (scene?.auto?.on === true || ensureCustomReady(scene)) return;
+    message = "Custom Farm không khả dụng: không bảo vệ được controller.";
+    event.stopImmediatePropagation(); event.preventDefault();
+  }, true);
 
   function guardFarmKey(event) {
     if (settings.policyMode === "native") return;
@@ -266,6 +282,10 @@
     }
     if (scene.chat?.typing || scene.keyCapture || (!scene.auto?.on
         && (scene.self.dead || scene.uiBlocked || !connected(scene)))) return;
+    if (settings.policyMode === "custom" && !scene.auto?.on && !ensureCustomReady(scene)) {
+      shortcutMessage = "Custom Farm không khả dụng: không bảo vệ được controller.";
+      return;
+    }
     shortcutMessage = "";
     globalThis.GSTFarmRevivePolicy?.attach(scene);
     globalThis.GSTFarmBehavior?.attach(scene);
@@ -975,6 +995,11 @@
 
   function discover() {
     const scene = sceneNow();
+    if (settings.policyMode === "custom" && scene?.auto
+        && globalThis.GSTFarmUpdate?.installGate?.(scene) !== true) {
+      message = "Custom Farm không khả dụng: không bảo vệ được controller.";
+      return;
+    }
     if (scene?.auto) globalThis.GSTCustomFarm?.configure?.(scene, settings);
     if (!["extended", "custom"].includes(settings.policyMode) || identityBlocked || suspended || session) return;
     try {
@@ -1329,7 +1354,9 @@
       if (!this.ready() || !compatible(scene)) throw new Error("Farm configuration unavailable");
       blockedAuto = null; revival = null;
       if (settings.policyMode === "custom") {
+        if (globalThis.GSTFarmUpdate?.installGate?.(scene) !== true) throw new Error("Custom Farm gate unavailable");
         globalThis.GSTCustomFarm?.configure?.(scene, settings);
+        if (globalThis.GSTCustomFarm?.compatible?.(scene) !== true) throw new Error("Custom Farm dispatcher unavailable");
         globalThis.GSTFarmRevivePolicy?.attach(scene);
         globalThis.GSTFarmDefense?.attach(scene);
         globalThis.GSTFarmBossSafety?.attach(scene);
@@ -1421,6 +1448,9 @@
         globalThis.GSTCustomFarm?.stop?.(modeScene);
         if (modeScene?.auto?.on === true && typeof modeScene.toggleAutoFarm === "function") modeScene.toggleAutoFarm();
       }
+      if (settings.policyMode === "custom" && modeScene?.auto
+          && globalThis.GSTFarmUpdate?.installGate?.(modeScene) !== true)
+        message = "Custom Farm không khả dụng: không bảo vệ được controller.";
       configuredPolicyMode = settings.policyMode;
       globalThis.GSTFarmPolicy?.setMode(settings.policyMode);
       syncFarmKeyGuard();
@@ -1429,6 +1459,7 @@
       globalThis.GSTFarmSession?.setPolicyMode?.(settings.policyMode, sceneNow());
       if (settings.policyMode !== "extended" || identityBlocked) stopForLockedPolicy();
       globalThis.GSTCustomFarm?.configure?.(sceneNow(), settings);
+      if (settings.policyMode !== "custom") globalThis.GSTFarmUpdate?.removeGate?.(modeScene);
       stage = "revive";
       const farmRuntimeSettings = identityBlocked ? { ...settings, enabled: false,
         autoRespawn: false, selfDefense: false, nearbyClear: false, autoEncounter: false,
