@@ -199,6 +199,18 @@
         point: Array.isArray(nav.path?.[0]) ? [...nav.path[0]] : null, goal: [gx, gy] });
     },
     walk(scene, nav, host, time, x, y, gx, gy, reach) {
+      if (globalThis.GSTFarmPolicy?.isCustom?.()) {
+        if (!scene || GSTFarmInput.movement(scene)) return false;
+        const point = leg(scene, nav, host, gx, gy);
+        if (!point) { nav.path = []; return false; }
+        const dx = point.x - scene.px, dy = point.y - scene.py, d = Math.hypot(dx, dy);
+        if (!finite(d) || d < 0.05) return false;
+        scene.autoX = dx / d; scene.autoY = dy / d;
+        nav.path = [[point.x, point.y]];
+        schedule(scene, nav, gx, gy, reach);
+        previous.set(nav, { x: scene.px, y: scene.py, fix: scene.self?.fix, path: nav.path });
+        return true;
+      }
       if (nav === scene.auto) return scene.auto.walk.call(nav, host, time, x, y, gx, gy, reach);
       if (typeof host.clear === "function") prune(scene, nav, host);
       const result = scene.auto.walk.call(nav, host, time, x, y, gx, gy, reach);

@@ -300,7 +300,7 @@
   // Known targets inside a configured radius also need long-distance navigation.
   // Idle policy only decides what to do AFTER all eligible targets are exhausted.
   const wanted = (scene) => preferences.enabled === true;
-  const assisted = () => globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true
+  const assisted = () => globalThis.GSTFarmPolicy?.isExtended?.() === true
     && preferences.identityBlocked !== true;
   function searchArea(scene) {
     const w = scene.map?.w, h = scene.map?.h;

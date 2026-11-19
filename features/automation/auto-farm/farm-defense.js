@@ -311,7 +311,7 @@
         if (nativeBusy(scene, host)) return false;
         const candidate = matching[0].enemy;
         // Always prefer the native skill/target selector for regular farm targets.
-        if (scene.auto.target !== candidate.id
+        if (!globalThis.GSTFarmPolicy?.isCustom?.() && scene.auto.target !== candidate.id
             && !globalThis.GSTFarmMap?.handoffNearby?.(scene, candidate)
             && typeof scene.auto.pick === "function"
             && scene.auto.pick(host, time, [candidate], [], pos.x, pos.y)) {
@@ -360,12 +360,14 @@
         if (!globalThis.GSTFarmMap?.handoffNearby?.(scene, candidate)) {
           const group = outside.map(({ enemy }) => enemy);
           const temporaryHost = { ...host, enemies: () => group };
-          if (typeof scene.auto.pick !== "function"
-              || !scene.auto.pick(temporaryHost, time, group, [], pos.x, pos.y)) {
-            clearGroup(); return false;
+          if (!globalThis.GSTFarmPolicy?.isCustom?.()) {
+            if (typeof scene.auto.pick !== "function"
+                || !scene.auto.pick(temporaryHost, time, group, [], pos.x, pos.y)) {
+              clearGroup(); return false;
+            }
+            scene.auto.target = candidate.id;
+            scene.auto.think = 0;
           }
-          scene.auto.target = candidate.id;
-          scene.auto.think = 0;
         }
         nearbyAt = time; nearbyNoteAt = performance.now();
         nearbyNote = "Nhường Auto Farm gốc dùng kỹ năng khi có nhóm quái sát người.";
@@ -587,6 +589,12 @@
       attach(scene);
     },
     attach,
+    preferredTarget(scene) {
+      if (binding?.scene !== scene) return null;
+      if (episode?.attackAllowed) return episode.id;
+      if (groupActive(scene)) return [...groupIds][0] ?? null;
+      return Number.isSafeInteger(nearbyTarget) ? nearbyTarget : null;
+    },
     controls: (scene) => binding?.scene === scene && (episode !== null || nearbySteer !== null
       || groupActive(scene)),
     allowsNearbyTarget(scene, enemy) {

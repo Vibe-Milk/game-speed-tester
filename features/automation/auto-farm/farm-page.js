@@ -3,7 +3,7 @@
   const origin = "https://nghichthienky.online";
   const channel = "gst:farm:v1";
   globalThis.GSTFarmConfigurationReady = false;
-  let settings = { policyMode: "native", enabled: false, radius: 22, autoRespawn: true, targetMode: "all", targetLevel: 1, targetMinLevel: 1, targetMaxLevel: 20,
+  let settings = { policyMode: "native", customComparisonEnabled: false, enabled: false, radius: 22, autoRespawn: true, targetMode: "all", targetLevel: 1, targetMinLevel: 1, targetMaxLevel: 20,
     searchScope: "radius", idleMode: "hold", preferLoot: true, excludeBoss: false, bossFilter: "all",
     identityVerified: false, accountProfileKey: "", accountId: "", acceptPartyInvites: false, allowPlayerTargets: false,
     bossDodge: true, eliteDodge: false, bossRetreat: true, retreatHpPercent: 40, recoveryHpPercent: 100 };
@@ -23,6 +23,7 @@
   let message = "Chưa nhận được cấu hình Auto Farm từ extension.";
   let configurationError = "";
   let configurationReceived = false;
+  let configuredPolicyMode = null;
   let activationLock = null;
   let activationWatcher = null;
   let lastTrustedInputAt = -Infinity;
@@ -90,11 +91,11 @@
     return actors.some((actor) => matchesTarget(actor.st))
       || (finite(level) && matchesTarget({ cls: "boss", lv: level }));
   }
-  globalThis.GSTFarmPriority = { compare: (a, b) => settings.policyMode !== "extended" ? 0 : comparePriority(a, b),
-    ranked: () => settings.policyMode === "extended" && ranked(),
-    switchReason: (...args) => settings.policyMode !== "extended" ? "" : switchReason(...args),
-    matches: (enemy) => settings.policyMode !== "extended" || matchesTarget(enemy),
-    excludesBoss: () => settings.policyMode === "extended" && (settings.excludeBoss || ["highLevel", "lowLevel"].includes(settings.targetMode)),
+  globalThis.GSTFarmPriority = { compare: (a, b) => (!["extended","custom"].includes(settings.policyMode)) ? 0 : comparePriority(a, b),
+    ranked: () => ["extended","custom"].includes(settings.policyMode) && ranked(),
+    switchReason: (...args) => (!["extended","custom"].includes(settings.policyMode)) ? "" : switchReason(...args),
+    matches: (enemy) => !["extended","custom"].includes(settings.policyMode) || matchesTarget(enemy),
+    excludesBoss: () => ["extended","custom"].includes(settings.policyMode) && (settings.excludeBoss || ["highLevel", "lowLevel"].includes(settings.targetMode)),
     realmBossEligible,
     bossFocus: (scene) => settings.policyMode === "extended" && ["boss", "bossLevel"].includes(settings.targetMode)
       && realmBossEligible(scene) };
@@ -113,7 +114,7 @@
     return labeled("Farm tất cả quái");
   }
   function matchesTarget(enemy) {
-    if (settings.policyMode !== "extended") return true;
+    if (!["extended", "custom"].includes(settings.policyMode)) return true;
     if (isBoss(enemy) && settings.bossFilter === "world" && !isWorldBoss(enemy)) return false;
     if ((settings.excludeBoss || settings.targetMode === "highLevel" || settings.targetMode === "lowLevel") && isBoss(enemy)) return false;
     if (settings.targetMode === "boss") return isBoss(enemy);
@@ -137,7 +138,7 @@
     }
   }
   function needsActivationTracking() {
-    return identityBlocked || settings.policyMode === "disabled"
+    return identityBlocked || settings.policyMode === "disabled" || settings.policyMode === "custom"
       || globalThis.GSTHarvest?.needsFarmCoordination?.() === true
       || globalThis.GSTMeditation?.wantsFarmActivationObserver?.() === true;
   }
@@ -153,17 +154,32 @@
       const descriptor = Object.getOwnPropertyDescriptor(scene.auto, "toggle");
       const owner = { scene, auto: scene.auto, original, descriptor, stopRequested: false };
       owner.wrapper = function (...args) {
-        if ((identityBlocked || settings.policyMode === "disabled") && this.on === false) {
-          message = identityBlocked ? "Auto Farm đang chờ xác nhận đúng tài khoản." : "Auto Farm đang bị khóa bởi chế độ Disabled. Hãy đổi chế độ rồi bật lại bằng tay.";
+        if ((identityBlocked || settings.policyMode === "disabled" || settings.policyMode === "custom" && !globalThis.GSTCustomFarm?.compatible?.(scene)) && this.on === false) {
+          message = identityBlocked ? "Auto Farm đang chờ xác nhận đúng tài khoản." : settings.policyMode === "custom" ? "Custom Farm không khả dụng; không bật native Farm dự phòng." : "Auto Farm đang bị khóa bởi chế độ Disabled. Hãy đổi chế độ rồi bật lại bằng tay.";
           return undefined;
         }
         const wasOn = this.on === true;
+        const foreignMovement = [globalThis.GSTHarvest, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense,
+          globalThis.GSTMapTravel, globalThis.GSTQuest, globalThis.GSTFarmSeals, globalThis.GSTRealm, globalThis.GSTChest]
+          .some((owner) => { try { return owner?.controls?.(scene) === true; } catch { return false; } });
+        const movement = foreignMovement ? [scene.autoX, scene.autoY] : null;
         const result = original.apply(this, args);
+        if (movement && scene.autoX === 0 && scene.autoY === 0
+            && movement.every(finite) && (movement[0] !== 0 || movement[1] !== 0))
+          [scene.autoX, scene.autoY] = movement;
+        if (wasOn && this.on === false && settings.policyMode === "custom") {
+          globalThis.GSTCustomFarm?.setActivationIntent?.(scene, false);
+          globalThis.GSTCustomFarm?.stop?.(scene);
+          owner.stopRequested = false;
+        }
         if (!wasOn && this.on === true) {
-          globalThis.GSTMeditation?.farmStarted?.(scene);
-          if (performance.now() - lastTrustedInputAt < 700
-              && globalThis.GSTFarmSession?.restoring?.(scene) !== true)
-            globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
+          const explicit = (performance.now() - lastTrustedInputAt < 700
+            || settings.policyMode === "custom" && globalThis.GSTCustomFarm?.authorized?.(scene) === true)
+            && globalThis.GSTFarmSession?.restoring?.(scene) !== true;
+          if (settings.policyMode === "custom") globalThis.GSTCustomFarm?.setActivationIntent?.(scene, explicit);
+          else globalThis.GSTMeditation?.farmStarted?.(scene);
+          if (explicit) globalThis.GSTHarvest?.coordinateFarmEnable?.(scene);
+          owner.stopRequested = false;
         }
         return result;
       };
@@ -177,10 +193,13 @@
     const owner = activationLock;
     if (scene.auto.on && !owner.stopRequested) {
       owner.stopRequested = true;
-      if (identityBlocked || settings.policyMode === "disabled") {
+      if (settings.policyMode === "custom" && globalThis.GSTCustomFarm?.authorized?.(scene) !== true) {
+        message = "Custom Farm yêu cầu bật trực tiếp trong tab này; trạng thái tự khôi phục đã bị dừng.";
+        scene.toggleAutoFarm();
+      } else if (identityBlocked || settings.policyMode === "disabled") {
         // The lock is installed first; this is the single native OFF request.
         scene.toggleAutoFarm();
-      } else globalThis.GSTMeditation?.farmStarted?.(scene);
+      } else if (settings.policyMode !== "custom") globalThis.GSTMeditation?.farmStarted?.(scene);
     }
   }
   function syncActivationTracking() {
@@ -949,15 +968,29 @@
   function watch() {
     // Independent defense/meditation helpers still need a scene watcher when
     // the user disables respawn and expanded filtering.
-    if (settings.policyMode === "extended" && !identityBlocked && !suspended && !session && watcher === null) {
+    if (["extended","custom"].includes(settings.policyMode) && !identityBlocked && !suspended && !session && watcher === null) {
       watcher = setInterval(discover, 1000);
     }
   }
 
   function discover() {
-    if (settings.policyMode !== "extended" || identityBlocked || suspended || session) return;
+    const scene = sceneNow();
+    if (scene?.auto) globalThis.GSTCustomFarm?.configure?.(scene, settings);
+    if (!["extended", "custom"].includes(settings.policyMode) || identityBlocked || suspended || session) return;
     try {
-      const scene = sceneNow();
+      if (settings.policyMode === "custom") {
+        globalThis.GSTCustomFarm?.configure?.(scene, settings);
+        globalThis.GSTFarmRevivePolicy?.attach(scene);
+        checkRespawn(scene);
+        globalThis.GSTFarmDefense?.attach(scene);
+        globalThis.GSTFarmEncounter?.attach(scene);
+        globalThis.GSTFarmBossSafety?.attach(scene);
+        globalThis.GSTFarmVisual?.configure?.(scene, settings);
+        globalThis.GSTFarmVisual?.attach(scene);
+        globalThis.GSTFarmDiagnostics?.attach(scene);
+        message = globalThis.GSTCustomFarm?.status?.(scene) ?? "Custom Farm: waiting.";
+        return;
+      }
       globalThis.GSTFarmSkillDiagnostics?.setContext?.(scene, settings);
       if (settings.acceptPartyInvites) globalThis.GSTFarmParty?.configure(scene, settings);
       // Revival policy is independent of extended targeting. Attach it even
@@ -1291,10 +1324,17 @@
 
   globalThis.GSTFarmQuest = {
     ready: () => globalThis.GSTFarmConfigurationReady === true
-      && settings.policyMode === "extended" && settings.targetMode === "all",
+      && ["extended", "custom"].includes(settings.policyMode) && settings.targetMode === "all",
     prepare(scene) {
       if (!this.ready() || !compatible(scene)) throw new Error("Farm configuration unavailable");
       blockedAuto = null; revival = null;
+      if (settings.policyMode === "custom") {
+        globalThis.GSTCustomFarm?.configure?.(scene, settings);
+        globalThis.GSTFarmRevivePolicy?.attach(scene);
+        globalThis.GSTFarmDefense?.attach(scene);
+        globalThis.GSTFarmBossSafety?.attach(scene);
+        return;
+      }
       globalThis.GSTFarmCombat?.attach(scene);
       globalThis.GSTFarmRevivePolicy?.attach(scene);
       globalThis.GSTFarmBehavior?.attach(scene);
@@ -1349,7 +1389,7 @@
       identityBlocked = data.identityBlocked === true;
       if (wasIdentityBlocked !== identityBlocked && activationLock) activationLock.stopRequested = false;
       settings = { policyMode: globalThis.GSTFarmPolicy?.normalize(data.policyMode) ?? "extended",
-        identityBlocked, identityVerified: data.identityVerified === true,
+        identityBlocked, identityVerified: data.identityVerified === true, customComparisonEnabled: data.customComparisonEnabled === true,
         accountProfileKey: typeof data.accountProfileKey === "string" ? data.accountProfileKey : "",
         accountId: typeof data.accountId === "string" ? data.accountId : "",
         slot: typeof data.accountSlot === "string" ? data.accountSlot : "",
@@ -1376,12 +1416,19 @@
         bossFilter: data.bossFilter === "world" ? "world" : "all" };
       globalThis.GSTFarmSkillDiagnostics?.setContext?.(sceneNow(), settings);
       stage = "policy";
+      const modeScene = sceneNow();
+      if (configuredPolicyMode !== null && configuredPolicyMode !== settings.policyMode) {
+        globalThis.GSTCustomFarm?.stop?.(modeScene);
+        if (modeScene?.auto?.on === true && typeof modeScene.toggleAutoFarm === "function") modeScene.toggleAutoFarm();
+      }
+      configuredPolicyMode = settings.policyMode;
       globalThis.GSTFarmPolicy?.setMode(settings.policyMode);
       syncFarmKeyGuard();
       stage = "session";
       globalThis.GSTFarmSession?.setIdentityBlocked?.(identityBlocked, sceneNow());
       globalThis.GSTFarmSession?.setPolicyMode?.(settings.policyMode, sceneNow());
       if (settings.policyMode !== "extended" || identityBlocked) stopForLockedPolicy();
+      globalThis.GSTCustomFarm?.configure?.(sceneNow(), settings);
       stage = "revive";
       const farmRuntimeSettings = identityBlocked ? { ...settings, enabled: false,
         autoRespawn: false, selfDefense: false, nearbyClear: false, autoEncounter: false,
@@ -1486,7 +1533,7 @@
         message: (settings.policyMode === "extended" && targetFilterActive() ? `${filterLabel()}. ` : "") + (shortcutMessage
           || (dead && respawnMessage ? respawnMessage : primary)) + (defenseInfo ? ` · ${defenseInfo}` : ""),
         encounterStatus: encounterInfo,
-        autoOn, dead, active: session !== null, radius: settings.radius }, origin);
+        autoOn, dead, policyMode: settings.policyMode, customState: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.state?.(scene) ?? "WAITING_FOR_DATA" : null, customComparisonEnabled: settings.customComparisonEnabled === true, customStats: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.stats?.(scene) ?? null : null, active: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.active?.(scene) === true : session !== null, radius: settings.radius }, origin);
     }
   });
   window.addEventListener("pagehide", () => {

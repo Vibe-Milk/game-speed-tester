@@ -24,12 +24,13 @@
         inCombat: () => { combat = true; return host.inCombat(); } };
     },
     attach(scene) {
-      if (!enabled || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !scene?.auto) { detach(); return; }
+      if (!enabled || globalThis.GSTFarmPolicy?.isCustom?.() || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !scene?.auto) { detach(); return; }
       if (binding && binding.scene === scene && binding.auto === scene.auto && GSTFarmUpdate.attached(scene)) return;
       detach();
       if (!scene?.sys?.isActive?.() || typeof scene.auto?.update !== "function" || !scene.events?.on || !scene.events.off) return;
       const owner = { scene, auto: scene.auto, requested: false };
       owner.remove = GSTFarmUpdate.add(scene, -1, function (host) {
+        if (globalThis.GSTFarmPolicy?.isCustom?.()) { this.resting = false; owner.requested = false; return false; }
         if (!this.on || scene.self?.dead || !this.resting) { owner.requested = false; return false; }
         if (host.meditating?.()) {
           if (!owner.requested && typeof host.meditate === "function") { owner.requested = true; host.meditate(); }

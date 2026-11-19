@@ -220,6 +220,7 @@
     },
     remember: (scene) => { if (policyMode === "extended" && keep && scene?.auto?.on) save(scene, true); },
     restoring: (scene) => binding?.scene === scene && binding.restoring === true,
+    keepEnabled: () => keep === true,
     deathInterruption: (scene) => {
       const state = deathInterruption;
       return !!state && state.scene === scene && state.auto === scene?.auto

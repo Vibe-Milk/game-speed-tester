@@ -62,7 +62,7 @@
     const scene = binding?.scene;
     if (!scene) return;
     if (sceneNow() !== scene || scene.auto !== binding.auto || !scene.sys?.isActive?.()) { detach(); return; }
-    if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.()) {
+    if (!globalThis.GSTFarmPolicy?.isExtended?.()) {
       detach();
       return;
     }
@@ -150,7 +150,7 @@
   function collectLoot(host, time) {
     const scene = binding?.scene;
     try {
-      if (!scene || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.()) return false;
+      if (!scene || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || globalThis.GSTFarmPolicy?.isCustom?.()) return false;
       const plan = lootPlan(scene, host, time);
       if (plan?.waiting) lootWaiting = true;
       else if (lootWaiting && (!plan || !plan.waiting)) {
@@ -249,7 +249,7 @@
     observedTarget = null; lootSite = null; lootActive = false; lootWaiting = false; lootLastCount = 0; lootAbandoned = false;
   }
   function attach(scene) {
-    if (!configured || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || suspended) { detach(); return; }
+    if (!configured || !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || globalThis.GSTFarmPolicy?.isCustom?.() || suspended) { detach(); return; }
     if (binding && binding.scene === scene && binding.auto === scene?.auto && GSTFarmUpdate.attached(scene)) return;
     detach();
     if (!scene?.sys?.isActive?.() || !scene.self || !connected(scene) || typeof scene.auto?.idle !== "function"
@@ -290,7 +290,7 @@
         nearbyClear: value.nearbyClear === true, nearbyRadius: value.nearbyRadius };
       if (binding && binding.scene !== scene) detach();
       settings = next;
-      if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.()) {
+      if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || globalThis.GSTFarmPolicy?.isCustom?.()) {
         detach();
         return;
       }

@@ -30,6 +30,7 @@ const fontFeedback = document.getElementById("fontFeedback");
 const farmControls = document.getElementById("farmControls");
 const farmRightControls = document.getElementById("farmRightControls");
 const farmPolicyMode = document.getElementById("farmPolicyMode");
+const farmCustomStats = document.getElementById("farmCustomStats");
 const farmPolicySavedMode = document.getElementById("farmPolicySavedMode");
 const farmPolicyDescription = document.getElementById("farmPolicyDescription");
 const farmPolicyRuntimeStatus = document.getElementById("farmPolicyRuntimeStatus");
@@ -221,6 +222,7 @@ function updatePopupAccountContext(context) {
   if (context && popupAccountTabId !== null) context = { ...context, tabId: popupAccountTabId };
   if (samePopupContext(popupAccountContext, context, popupAccountTabId)) return false;
   if (previous !== null || context !== null) popupAccountBindingRequired = true;
+  farmTabPolicyMode = null;
   popupAccountContext = context;
   popupAccountContextVersion++;
   globalThis.GSTPopupAccountContext = context;
@@ -470,11 +472,26 @@ async function refreshFarm() {
     const tabId = popupAccountTabId;
     if (!Number.isInteger(tabId)) throw new Error("No bound game tab.");
     const status = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-status" });
+    if (document.activeElement !== farmCustomStats) farmCustomStats.checked = status.customComparisonEnabled === true;
+    if (["extended", "custom", "native", "disabled"].includes(status.policyMode)) {
+      farmTabPolicyMode = status.policyMode;
+      if (farmPolicyPending === 0) {
+        farmPolicyMode.value = status.policyMode;
+        farmPolicyDescription.textContent = status.policyMode === farmPolicyConfirmed
+          ? farmPolicyDescriptions[status.policyMode]
+          : `Tab này dùng ${farmPolicyLabels[status.policyMode]}; mặc định đã lưu là ${farmPolicyLabels[farmPolicyConfirmed]}.`;
+        farmCustomStats.disabled = !farmSyncReady || status.policyMode !== "custom" || !popupAccountContext?.verified;
+      }
+    }
     const farmLabel = status.autoOn === true ? "BẬT" : status.autoOn === false ? "TẮT" : "CHƯA RÕ";
     autoFarmValue.textContent = status.autoOn === true ? "Đang bật" : status.autoOn === false ? "Đã tắt" : "Chưa rõ";
     autoFarmValue.dataset.state = status.autoOn === true ? "on" : status.autoOn === false ? "off" : "unknown";
-    farmPolicyRuntimeStatus.textContent = `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
-    farmStatus.textContent = `Auto Farm của game: ${farmLabel}${status.dead ? " · Đã chết" : ""}. ${status.message}`;
+    farmPolicyRuntimeStatus.textContent = status.policyMode === "custom"
+      ? `Custom Farm thử nghiệm trong tab này: ${status.customState || "WAITING_FOR_DATA"} · ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`
+      : `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
+    const customStats = status.customStats;
+    const statsLabel = customStats ? ` · So sánh tab: chạy ${Math.floor(customStats.elapsed/1000)}s, tạm dừng ${Math.floor(customStats.paused/1000)}s, kẹt ${Math.floor(customStats.stuck/1000)}s, chết ${customStats.observedDeaths}, mục tiêu có cờ chết ${customStats.observedKills}; XP/phút không khả dụng, potion không thể quy kết.` : "";
+    farmStatus.textContent = `Auto Farm của game: ${farmLabel}${status.dead ? " · Đã chết" : ""}. ${status.message}${statsLabel}`;
     document.getElementById("farmEncounterStatus").textContent = status.encounterStatus || "";
   } catch {
     autoFarmValue.textContent = "Chưa rõ";
@@ -495,13 +512,15 @@ let farmHpThresholdOperation = null, farmHpThresholdFollowupCount = 0, farmHpThr
 let farmPolicyLoaded = false;
 let farmPolicyHasSavedValue = false;
 let farmPolicyConfirmed = null;
+let farmTabPolicyMode = null;
 let farmPolicyPending = 0;
 let farmPolicyRequestRevision = 0;
 let farmPolicyWaiters = [];
 let selectingFarmPolicy = false;
-const farmPolicyLabels = Object.freeze({ extended: "Tool hỗ trợ", native: "Theo game gốc", disabled: "Khóa Auto Farm" });
+const farmPolicyLabels = Object.freeze({ extended: "Tool hỗ trợ", custom: "Thử nghiệm · Custom Farm", native: "Theo game gốc", disabled: "Khóa Auto Farm" });
 const farmPolicyDescriptions = Object.freeze({
   extended: "Đang chọn Tool hỗ trợ: dùng farm gốc với các hỗ trợ đã cài của extension.",
+  custom: "Đang chọn Custom Farm thử nghiệm: vòng quyết định riêng dùng dữ liệu đang hiển thị; mặc định tắt cho tới khi bật Auto Farm trong game. Kết quả chưa được đo kiểm.",
   native: "Đang chọn Theo game gốc: farm gốc tự điều khiển, không có hỗ trợ farm riêng của extension.",
   disabled: "Đang chọn Khóa Auto Farm: dừng farm đang chạy và chặn các đường bật được hỗ trợ."
 });
@@ -544,7 +563,7 @@ function syncFarmPolicyUI(raw = {}) {
   farmPolicyConfirmed = confirmedMode;
   farmPolicyHasSavedValue = typeof raw.policyMode === "string" && globalThis.GSTFarmPolicy.modes.includes(raw.policyMode);
   const pendingSelection = farmPolicyPending > 0 ? farmPolicyMode.value : null;
-  farmPolicyMode.value = confirmedMode;
+  farmPolicyMode.value = farmTabPolicyMode ?? confirmedMode;
   if (pendingSelection && globalThis.GSTFarmPolicy.modes.includes(pendingSelection)) farmPolicyMode.value = pendingSelection;
   const accountAllowed = !accountContextLoaded || (popupAccountContext
     ? popupAccountContext.verified === true : !popupAccountBindingRequired);
@@ -552,18 +571,25 @@ function syncFarmPolicyUI(raw = {}) {
   farmPolicySavedMode.textContent = farmPolicyHasSavedValue
     ? `Chế độ đã lưu: ${farmPolicyLabels[confirmedMode]}.`
     : `Chưa có chế độ hợp lệ được lưu; mặc định hiện tại: ${farmPolicyLabels[confirmedMode]}.`;
-  farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyMode.value] ?? "Đang đọc chế độ…";
+  farmPolicyDescription.textContent = farmTabPolicyMode && farmTabPolicyMode !== confirmedMode
+    ? `Tab này dùng ${farmPolicyLabels[farmTabPolicyMode]}; mặc định đã lưu là ${farmPolicyLabels[confirmedMode]}.`
+    : farmPolicyDescriptions[farmPolicyMode.value] ?? "Đang đọc chế độ…";
+  const tabMode = farmTabPolicyMode ?? confirmedMode;
   const extended = confirmedMode === "extended";
-  farmControls.disabled = !farmSyncReady || !extended || !accountAllowed;
-  farmRightControls.disabled = !farmSyncReady || !extended || !accountAllowed;
+  const assisted = extended || confirmedMode === "custom";
+  farmControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  farmRightControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  farmCustomStats.disabled = !farmSyncReady || tabMode !== "custom" || !accountAllowed;
   syncBossTargetControls();
-  breakSeals.disabled = !farmSyncReady || !extended || !accountAllowed;
-  shortcutControls.disabled = !farmSyncReady || !extended || !accountAllowed;
-  farmAssistanceAvailability.hidden = extended || !farmSyncReady;
+  breakSeals.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  shortcutControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  farmAssistanceAvailability.hidden = assisted || !farmSyncReady;
   farmAssistanceAvailability.textContent = !accountAllowed
     ? "Xác nhận nick trong tab game trước khi sửa cài đặt riêng."
     : confirmedMode === "disabled"
     ? "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng dùng lại khi bạn mở khóa và chọn chế độ phù hợp."
+    : confirmedMode === "custom"
+    ? "Custom Farm là thử nghiệm riêng; bật riêng trong tab bạn muốn so sánh. Thống kê nếu bật được lưu cục bộ theo tab."
     : "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng chỉ áp dụng ở Tool hỗ trợ.";
 }
 function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {}) {
@@ -648,12 +674,33 @@ window.addEventListener("gst:popup-account-context-change", async (event) => {
   syncFarmPreferences(preferences, { preserveDraft: false, forceKeys: ["radius", "nearbyRadius",
     "targetLevel", "targetMinLevel", "targetMaxLevel", "retreatHpPercent", "recoveryHpPercent"] });
 });
+farmCustomStats.addEventListener("change", async () => {
+  const enabled = farmCustomStats.checked, tabId = popupAccountTabId;
+  farmCustomStats.disabled = true;
+  try {
+    if (!Number.isInteger(tabId)) throw new Error("No bound game tab.");
+    const context = popupAccountContext ? { ...popupAccountContext } : null;
+    const result = await chrome.tabs.sendMessage(tabId, {
+      type: "gst:farm-custom-stats", enabled, targetTabId: tabId,
+      profileIdentity: context?.verified === true ? GSTAccountProfiles.identity(context) : null
+    });
+    if (result?.accepted !== true) throw new Error("Not accepted.");
+    farmPolicyFeedback.textContent = enabled
+      ? "Thống kê thử nghiệm được bật riêng cho tab này."
+      : "Thống kê thử nghiệm đã tắt riêng cho tab này.";
+  } catch {
+    farmCustomStats.checked = !enabled;
+    farmPolicyFeedback.textContent = "Không thể xác nhận cài đặt theo tab; trạng thái trước đó được giữ.";
+  } finally {
+    farmCustomStats.disabled = !farmSyncReady || (farmTabPolicyMode ?? farmPolicyConfirmed) !== "custom";
+  }
+});
 farmPolicyMode.addEventListener("change", async () => {
   const mode = globalThis.GSTFarmPolicy.normalize(farmPolicyMode.value);
   const requestRevision = ++farmPolicyRequestRevision;
-  if (mode === farmPolicyConfirmed && farmPolicyPending === 0) {
-    farmPolicyMode.value = farmPolicyConfirmed;
-    farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyConfirmed];
+  if (mode === (farmTabPolicyMode ?? farmPolicyConfirmed) && farmPolicyPending === 0) {
+    farmPolicyMode.value = farmTabPolicyMode ?? farmPolicyConfirmed;
+    farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyMode.value];
     return;
   }
   farmPolicyPending++;
@@ -668,10 +715,25 @@ farmPolicyMode.addEventListener("change", async () => {
     if (requestRevision !== farmPolicyRequestRevision) return;
     if (farmStorageRevision !== revisionAtRead && latestFarmPreferences) committed = latestFarmPreferences;
     latestFarmPreferences = committed;
+    let localAccepted = false;
+    const targetTabId = popupAccountTabId, targetContext = popupAccountContext ? { ...popupAccountContext } : null;
+    if (Number.isInteger(targetTabId) && targetContext?.verified === true) {
+      try {
+        const result = await chrome.tabs.sendMessage(targetTabId, {
+          type: "gst:farm-policy-tab", mode: committed.policyMode, targetTabId,
+          profileIdentity: GSTAccountProfiles.identity(targetContext), updatedAt: Date.now()
+        });
+        localAccepted = result?.accepted === true;
+      } catch {}
+    }
+    if (requestRevision !== farmPolicyRequestRevision) return;
+    if (localAccepted) farmTabPolicyMode = committed.policyMode;
     syncFarmPreferences(committed);
-    farmPolicyFeedback.textContent = committed.policyMode === mode
-      ? `Đã lưu chế độ ${farmPolicyLabels[mode]}. Trạng thái farm được đọc riêng từ game.`
-      : `Đã đồng bộ chế độ ${farmPolicyLabels[committed.policyMode]} từ cài đặt mới nhất.`;
+    farmPolicyFeedback.textContent = committed.policyMode === mode && localAccepted
+      ? `Đã lưu mặc định ${farmPolicyLabels[mode]} và áp dụng trong tab này. Các tab đang mở khác giữ chế độ riêng của chúng.`
+      : localAccepted
+        ? `Đã đồng bộ chế độ ${farmPolicyLabels[committed.policyMode]} mới nhất và áp dụng trong tab này.`
+        : "Đã lưu chế độ hồ sơ, nhưng chưa xác nhận được chế độ cục bộ của tab này.";
   } catch {
     if (requestRevision === farmPolicyRequestRevision) {
       let rollback = latestFarmPreferences ?? farmConfirmed;
@@ -680,15 +742,15 @@ farmPolicyMode.addEventListener("change", async () => {
       if (farmStorageRevision !== revisionAtRead && latestFarmPreferences) rollback = latestFarmPreferences;
       latestFarmPreferences = rollback;
       syncFarmPreferences(rollback);
-      farmPolicyMode.value = farmPolicyConfirmed;
-      farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyConfirmed];
+      farmPolicyMode.value = farmTabPolicyMode ?? farmPolicyConfirmed;
+      farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyMode.value];
       farmPolicyFeedback.textContent = "Chưa lưu được chế độ; đã trả bộ chọn về giá trị đã xác nhận gần nhất.";
     }
   } finally {
     farmPolicyPending--;
     if (farmPolicyPending === 0 && requestRevision === farmPolicyRequestRevision) {
-      farmPolicyMode.value = farmPolicyConfirmed;
-      farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyConfirmed];
+      farmPolicyMode.value = farmTabPolicyMode ?? farmPolicyConfirmed;
+      farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyMode.value];
     }
     syncBossTargetControls();
     if (farmPolicyPending === 0) {
@@ -728,7 +790,7 @@ function syncBossTargetControls() {
   const mode = farmTargetMode.value || farmConfirmed.targetMode || "all";
   const excluded = farmExcludeBoss.checked;
   const ordinaryOnly = ["highLevel", "lowLevel"].includes(mode);
-  const unavailable = !farmSyncReady || farmConfirmed.policyMode !== "extended"
+  const unavailable = !farmSyncReady || !["extended", "custom"].includes(farmConfirmed.policyMode)
     || farmPreferenceWritesPending > 0 || farmPolicyPending > 0;
   farmBossFilter.disabled = unavailable || excluded || ordinaryOnly;
   farmExcludeBoss.disabled = unavailable;
@@ -1018,7 +1080,7 @@ function commitFarmHpThresholds() {
       }
       if (!saved) farmRetreatThresholdError.textContent = "Chưa lưu được cặp ngưỡng HP; cài đặt đã lưu trước đó được giữ.";
       if (farmHpThresholdFollowupRequested && farmHpThresholdFollowupCount < 2
-          && farmConfirmed.policyMode === "extended") {
+          && ["extended", "custom"].includes(farmConfirmed.policyMode)) {
         farmHpThresholdFollowupRequested = false;
         farmHpThresholdFollowupCount++;
         farmHpThresholdCommit = null;
@@ -1040,11 +1102,11 @@ for (const input of [farmRetreatHpPercent, farmRecoveryHpPercent]) {
   input.addEventListener("input", () => {
     farmHpEditRevision++;
     if (farmHpThresholdCommit && farmHpThresholdFollowupCount < 2
-        && farmConfirmed.policyMode === "extended") farmHpThresholdFollowupRequested = true;
+        && ["extended", "custom"].includes(farmConfirmed.policyMode)) farmHpThresholdFollowupRequested = true;
     farmRetreatThresholdError.textContent = "";
   });
   input.addEventListener("blur", (event) => {
-    if (farmConfirmed.policyMode !== "extended" || selectingFarmPolicy
+    if (!["extended", "custom"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
         || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
     void commitFarmHpThresholds();
   });
@@ -1058,7 +1120,7 @@ farmRadius.addEventListener("input", () => {
   farmMessage("Bản nháp chưa lưu.");
 });
 farmRadius.addEventListener("blur", (event) => {
-  if (farmConfirmed.policyMode !== "extended" || selectingFarmPolicy
+  if (!["extended", "custom"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
       || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
   void commitFarmRadius();
 });
@@ -1073,7 +1135,7 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (farmPolicyPending > 0) await new Promise((resolve) => farmPolicyWaiters.push(resolve));
   const startedWrites = [...new Map([...writesAtRequest, ...farmWrites.entries()]).entries()];
   const pending = [];
-  const active = farmConfirmed.policyMode === "extended";
+  const active = ["extended", "custom"].includes(farmConfirmed.policyMode);
   const mode = activeFarmTargetMode(), targetDraft = farmLevelDraft();
   if (farmSingleCommit) pending.push(farmSingleCommit);
   else if (active && ["maxLevel", "minLevel"].includes(mode) && targetDraft.dirty) pending.push(commitFarmSingle(mode));
@@ -1089,12 +1151,12 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
     // A write may finish while the user is still editing. Drain a small,
     // bounded number of latest complete pairs; leave any newer draft visible.
     for (let attempt = 0; attempt < 3 && farmHpThresholdDraft().dirty; attempt++) {
-      if (farmConfirmed.policyMode !== "extended") break;
+      if (!["extended", "custom"].includes(farmConfirmed.policyMode)) break;
       if (!farmHpThresholdDraft().valid) break;
       results = [...results, await commitFarmHpThresholds()];
     }
   }
-  if (active && farmConfirmed.policyMode !== "extended")
+  if (active && !["extended", "custom"].includes(farmConfirmed.policyMode))
     return { saved: false, reason: "policy-changed" };
   const writes = new Map([...startedWrites, ...farmWrites.entries()]);
   const writeEntries = [...writes.entries()];
@@ -1106,7 +1168,7 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (!active) {
     if (discardInactiveDrafts) {
       // Re-check in case a newer confirmed policy arrived while writes settled.
-      if (farmConfirmed.policyMode === "extended") return { saved: false, reason: "policy-changed" };
+      if (["extended", "custom"].includes(farmConfirmed.policyMode)) return { saved: false, reason: "policy-changed" };
       if (failedOtherWrite) return { saved: false, reason: "persistence" };
       if (farmHasDraft()) {
         farmHpSyncedEditRevision = farmHpEditRevision;

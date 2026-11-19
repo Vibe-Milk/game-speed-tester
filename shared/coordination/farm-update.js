@@ -16,6 +16,7 @@
     runRecovery(scene, host, ...args) {
       const auto = scene?.auto;
       const entry = auto && bindings.get(auto);
+      if (globalThis.GSTFarmPolicy?.isCustom?.()) return { ran: false };
       if (!entry || auto.update !== entry.wrapper || !auto.on || typeof auto.resting !== "boolean"
           || typeof entry.original !== "function" || !host || typeof host !== "object") return { ran: false };
       const wasResting = auto.resting;
@@ -45,17 +46,21 @@
       if (!entry) {
         const original = auto.update;
         const descriptor = Object.getOwnPropertyDescriptor(auto, "update");
-        entry = { original, descriptor, callbacks: new Map(), ordered: [], nativeUpdateDepth: 0 };
+        entry = { scene, original, descriptor, callbacks: new Map(), ordered: [], nativeUpdateDepth: 0 };
         entry.wrapper = function (...args) {
           if (this === auto) {
             for (const handler of entry.ordered) if (handler.callback.apply(this, args) === true) return;
+            if (globalThis.GSTFarmPolicy?.isCustom?.()) {
+              if (entry.scene) return globalThis.GSTCustomFarm?.update?.(entry.scene, args[0], args[1], args[2]) ?? true;
+              return;
+            }
           }
           let nativeArgs = args;
           if (this === auto && globalThis.GSTFarmCombat?.active(scene)) {
             nativeArgs = [...args];
             nativeArgs[0] = GSTFarmCombat.host(scene, args[0]);
           }
-          if (this !== auto) return original.apply(this, args);
+          if (this !== auto) return globalThis.GSTFarmPolicy?.isCustom?.() ? undefined : original.apply(this, args);
           entry.nativeUpdateDepth++;
           try { return original.apply(this, nativeArgs); }
           finally { entry.nativeUpdateDepth--; }

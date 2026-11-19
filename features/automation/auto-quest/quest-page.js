@@ -439,11 +439,12 @@
           if (s.auto.on) { stop("Auto Farm bị bật ngoài lượt quest; đã dừng để tránh xung đột."); return false; }
           run.phase = "farm";
           GSTFarmQuest.prepare(s);
+          if (globalThis.GSTFarmPolicy?.isCustom?.()) globalThis.GSTCustomFarm?.setActivationIntent?.(s,true);
           s.toggleAutoFarm();
           if (!s.auto.on) { stop("Chưa bật được Auto Farm gốc; kiểm tra điều kiện trong game."); return false; }
           run.ownedAuto = true;
         }
-        message = `Đang làm quest: ${q.title}. Dùng Auto Farm gốc trong phạm vi đã cài.`;
+        message = `Đang làm quest: ${q.title}. ${globalThis.GSTFarmPolicy?.isCustom?.() ? "Custom Farm đang chạy." : "Dùng Auto Farm gốc trong phạm vi đã cài."}`;
         return false;
       }
       if (s.auto.on) {

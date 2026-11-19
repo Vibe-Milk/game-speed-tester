@@ -41,11 +41,16 @@
         // shared HP/MP throttling. Never send a separate input or change HP.
         const wait = auto.wait(host, kind, time);
         if (!(time > auto.pillAt) || !finite(wait) || wait > 0) continue;
+        owner.lastActionAt = time;
         auto.drink(host, kind, pills, value, time);
         break; // HP first; MP on a later eligible tick.
       }
     } catch { /* A potion helper must not interrupt the game frame. */ }
   }
+  globalThis.GSTAutoPotion = Object.freeze({ configured: () => enabled(), busy(scene) {
+    return !!binding && binding.scene === scene && finite(binding.lastActionAt)
+      && scene.now?.() - binding.lastActionAt < 0.35;
+  } });
   function detach() {
     const old = binding;
     binding = null;

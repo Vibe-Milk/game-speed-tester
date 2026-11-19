@@ -2,7 +2,7 @@
 // Copy-Item -LiteralPath .\features\automation\auto-farm\farm-policy.js -Destination .\features\automation\auto-farm\farm-policy-main.js
 (() => {
   "use strict";
-  const modes = Object.freeze(["extended", "native", "disabled"]);
+  const modes = Object.freeze(["extended", "custom", "native", "disabled"]);
   const DEFAULT_MODE = "extended";
   const normalize = (value) => modes.includes(value) ? value : DEFAULT_MODE;
   // MAIN starts closed to farm assistance until the stored mode arrives over
@@ -16,8 +16,9 @@
     mode: () => activeMode,
     isNative: () => activeMode === "native",
     isExtended: () => activeMode === "extended",
+    isCustom: () => activeMode === "custom",
     isDisabled: () => activeMode === "disabled",
-    hasExtensionAssistance: () => activeMode === "extended",
+    hasExtensionAssistance: () => activeMode === "extended" || activeMode === "custom",
     setMode(value) { activeMode = normalize(value); return activeMode; },
     read(preferences) { return normalize(preferences?.policyMode); },
     withMode(preferences, mode) { return { ...(preferences ?? {}), policyMode: normalize(mode) }; },

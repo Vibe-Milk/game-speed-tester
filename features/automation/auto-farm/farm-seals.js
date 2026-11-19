@@ -252,7 +252,7 @@
     if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:farm:v1"
         || event.data.type !== "configure") return;
     enabled = event.data.identityBlocked !== true
-      && event.data.breakSeals === true && event.data.policyMode === "extended";
+      && event.data.breakSeals === true && ["extended", "custom"].includes(event.data.policyMode);
     if (!enabled) {
       detach(); clearInterval(watcher); watcher = null; message = "";
       // If safety existed only because seals were active, release it now.

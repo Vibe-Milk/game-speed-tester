@@ -199,7 +199,7 @@
     if (data?.channel === "gst:farm:v1" && data.type === "configure") {
       // Native mode removes only the flight demand owned by Auto Farm.
       // Always Flying remains an independent demand.
-      farm = data.policyMode === "extended";
+      farm = ["extended", "custom"].includes(data.policyMode);
       configure();
     }
     if (data?.channel !== "gst:flight:v1") return;

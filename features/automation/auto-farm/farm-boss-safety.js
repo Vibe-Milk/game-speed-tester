@@ -251,7 +251,7 @@
         && finite(scene.selfAt) && scene.selfAt > owner.snapshotAtRequest
         && finite(owner.requestedAt) && time - owner.requestedAt >= 2
         && scene.self.hp / scene.self.mh < recoveryThreshold && !inCombat
-        && typeof host.meditate === "function") {
+        && typeof host.meditate === "function" && !globalThis.GSTFarmPolicy?.isCustom?.()) {
       // Native rest() stops meditation at 95%; restart it only after a newer
       // snapshot confirms the stop, then keep waiting for the configured HP.
       owner.phase = "pending";
@@ -992,7 +992,7 @@
         const owner = recoveryMeditation?.scene === scene ? recoveryMeditation : null;
         if (owner && scene.self.med !== true) return true; // Await pending/unknown meditation confirmation.
         if (owner && scene.self.med === true) {
-          if (owner.phase !== "stop-pending" && typeof host.meditate === "function") {
+          if (owner.phase !== "stop-pending" && typeof host.meditate === "function" && !globalThis.GSTFarmPolicy?.isCustom?.()) {
             owner.phase = "stop-pending";
             try { host.meditate(); }
             catch { note(scene, "unsupported", "Không gửi được yêu cầu dừng thiền; đang giữ hồi phục và chờ trạng thái game."); }

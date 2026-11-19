@@ -498,13 +498,16 @@
           <select id="farmPolicyMode" aria-describedby="farmPolicySavedMode farmPolicyDescription" disabled>
             <option value="" selected>Đang đọc cài đặt…</option>
             <option value="extended">Tool hỗ trợ</option>
+            <option value="custom">Thử nghiệm · Custom Farm</option>
             <option value="native">Theo game gốc</option>
             <option value="disabled">Khóa Auto Farm</option>
           </select>
           <p class="hint" data-help-for='label[for="farmPolicyMode"]'>Tool hỗ trợ dùng farm gốc cùng các hỗ trợ của extension. Theo game gốc để farm tự điều khiển. Khóa Auto Farm dừng phiên đang chạy và chặn các đường bật được hỗ trợ.</p>
           <p id="farmPolicySavedMode" class="feature-status" role="status" aria-live="polite">Đang đọc chế độ đã lưu…</p>
           <p id="farmPolicyDescription" class="hint" aria-live="polite">Đang đọc chế độ…</p>
-          <p class="hint" data-help-for="#farmPolicySavedMode">Trạng thái BẬT/TẮT là trạng thái controller gốc trong tab đang mở. Lưu chế độ không xác nhận game đã nhận cấu hình. Khi mở khóa, hãy chọn Tool hỗ trợ hoặc Theo game gốc rồi tự bật farm.</p>
+          <label class="check-row"><input id="farmCustomStats" type="checkbox"><span>Ghi thống kê so sánh Custom Farm trên tab này</span></label>
+      <p class="hint">Số liệu thời gian, mục tiêu chết quan sát được, số lần chết; XP/phút và đan có thể ghi “không khả dụng/không thể quy kết”.</p>
+      <p class="hint" data-help-for="#farmPolicySavedMode">Trạng thái BẬT/TẮT theo tab. Chế độ custom chỉ chạy sau khi bật Farm trực tiếp trong tab đó; đổi chế độ sẽ dừng Farm đang chạy. Lưu cấu hình không xác nhận game đã nhận thao tác.</p>
           <p id="farmPolicyFeedback" class="notice" role="status" aria-live="polite"></p>
     </div></details>
     <details class="feature-group interface-section" data-panel="display">

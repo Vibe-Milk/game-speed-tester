@@ -40,6 +40,7 @@
         "shared/coordination/farm-revive-policy.js",
         "features/automation/auto-farm/farm-compatibility-main.js",
         "features/automation/auto-farm/farm-policy-main.js",
+        "features/automation/auto-farm/farm-custom.js",
         "shared/navigation/farm-input.js",
         "features/movement/map/map-travel-page.js",
         "shared/navigation/farm-routing.js",

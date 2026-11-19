@@ -13,6 +13,31 @@
   let accountProfileReady = false, accountProfileVerified = false, accountProfileKey = "", accountId = "";
   let accountSlot = "", accountCharacter = "", accountClassId = "", accountCharacterId = "";
   const pending = new Map();
+  function customStatsEnabled() { try { return sessionStorage.getItem("gst:custom-farm-stats-enabled:v1") === "1"; } catch { return false; } }
+  function profileContextMatches(context) {
+    const current = context?.context;
+    return accountProfileReady && accountProfileVerified && current?.verified === true
+      && current.profileKey === accountProfileKey && current.slot === accountSlot
+      && current.character === accountCharacter && current.classId === accountClassId
+      && current.characterId === accountCharacterId;
+  }
+  function tabPolicyIdentity() {
+    if (!profileContextMatches(GSTAccountProfiles.context())) return "";
+    return JSON.stringify([accountProfileKey, accountId, accountSlot, accountCharacter, accountClassId, accountCharacterId]);
+  }
+  function resolveTabPolicy(value) {
+    const configured = typeof globalThis.GSTFarmPolicy?.read === "function"
+      ? globalThis.GSTFarmPolicy.read(value)
+      : ["native", "disabled", "custom"].includes(value?.policyMode) ? value.policyMode : "extended";
+    const identity = tabPolicyIdentity();
+    if (!identity) return configured;
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("gst:farm-policy-tab:v1") || "null");
+      if (stored?.identity === identity && globalThis.GSTFarmPolicy?.modes?.includes(stored.mode)) return stored.mode;
+      sessionStorage.setItem("gst:farm-policy-tab:v1", JSON.stringify({ identity, mode: configured, updatedAt: 0 }));
+    } catch {}
+    return configured;
+  }
 
   function configureShortcut(value) {
     const code = value?.code;
@@ -38,9 +63,7 @@
     // The storage bridge must still deliver configuration if its isolated-world
     // helper is unavailable. Preserve explicit native/disabled modes; MAIN also
     // validates the mode before applying it.
-    const policyMode = typeof globalThis.GSTFarmPolicy?.read === "function"
-      ? globalThis.GSTFarmPolicy.read(value)
-      : ["native", "disabled"].includes(value?.policyMode) ? value.policyMode : "extended";
+    const policyMode = resolveTabPolicy(value);
     const retreatHpPercent = value?.retreatHpPercent, recoveryHpPercent = value?.recoveryHpPercent;
     const hpThresholds = Number.isSafeInteger(retreatHpPercent) && retreatHpPercent >= 1
       && Number.isSafeInteger(recoveryHpPercent) && retreatHpPercent < recoveryHpPercent && recoveryHpPercent <= 100
@@ -56,6 +79,7 @@
       accountClassId: accountProfileVerified ? accountClassId : "",
       accountCharacterId: accountProfileVerified ? accountCharacterId : "",
       enabled: value?.enabled === true,
+      customComparisonEnabled: customStatsEnabled(),
       showTargetLine: value?.showTargetLine === true,
       showRange: value?.showRange === true,
       nearbyClear: value?.nearbyClear === true,
@@ -135,6 +159,16 @@
       },
       autoOn: typeof event.data.autoOn === "boolean" ? event.data.autoOn : null,
       dead: typeof event.data.dead === "boolean" ? event.data.dead : null,
+      policyMode: ["extended", "custom", "native", "disabled"].includes(event.data.policyMode) ? event.data.policyMode : null,
+      customState: ["OFF","PAUSED","SEARCH","APPROACH","COMBAT","LOOT","RECOVERY","DEAD","WAITING_FOR_DATA"].includes(event.data.customState) ? event.data.customState : null,
+      customComparisonEnabled: event.data.customComparisonEnabled === true,
+      customStats: event.data.customStats && typeof event.data.customStats === "object" ? {
+        elapsed: Number.isFinite(event.data.customStats.elapsed) ? Math.max(0, Math.min(86400000, event.data.customStats.elapsed)) : 0,
+        paused: Number.isFinite(event.data.customStats.paused) ? Math.max(0, Math.min(86400000, event.data.customStats.paused)) : 0,
+        stuck: Number.isFinite(event.data.customStats.stuck) ? Math.max(0, Math.min(86400000, event.data.customStats.stuck)) : 0,
+        observedDeaths: Number.isSafeInteger(event.data.customStats.observedDeaths) ? Math.max(0, Math.min(100000, event.data.customStats.observedDeaths)) : 0,
+        observedKills: Number.isSafeInteger(event.data.customStats.observedKills) ? Math.max(0, Math.min(100000, event.data.customStats.observedKills)) : 0
+      } : null,
       encounterStatus: typeof event.data.encounterStatus === "string" ? event.data.encounterStatus.slice(0, 160) : "",
       message: loadError || (typeof event.data.message === "string" ? event.data.message.slice(0, 240) : "No Auto Farm status.")
     });
@@ -145,6 +179,44 @@
       shortcutRevision++;
       configureShortcut(message.preferences);
       respond({ accepted: true });
+      return;
+    }
+    if (message?.type === "gst:farm-policy-tab") {
+      const context = GSTAccountProfiles.context();
+      const expected = message.profileIdentity, targetTabId = message.targetTabId;
+      const currentIdentity = tabPolicyIdentity();
+      const mode = ["extended", "custom", "native", "disabled"].includes(message.mode) ? message.mode : null;
+      let stored = null;
+      try { stored = JSON.parse(sessionStorage.getItem("gst:farm-policy-tab:v1") || "null"); } catch {}
+      if (!profileContextMatches(context)
+          || !Number.isInteger(targetTabId) || expected?.tabId !== targetTabId
+          || !GSTAccountProfiles.matchesIdentity(context.context, expected, targetTabId)
+          || expected.profileKey !== accountProfileKey || !currentIdentity
+          || !["extended", "custom", "native", "disabled"].includes(mode)
+          || !Number.isSafeInteger(message.updatedAt) || message.updatedAt <= (stored?.updatedAt || 0)) {
+        respond({ accepted: false, reason: "account_identity_mismatch" });
+        return;
+      }
+      try {
+        sessionStorage.setItem("gst:farm-policy-tab:v1", JSON.stringify({ identity: currentIdentity, mode, updatedAt: message.updatedAt }));
+      } catch { respond({ accepted: false, reason: "tab_storage_unavailable" }); return; }
+      if (settings) configure(settings);
+      respond({ accepted: true, mode });
+      return;
+    }
+    if (message?.type === "gst:farm-custom-stats" && typeof message.enabled === "boolean") {
+      const context = GSTAccountProfiles.context(), expected = message.profileIdentity, targetTabId = message.targetTabId;
+      if (!profileContextMatches(context) || !Number.isInteger(targetTabId)
+          || expected?.tabId !== targetTabId
+          || !GSTAccountProfiles.matchesIdentity(context.context, expected, targetTabId)
+          || expected.profileKey !== accountProfileKey) {
+        respond({ accepted: false, reason: "account_identity_mismatch" });
+        return;
+      }
+      try { sessionStorage.setItem("gst:custom-farm-stats-enabled:v1", message.enabled ? "1" : "0"); }
+      catch { respond({ accepted: false, reason: "tab_storage_unavailable" }); return; }
+      if (settings) configure(settings);
+      respond({ accepted: true, enabled: message.enabled });
       return;
     }
     if (message?.type === "gst:farm-configure") {
