@@ -83,6 +83,11 @@
       || otherOwner(scene, starting && globalThis.GSTHarvest?.needsFarmCoordination?.() === true)
       || globalThis.GSTFarmInput?.movement?.(scene);
   }
+  function movementBlocked(scene) {
+    const fx = scene.self?.fx ?? "";
+    return scene.moveLockUntil > scene.now() || (scene.self?.ml ?? 0) > 0.05
+      || fx.includes("s") || fx.includes("r");
+  }
   function guard(s) {
     if (!s.enabled) return;
     try {
@@ -90,6 +95,9 @@
       const error = context(s); if (error) { halt(s, error); return; }
       if (paused(s)) { release(s); s.state = "PAUSED"; s.message = "Farm đang nhường thao tác tay hoặc tính năng khác."; return; }
       const scene = s.scene, point = s.leg;
+      // Native move() cannot advance during these locks. Forget the progress
+      // baseline without charging a stuck retry or rejecting the target.
+      if (movementBlocked(scene)) { release(s); return; }
       if (s.vector && (s.fix !== scene.self.fix || !point
           || !scene.autoHost().clear(scene.px, scene.py, point[0], point[1]))) {
         release(s); globalThis.GSTFarmPlanner.invalidateRoute(scene);
@@ -166,6 +174,10 @@
       host.face(target.x, target.y, target.id); s.lockId = scene.lockId;
       s.nextAttack = time + 0.15; host.basic(); // Native cooldown/resource/server checks remain authoritative.
       return;
+    }
+    // Root can still allow legal in-range actions above; only approach waits.
+    if (movementBlocked(scene)) {
+      release(s); s.state = "PAUSED"; s.message = "Farm đang chờ game mở khóa di chuyển."; return;
     }
     if (s.pathAt !== plan.plannedAt) { s.nav.path = plan.path.map((p) => [...p]); s.pathAt = plan.plannedAt; }
     while (s.nav.path.length > 1 && Math.hypot(s.nav.path[0][0] - scene.px, s.nav.path[0][1] - scene.py) <= 0.3) s.nav.path.shift();

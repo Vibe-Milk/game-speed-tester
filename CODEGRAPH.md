@@ -380,3 +380,8 @@ Pure heals use the player position only below 70% HP while in combat; buffs/self
 UI shows both choices with separate clickable help: game delegates pickup to the game's independent behavior and performs no tool loot selection/movement; tool is explicitly disabled/unavailable. A retained/injected pickupMode=tool is preserved and refuses Tool Farm startup rather than silently falling back or pretending exclusivity. No tool loot action/controller has been enabled. Completing Tool pickup (post-combat, radius-bounded, unreachable-item skip, manual yield) requires a supported way to disable competing native automatic pickup or an explicitly revised requirement. Other hidden features remain retired.
 
 Source identities: WorldScene/sim hashes match v2.0 manifest; index native skill resolver, costs, cast/run/dash/blink behavior and HUD slot replacement were inspected. No tests/lint/typecheck/browser QA/gameplay were run. Task 6 remains runtime-unverified; Task 7 is partially prepared with the explicit blocker above.
+
+### Farm lifecycle corrections
+
+- `shared/coordination/farm-update.js` calls the existing `GSTToolFarm.stop(scene, reason)` before publishing a replacement `scene.auto`, so release can still recognize the previous controller's owned movement. The existing activation sync disposes the old session afterward; manual and independent feature ownership guards remain in effect.
+- `farm-tool.js` releases its movement and resets the stuck baseline while native movement is blocked by `moveLockUntil`, server `self.ml`, stun or root FX. Approach waits without consuming a stuck retry; legal in-range combat still uses the existing native action checks.

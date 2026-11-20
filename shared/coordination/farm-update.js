@@ -92,6 +92,10 @@
           }
           globalThis.GSTCustomFarm?.pauseOwnership?.(scene, "Custom Farm tạm dừng: controller đã thay đổi; hãy bật lại.");
         }
+        // Release while scene.auto still identifies the previous owner.
+        // Publishing first would make its recorded movement unrecognizable.
+        if (next !== gate.value)
+          globalThis.GSTToolFarm?.stop?.(scene, "Controller đã thay đổi; hãy bật Farm lại.");
         gate.value = next;
         globalThis.GSTFarmActivation?.sync?.();
       };
