@@ -487,11 +487,11 @@ async function refreshFarm() {
     autoFarmValue.textContent = status.autoOn === true ? "Đang bật" : status.autoOn === false ? "Đã tắt" : "Chưa rõ";
     autoFarmValue.dataset.state = status.autoOn === true ? "on" : status.autoOn === false ? "off" : "unknown";
     farmPolicyRuntimeStatus.textContent = status.policyMode === "tool"
-      ? `Farm của tool: chưa triển khai · trạng thái Farm ${farmLabel}.`
+      ? `Farm của tool: ${{ OFF: "Đã tắt", SEARCH: "Tìm quái", APPROACH: "Đang đi", COMBAT: "Đánh thường", PAUSED: "Đang nhường" }[status.toolState] || "Chưa rõ"} · ${farmLabel}.`
       : `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
     const customStats = status.customStats;
     const statsLabel = customStats ? ` · So sánh tab: chạy ${Math.floor(customStats.elapsed/1000)}s, tạm dừng ${Math.floor(customStats.paused/1000)}s, kẹt ${Math.floor(customStats.stuck/1000)}s, chết ${customStats.observedDeaths}, mục tiêu có cờ chết ${customStats.observedKills}; XP/phút không khả dụng, potion không thể quy kết.` : "";
-    farmStatus.textContent = `Auto Farm của game: ${farmLabel}${status.dead ? " · Đã chết" : ""}. ${status.message}${statsLabel}`;
+    farmStatus.textContent = `${status.policyMode === "tool" ? "Farm của tool" : "Farm của game"}: ${farmLabel}${status.dead ? " · Đã chết" : ""}. ${status.message}${statsLabel}`;
     document.getElementById("farmEncounterStatus").textContent = status.encounterStatus || "";
   } catch {
     autoFarmValue.textContent = "Chưa rõ";
@@ -519,7 +519,7 @@ let farmPolicyWaiters = [];
 let selectingFarmPolicy = false;
 const farmPolicyLabels = Object.freeze({ tool: "Farm của tool", native: "Farm của game", disabled: "Khóa Auto Farm cũ" });
 const farmPolicyDescriptions = Object.freeze({
-  tool: "Bộ điều khiển Farm của tool chưa được triển khai. Farm OFF; không dùng Farm gốc hoặc Custom Farm cũ làm dự phòng.",
+  tool: "Farm của tool tự đi và đánh thường theo bán kính/bộ lọc. Chọn chế độ để Farm OFF; dùng nút/phím Farm trong game để bắt đầu. Chưa tự dùng kỹ năng 1–6 hoặc nhặt đồ.",
   native: "Farm của game: bật/tắt riêng trong game; quyết định Farm của tool không chạy. Bộ lọc và bán kính tool không áp dụng cho Farm game.",
   disabled: "Khóa Auto Farm cũ được giữ nguyên. Chọn Farm của game hoặc Farm của tool để rời khóa; sau khi chọn Farm vẫn OFF."
 });
@@ -589,7 +589,7 @@ function syncFarmPolicyUI(raw = {}) {
     : confirmedMode === "disabled"
     ? "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng dùng lại khi bạn mở khóa và chọn chế độ phù hợp."
     : tabMode === "tool"
-    ? "Farm của tool chưa được triển khai. Cài đặt chỉ được lưu để xây lại; các hành vi Farm cũ đều không chạy."
+    ? "Farm của tool hiện hỗ trợ đi và đánh thường. Bật riêng bằng nút/phím Farm trong game; kỹ năng 1–6, nhặt đồ và các hành vi Farm cũ vẫn tắt."
     : "Farm của game dùng quy tắc game gốc; các cài đặt Farm tool chỉ được giữ lại, không áp dụng.";
 }
 function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {}) {

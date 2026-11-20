@@ -1,4 +1,6 @@
-> **Đã ngừng controller thử nghiệm:** `custom` và `extended` cũ hiện được đọc thành `tool`. Farm của tool chưa triển khai, luôn OFF và không dùng native dự phòng. Nội dung dưới đây là tài liệu lịch sử, không phải hướng dẫn bật controller hiện tại. Chọn Farm của game trong Quản lý tính năng để dùng native, rồi bật riêng trong game. Khóa `disabled` cũ chỉ được mở khi người dùng chủ động chọn controller.
+> **Task 5 update:** Farm của tool now has a new movement/basic-attack controller, enabled only by a fresh in-game Farm button/key after controller selection. The retired `custom` engine described below is still inactive. No skill-slot scheduling or tool pickup is implemented. See CODEGRAPH.md (Task 5) for current behavior and limitations.
+
+> **Historical controller:** legacy `custom`/`extended` values migrate to `tool`; the retired engine below remains inactive. The current Task 5 controller is described above and in CODEGRAPH.md.
 
 # Custom Auto Farm thử nghiệm
 

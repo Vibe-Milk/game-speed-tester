@@ -54,3 +54,8 @@ Source/diff review only. Tests, lint, typecheck, browser QA and gameplay: NOT RU
 ## Task 4 planner availability
 
 The saved radius/monster filters now feed a read-only target/route proposal on the existing status path. Farm stays OFF/unimplemented; there is no executable movement/combat controller. No hidden feature above has been restored. Planning uses radius only regardless of retained legacy whole-map/idle flags. The preview origin is not an activation origin; Task 5 must bind a fresh explicit start and current ownership before consuming plans. See the Task 4 section of CODEGRAPH.md for lifecycle, query bounds and limitations.
+
+
+## Task 5 movement/basic combat
+
+Tool now runs only after fresh explicit ON, with a new fixed start origin. Radius and monster filters feed approach/basic attacks; controller selection remains separate from ON. All hidden features in the table remain hidden and disabled. The only extra combat action is native Space/basic; skills 1–6 and tool pickup are not restored. The independent shared Harvest recovery setting remains visible, while tool Farm stops on death. No keep-after-map or returnDeath restoration is enabled. See Task 5 in CODEGRAPH.md for ownership, lifecycle, bounded stuck recovery and validation limits.

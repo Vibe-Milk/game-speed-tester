@@ -23,13 +23,14 @@
     if (sessions.get(scene)?.key === key) return;
     reset(scene);
     const state = { key, options: { ...options }, auto: scene.auto, map: null, collision: null,
-      origin: null, targetId: null, rejected: new Map(), at: -Infinity, result: null };
+      origin: null, originLocked: false, targetId: null, rejected: new Map(), at: -Infinity, result: null };
     state.dispose = () => reset(scene);
     sessions.set(scene, state); liveScenes.add(scene);
     scene.events.on("shutdown", state.dispose); scene.events.on("destroy", state.dispose);
   }
   function yieldPlan(state, reason) {
-    state.targetId = null; state.result = null; state.at = -Infinity;
+    if (reason !== "yielding") state.targetId = null;
+    state.result = null; state.at = -Infinity;
     return waiting(reason);
   }
   function matches(enemy, options) {
@@ -60,10 +61,33 @@
     }
     return distance(a, pos) - distance(b, pos) || a.id - b.id;
   }
+  function begin(scene, origin) {
+    const state = sessions.get(scene);
+    if (!state || !origin || ![origin.x, origin.y].every(finite)) return false;
+    state.origin = { ...origin }; state.originLocked = true;
+    state.map = scene.autoHost().mapKey(); state.collision = scene.collision;
+    state.rejected.clear(); yieldPlan(state, "new_start"); return true;
+  }
+  function invalidateRoute(scene, rejectedId = null) {
+    const state = sessions.get(scene); if (!state) return;
+    if (rejectedId !== null && state.result?.targetId === rejectedId) {
+      const time = scene.now(), target = state.result.target;
+      state.rejected.set(rejectedId, { x: target.x, y: target.y, at: time, until: time + 5 });
+      if (state.rejected.size > 128) state.rejected.delete(state.rejected.keys().next().value);
+      state.targetId = null;
+    }
+    state.result = null; state.at = -Infinity;
+  }
   function preview(scene) {
+    const state = sessions.get(scene);
+    return state?.originLocked ? snapshot(scene) : evaluate(scene, false);
+  }
+  function snapshot(scene) { return sessions.get(scene)?.result ? copy(sessions.get(scene).result) : waiting("no_proposal"); }
+  function evaluate(scene, execution) {
     const state = scene && sessions.get(scene);
     if (!state || sceneNow() !== scene || !globalThis.GSTFarmPolicy?.isTool?.()
         || globalThis.GSTFarmConfigurationReady !== true) return waiting("not_configured");
+    if (execution && (!state.originLocked || !globalThis.GSTToolFarm?.active?.(scene))) return waiting("not_started");
     const options = state.options;
     try {
       if (scene.auto !== state.auto) { reset(scene); return waiting("controller_changed"); }
@@ -81,10 +105,11 @@
       const host = scene.autoHost?.(), map = host?.mapKey?.();
       if (typeof map !== "string" || !map || !scene.collision) return yieldPlan(state, "map_unavailable");
       if (state.map !== map || state.collision !== scene.collision) {
+        if (state.originLocked) return yieldPlan(state, "map_changed");
         state.map = map; state.collision = scene.collision; state.origin = null;
         state.rejected.clear(); yieldPlan(state, "map_changed");
       }
-      if (scene.auto.on === true || document.hidden || !document.hasFocus() || scene.uiBlocked || scene.keyCapture
+      if ((!execution && scene.auto.on === true) || document.hidden || !document.hasFocus() || scene.uiBlocked || scene.keyCapture
           || scene.chat?.typing || scene.heldAttack || scene.pendingSkill || scene.aiming || scene.dashT > 0
           || scene.self.med || scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time
           || globalThis.GSTFarmInput?.movement?.(scene)
@@ -106,14 +131,20 @@
       // Reuse only a still-current path after rechecking every segment from the
       // current position. Cache copies never expose our internal retained plan.
       if (retained && state.result && time >= state.at && time - state.at < 0.5
-          && distance(retained, state.result.target) < 0.01) {
+          && retained.radius === state.result.target.radius && (execution || distance(retained, state.result.target) < 0.01)) {
         let previous = pos;
-        const valid = state.result.path.every((pair) => {
+        const cached = state.result.path.map((point) => [...point]);
+        while (cached.length > 1 && distance(pos, { x: cached[0][0], y: cached[0][1] }) < 0.3) cached.shift();
+        const valid = cached.every((pair) => {
           const point = { x: pair[0], y: pair[1] };
           const clear = allowed(point) && host.clear(previous.x, previous.y, point.x, point.y) === true;
           previous = point; return clear;
         });
-        if (valid) return copy(state.result);
+        if (valid) {
+          state.result.path = cached;
+          state.result.target = { x: retained.x, y: retained.y, radius: retained.radius };
+          return copy(state.result);
+        }
       }
       if (time >= state.at && time - state.at < 0.5) return waiting("planning_throttled");
       state.at = time;
@@ -124,8 +155,25 @@
       for (const enemy of ordered) {
         const skip = state.rejected.get(enemy.id);
         if (skip && distance(skip, enemy) < 1) continue;
-        if (++probes > 6) break;
-        const path = globalThis.GSTNavigation?.planRoute?.(host, pos, enemy, allowed);
+        if (probes >= 6) break;
+        let path = null, goal = enemy;
+        const baseReach = ["kiem-tien", "ma-tong", "the-tu", "untrained"].includes(options.classId) ? 1.3 : 1.6;
+        if (execution && (!finite(enemy.radius) || enemy.radius < 0)) continue;
+        const reach = baseReach + (execution ? enemy.radius : 0);
+        const angle = Math.atan2(pos.y - enemy.y, pos.x - enemy.x);
+        const goals = !execution ? [enemy] : distance(pos, enemy) <= reach && host.clear(pos.x, pos.y, enemy.x, enemy.y)
+          ? [pos] : [0, 0.75, -0.75].map((offset) => ({
+            x: enemy.x + Math.cos(angle + offset) * reach * 0.8,
+            y: enemy.y + Math.sin(angle + offset) * reach * 0.8 }));
+        let complete = true;
+        for (const point of goals) {
+          if (!allowed(point)) continue;
+          if (probes >= 6) { complete = false; break; }
+          probes++;
+          path = globalThis.GSTNavigation?.planRoute?.(host, pos, point, allowed);
+          if (path) { goal = point; break; }
+        }
+        if (!path && !complete) break;
         if (!path) {
           state.rejected.set(enemy.id, { x: enemy.x, y: enemy.y, at: time, until: time + 5 });
           if (state.rejected.size > 128) state.rejected.delete(state.rejected.keys().next().value);
@@ -133,7 +181,8 @@
         }
         state.targetId = enemy.id;
         state.result = { state: "PLANNED", reason: "proposal_only", executable: false,
-          targetId: enemy.id, target: { x: enemy.x, y: enemy.y }, origin: { ...state.origin },
+          targetId: enemy.id, target: { x: enemy.x, y: enemy.y, radius: enemy.radius },
+          goal: { x: goal.x, y: goal.y }, reach, origin: { ...state.origin },
           radius: options.radius, path, plannedAt: time };
         return copy(state.result);
       }
@@ -141,8 +190,8 @@
     } catch { return yieldPlan(state, "data_unavailable"); }
   }
   function copy(result) {
-    return { ...result, target: { ...result.target }, origin: { ...result.origin }, path: result.path.map((p) => [...p]) };
+    return { ...result, goal: { ...result.goal }, target: { ...result.target }, origin: { ...result.origin }, path: result.path.map((p) => [...p]) };
   }
-  globalThis.GSTFarmPlanner = Object.freeze({ configure, preview, reset });
+  globalThis.GSTFarmPlanner = Object.freeze({ configure, preview, reset, begin, invalidateRoute, snapshot, plan: (scene) => evaluate(scene, true) });
   window.addEventListener("pagehide", () => { for (const scene of [...liveScenes]) reset(scene); });
 })();

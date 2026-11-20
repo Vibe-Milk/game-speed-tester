@@ -30,7 +30,7 @@
   const range = section('range', 'Bán kính Farm');
   move([byId('farmRadius').closest('.input-action')], range);
   const hint = document.createElement('p'); hint.className = 'hint'; hint.setAttribute('role', 'note');
-  hint.textContent = 'Bán kính và bộ lọc chỉ được lưu để chuẩn bị xây Farm của tool. Farm của game dùng cài đặt game gốc.';
+  hint.textContent = 'Bán kính và bộ lọc áp dụng cho Farm của tool sau khi bật riêng trong game. Farm của game dùng cài đặt game gốc.';
   range.prepend(hint);
   const targets = section('targets', 'Bộ lọc quái');
   const targetColumn = archive.querySelector('.farm-target');
@@ -46,7 +46,7 @@
   const respawn = byId('farmAutoRespawn').closest('label');
   const respawnHint = respawn.nextElementSibling;
   respawn.querySelector('span').textContent = 'Cho phép hồi sinh dùng chung với Thu hoạch';
-  respawnHint.textContent = 'Thu hoạch còn kiểm tra lựa chọn hồi sinh riêng của nó. Farm của tool chưa chạy; Farm của game giữ cơ chế hồi sinh gốc.';
+  respawnHint.textContent = 'Thu hoạch còn kiểm tra lựa chọn hồi sinh riêng của nó. Farm của tool dừng khi chết; Farm của game giữ cơ chế hồi sinh gốc.';
   move([respawn, respawnHint], shared, false);
   // Skill tracking cannot be enabled in inert tool/native policy. Keep the
   // read-only movement export available, but hide its retired skill controls.

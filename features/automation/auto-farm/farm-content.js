@@ -160,6 +160,7 @@
       autoOn: typeof event.data.autoOn === "boolean" ? event.data.autoOn : null,
       dead: typeof event.data.dead === "boolean" ? event.data.dead : null,
       policyMode: ["tool", "extended", "custom", "native", "disabled"].includes(event.data.policyMode) ? event.data.policyMode : null,
+      toolState: ["OFF", "SEARCH", "APPROACH", "COMBAT", "PAUSED"].includes(event.data.toolState) ? event.data.toolState : null,
       planner: event.data.planner && ["WAITING", "SEARCHING", "PLANNED"].includes(event.data.planner.state) ? {
         state: event.data.planner.state, executable: false,
         reason: typeof event.data.planner.reason === "string" ? event.data.planner.reason.slice(0, 60) : "",

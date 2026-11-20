@@ -32,7 +32,7 @@
   function invalidateFarmGestures() { gestureGeneration++; generationAt = performance.now(); shortcutIntent = null; }
   function farmButton(target) { return target instanceof Element ? target.closest('[data-entry="auto"], [data-key="V"]') : null; }
   function rememberFarmGesture(event) {
-    if (settings.policyMode !== "custom" || suspended || !event.isTrusted || document.hidden || event.repeat
+    if (settings.policyMode !== "tool" || suspended || !event.isTrusted || document.hidden || event.repeat
         || event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
     const button = farmButton(event.target), scene = sceneNow();
     if (!button || !scene?.auto || event.timeStamp < generationAt) return;
@@ -60,8 +60,10 @@
       const manualKey = event.type === "keydown" && /^(Key[WASDQ]|Arrow(Up|Down|Left|Right)|Space|Digit[1-6])$/.test(event.code);
       const manualPointer = event.type === "pointerdown" && event.target instanceof Element
         && event.target.closest('canvas,[data-key]');
-      if (!editing && !farmKey && !farmButton(event.target) && (manualKey || manualPointer))
+      if (!editing && !farmKey && !farmButton(event.target) && (manualKey || manualPointer)) {
         globalThis.GSTFarmUpdate?.manualActions?.(sceneNow());
+        globalThis.GSTToolFarm?.manual?.(sceneNow());
+      }
     }
   };
   window.addEventListener("pointerdown", noteTrustedInput, true);
@@ -163,9 +165,10 @@
       ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   }
 
-  const toolUnavailable = "Bộ điều khiển Farm của tool chưa được triển khai; không cho phép bật Farm.";
+  const toolUnavailable = "Farm của tool: dùng nút/phím Farm để bắt đầu; hiện chỉ đi và đánh thường.";
   function blockedFarmStart() {
-    return !configurationReceived || identityBlocked || settings.policyMode !== "native";
+    return !configurationReceived || identityBlocked || !["native", "tool"].includes(settings.policyMode)
+      || settings.policyMode === "tool" && !globalThis.GSTToolFarm;
   }
   function blockedFarmMessage() {
     return identityBlocked ? "Auto Farm đang chờ xác nhận đúng tài khoản."
@@ -182,6 +185,7 @@
   // Native toggle's OFF path only resets Farm state and calls steer/note. Avoid
   // scene.toggleAutoFarm here: it cancels manual click orders before toggling.
   function stopFarmOwner(scene) {
+    globalThis.GSTToolFarm?.stop?.(scene);
     globalThis.GSTCustomFarm?.stop?.(scene);
     globalThis.GSTCustomFarm?.reset?.(scene);
     if (!scene?.auto) return;
@@ -203,6 +207,7 @@
   function clearActivationLock() {
     const old = activationLock; activationLock = null;
     if (!old) return;
+    globalThis.GSTToolFarm?.dispose?.(old.scene);
     if (old.auto.toggle === old.wrapper) {
       if (old.descriptor) Object.defineProperty(old.auto, "toggle", old.descriptor);
       else delete old.auto.toggle;
@@ -237,16 +242,39 @@
       owner.wrapper = function (...args) {
         if (activationLock !== owner || sceneNow() !== scene || scene.auto !== owner.auto || this !== owner.auto) return;
         const wasOn = this.on === true;
+        const tool = settings.policyMode === "tool";
+        if (tool && !wasOn) {
+          const explicit = shortcutIntent?.generation === gestureGeneration && shortcutIntent.scene === scene
+            && shortcutIntent.auto === this || validFarmGesture(window.event, scene, true);
+          if (!explicit || blockedFarmStart() || !globalThis.GSTToolFarm?.prepare?.(scene, settings)) {
+            message = "Chưa bật Farm của tool: cần thao tác mới, đúng nick và game sẵn sàng."; return;
+          }
+        }
+        if (wasOn) globalThis.GSTToolFarm?.stop?.(scene);
         if (!wasOn && blockedFarmStart()) { message = blockedFarmMessage(); return; }
         const movement = foreignMovement(scene) ? [scene.autoX, scene.autoY] : null;
-        const result = owner.original.apply(this, args);
+        const thisAuto = this;
+        const toggleArgs = tool ? [new Proxy(args[0], { get(host, property) {
+          if (property === "note") return () => host.note(thisAuto.on
+            ? "Farm của tool: bật · di chuyển và đánh thường" : "Farm của tool: tắt");
+          return Reflect.get(host, property);
+        } })] : args;
+        const result = owner.original.apply(this, toggleArgs);
         if (movement && scene.autoX === 0 && scene.autoY === 0) [scene.autoX, scene.autoY] = movement;
         const token = wasOn !== (this.on === true)
           ? globalThis.GSTIntentAuthority?.farmChanged?.(scene, this.on === true) : null;
         if (wasOn && !this.on) invalidateFarmGestures();
         if (!wasOn && this.on) {
+          if (tool && globalThis.GSTIntentAuthority?.validate?.(token, "farm", true, settings.accountProfileKey))
+            globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, token);
+          if (tool && !globalThis.GSTToolFarm?.start?.(scene, token)) {
+            owner.original.apply(this, args);
+            globalThis.GSTIntentAuthority?.farmChanged?.(scene, false);
+            invalidateFarmGestures();
+            message = "Không xác nhận được quyền chạy Farm của tool; đã để Farm OFF."; return;
+          }
           globalThis.GSTMeditation?.farmStarted?.(scene);
-          if (performance.now() - lastTrustedInputAt < 700)
+          if (!tool && performance.now() - lastTrustedInputAt < 700)
             globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, token);
         }
         return result;
@@ -255,6 +283,10 @@
         if (activationLock !== owner || this !== scene || sceneNow() !== scene || scene.auto !== owner.auto) return;
         if (!owner.auto.on && (blockedFarmStart() || window.event && window.event.timeStamp < generationAt)) {
           message = blockedFarmMessage(); return;
+        }
+        if (settings.policyMode === "tool") {
+          const result = owner.wrapper.call(owner.auto, scene.autoHost());
+          scene.syncAutoFarmButtons?.(); scene.bgSync?.(); return result;
         }
         return owner.sceneOriginal.apply(this, args);
       };
@@ -270,7 +302,8 @@
         scene.events.on("destroy", clearActivationLock);
       } catch (error) { clearActivationLock(); throw error; }
     }
-    if (blockedFarmStart() && scene.auto.on) stopFarmOwner(scene);
+    if (scene.auto.on && (blockedFarmStart() || settings.policyMode === "tool"
+        && !globalThis.GSTToolFarm?.active?.(scene))) stopFarmOwner(scene);
   }
   function syncActivationTracking() {
     if (needsActivationTracking()) {
@@ -286,6 +319,7 @@
     }
   }
   globalThis.GSTFarmActivation = Object.freeze({ sync: syncActivationTracking,
+    stop(scene) { if (scene === sceneNow()) stopFarmOwner(scene); },
     controllerDisposed(scene) { if (scene && sceneNow() === scene) {
       globalThis.GSTIntentAuthority?.retireFarm?.(); invalidateFarmGestures();
     } } });
@@ -300,9 +334,15 @@
     } catch { return false; }
   }
   window.addEventListener("click", (event) => {
-    if (!farmButton(event.target) || !blockedFarmStart() || sceneNow()?.auto?.on === true) return;
-    message = blockedFarmMessage();
-    event.stopImmediatePropagation(); event.preventDefault();
+    if (!farmButton(event.target)) return;
+    const scene = sceneNow();
+    if (settings.policyMode === "tool") {
+      event.stopImmediatePropagation(); event.preventDefault();
+      if (!scene?.auto?.on && !validFarmGesture(event, scene)) { message = "Thao tác Farm đã cũ; hãy bấm lại."; return; }
+      scene?.toggleAutoFarm?.(); return;
+    }
+    if (!blockedFarmStart() || scene?.auto?.on === true) return;
+    message = blockedFarmMessage(); event.stopImmediatePropagation(); event.preventDefault();
   }, true);
 
   function guardFarmKey(event) {
@@ -367,7 +407,7 @@
     const previousAuto = scene.auto;
     const wasOn = previousAuto?.on;
     if (wasOn === false && session) stop("Đã kết thúc phiên hỗ trợ cũ trước khi bật lại Auto Farm.");
-    const attempt = settings.policyMode === "custom" ? { generation: gestureGeneration, scene, auto: scene.auto } : null;
+    const attempt = settings.policyMode === "tool" ? { generation: gestureGeneration, scene, auto: scene.auto } : null;
     shortcutIntent = attempt;
     try {
       if (globalThis.GSTFarmDiagnostics) GSTFarmDiagnostics.toggleByUser(scene);
@@ -1527,6 +1567,7 @@
         preferLoot: data.preferLoot !== false, selfDefense: data.selfDefense === true, autoEncounter: data.autoEncounter === true, excludeBoss: data.excludeBoss === true,
         bossFilter: data.bossFilter === "world" ? "world" : "all" };
       globalThis.GSTFarmSkillDiagnostics?.setContext?.(sceneNow(), settings);
+      globalThis.GSTToolFarm?.configure?.(sceneNow(), settings);
       globalThis.GSTFarmPlanner?.configure?.(sceneNow(), settings);
       stage = "policy";
       const modeScene = sceneNow();
@@ -1652,14 +1693,16 @@
       // Status may compute a read-only proposal, never an activation/action.
       globalThis.GSTFarmPlanner?.configure?.(scene, settings);
       const proposal = globalThis.GSTFarmPlanner?.preview?.(scene);
+      const toolState = settings.policyMode === "tool" ? globalThis.GSTToolFarm?.state?.(scene) ?? "OFF" : null;
+      const toolMessage = settings.policyMode === "tool" ? globalThis.GSTToolFarm?.status?.(scene) ?? toolUnavailable : "";
       const planner = proposal ? { state: proposal.state, reason: proposal.reason,
         executable: false, targetId: proposal.targetId, waypointCount: proposal.path.length } : null;
       window.postMessage({ channel: "gst:farm-status:v1", requestId: data.requestId,
         configurationReceived, configurationReady: globalThis.GSTFarmConfigurationReady === true,
         message: (settings.policyMode === "extended" && targetFilterActive() ? `${filterLabel()}. ` : "") + (shortcutMessage
-          || (dead && respawnMessage ? respawnMessage : primary)) + (defenseInfo ? ` · ${defenseInfo}` : ""),
+          || (dead && respawnMessage ? respawnMessage : configurationError || (toolState === "OFF" && /^(Chưa bật|Không xác nhận|Thao tác)/.test(message) ? message : toolMessage) || primary)) + (defenseInfo ? ` · ${defenseInfo}` : ""),
         encounterStatus: encounterInfo,
-        planner, autoOn, dead, policyMode: settings.policyMode, customState: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.state?.(scene) ?? "WAITING_FOR_DATA" : null, customComparisonEnabled: settings.customComparisonEnabled === true, customStats: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.stats?.(scene) ?? null : null, active: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.active?.(scene) === true : session !== null, radius: settings.radius }, origin);
+        toolState, planner, autoOn, dead, policyMode: settings.policyMode, customState: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.state?.(scene) ?? "WAITING_FOR_DATA" : null, customComparisonEnabled: settings.customComparisonEnabled === true, customStats: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.stats?.(scene) ?? null : null, active: settings.policyMode === "tool" ? globalThis.GSTToolFarm?.active?.(scene) === true : settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.active?.(scene) === true : session !== null, radius: settings.radius }, origin);
     }
   });
   window.addEventListener("pagehide", () => {
