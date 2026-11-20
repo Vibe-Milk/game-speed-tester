@@ -246,7 +246,7 @@
         if (tool && !wasOn) {
           const explicit = shortcutIntent?.generation === gestureGeneration && shortcutIntent.scene === scene
             && shortcutIntent.auto === this || validFarmGesture(window.event, scene, true);
-          if (!explicit || blockedFarmStart() || !globalThis.GSTToolFarm?.prepare?.(scene, settings)) {
+          if (!explicit || blockedFarmStart() || !globalThis.GSTToolFarm?.prepare?.(scene, settings, { takeoverClick: true })) {
             message = globalThis.GSTToolFarm?.status?.(scene) || "Chưa bật Farm của tool: cần thao tác mới, đúng nick và game sẵn sàng."; return;
           }
         }

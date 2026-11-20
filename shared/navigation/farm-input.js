@@ -2,9 +2,9 @@
   "use strict";
   const bindings = new WeakMap();
   globalThis.GSTFarmInput = {
-    movement(scene) {
+    movement(scene, { ignoreClick = false } = {}) {
       const typing = scene.chat?.typing || scene.inputFieldActive?.() || scene.keyCapture;
-      return !!scene.clickOrder || !!scene.joyX || !!scene.joyY || (!typing
+      return (!ignoreClick && !!scene.clickOrder) || !!scene.joyX || !!scene.joyY || (!typing
         && ["W", "A", "S", "D", "UP", "DOWN", "LEFT", "RIGHT"].some((key) => scene.keys?.[key]?.isDown));
     },
     add(scene, callback) {

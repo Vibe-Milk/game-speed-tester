@@ -77,7 +77,7 @@
     }
     return "";
   }
-  function pauseReason(s, starting = false) {
+  function pauseReason(s, starting = false, ignoreClick = false) {
     const scene = s.scene;
     if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
     if (document.hidden) return "Tab game đang bị ẩn.";
@@ -101,8 +101,8 @@
       if (starting && owner === globalThis.GSTHarvest && owner?.needsFarmCoordination?.() === true) continue;
       if (owner?.controls?.(scene) === true) return name + " đang giữ quyền điều khiển.";
     }
-    if (globalThis.GSTFarmInput?.movement?.(scene))
-      return scene.clickOrder ? "Còn lệnh đi/đánh bằng chuột; dừng lệnh trước khi bật Farm."
+    if (globalThis.GSTFarmInput?.movement?.(scene, { ignoreClick }))
+      return !ignoreClick && scene.clickOrder ? "Còn lệnh đi/đánh bằng chuột; dừng lệnh trước khi bật Farm."
         : "Phím di chuyển hoặc joystick vẫn đang giữ.";
     return "";
   }
@@ -128,7 +128,7 @@
       }
     } catch { halt(s, "Farm đã dừng vì interface game thay đổi."); }
   }
-  function prepare(scene, options) {
+  function prepare(scene, options, { takeoverClick = false } = {}) {
     configure(scene, options);
     let s = sessions.get(scene);
     if (!s) {
@@ -148,6 +148,18 @@
     }
     const error = context(s, true);
     if (error) { s.message = error; messages.set(scene, error); }
+    // Only an explicit current ON may replace a native click order. Validate
+    // identity/readiness first, and never cancel on behalf of another owner.
+    const clickOwnedElsewhere = [globalThis.GSTRealm, globalThis.GSTChest, globalThis.GSTFarmMap]
+      .some((owner) => owner?.controls?.(scene) === true);
+    if (!error && takeoverClick && scene.clickOrder && !pauseReason(s, true, true)
+        && !otherOwner(scene) && !clickOwnedElsewhere) {
+      if (typeof scene.cancelClickOrder !== "function") {
+        s.message = "Thiếu thao tác dừng lệnh chuột của game; chưa bật Farm.";
+        messages.set(scene, s.message); return false;
+      }
+      scene.cancelClickOrder(); // Native adapter clears clickOrder only.
+    }
     if (!error && paused(s, true)) { s.message = pauseReason(s, true); messages.set(scene, s.message); return false; }
     return !error;
   }
