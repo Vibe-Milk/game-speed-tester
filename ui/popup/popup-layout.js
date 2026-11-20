@@ -71,6 +71,7 @@
     if (save) {
       navigationRevision++;
       void savePage(page);
+      globalThis.GSTPopupLayout?.collapseNav?.();
     }
   }
   globalThis.GSTPopupLayout = { selectPage };
@@ -158,6 +159,7 @@
       if (revision === expandedRevision) toggle.title = "Chưa lưu được trạng thái menu.";
     });
   }
+  if (globalThis.GSTPopupLayout) globalThis.GSTPopupLayout.collapseNav = collapseNav;
   function label() {
     const active = items.querySelector('[aria-current="page"]');
     toggle.textContent = `${active?.textContent ?? "Chọn chức năng"} · Chọn mục ▾`;
