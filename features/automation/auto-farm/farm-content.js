@@ -28,12 +28,12 @@
   function resolveTabPolicy(value) {
     const configured = typeof globalThis.GSTFarmPolicy?.read === "function"
       ? globalThis.GSTFarmPolicy.read(value)
-      : ["native", "disabled", "custom"].includes(value?.policyMode) ? value.policyMode : "extended";
+      : ["native", "disabled"].includes(value?.policyMode) ? value.policyMode : "tool";
     const identity = tabPolicyIdentity();
     if (!identity) return configured;
     try {
       const stored = JSON.parse(sessionStorage.getItem("gst:farm-policy-tab:v1") || "null");
-      if (stored?.identity === identity && globalThis.GSTFarmPolicy?.modes?.includes(stored.mode)) return stored.mode;
+      if (stored?.identity === identity && globalThis.GSTFarmPolicy?.modes?.includes(stored.mode)) return globalThis.GSTFarmPolicy.normalize(stored.mode);
       sessionStorage.setItem("gst:farm-policy-tab:v1", JSON.stringify({ identity, mode: configured, updatedAt: 0 }));
     } catch {}
     return configured;
@@ -159,7 +159,7 @@
       },
       autoOn: typeof event.data.autoOn === "boolean" ? event.data.autoOn : null,
       dead: typeof event.data.dead === "boolean" ? event.data.dead : null,
-      policyMode: ["extended", "custom", "native", "disabled"].includes(event.data.policyMode) ? event.data.policyMode : null,
+      policyMode: ["tool", "extended", "custom", "native", "disabled"].includes(event.data.policyMode) ? event.data.policyMode : null,
       customState: ["OFF","PAUSED","SEARCH","APPROACH","COMBAT","LOOT","RECOVERY","DEAD","WAITING_FOR_DATA"].includes(event.data.customState) ? event.data.customState : null,
       customComparisonEnabled: event.data.customComparisonEnabled === true,
       customStats: event.data.customStats && typeof event.data.customStats === "object" ? {
@@ -185,14 +185,15 @@
       const context = GSTAccountProfiles.context();
       const expected = message.profileIdentity, targetTabId = message.targetTabId;
       const currentIdentity = tabPolicyIdentity();
-      const mode = ["extended", "custom", "native", "disabled"].includes(message.mode) ? message.mode : null;
+      const mode = globalThis.GSTFarmPolicy?.modes.includes(message.mode)
+        ? globalThis.GSTFarmPolicy.normalize(message.mode) : null;
       let stored = null;
       try { stored = JSON.parse(sessionStorage.getItem("gst:farm-policy-tab:v1") || "null"); } catch {}
       if (!profileContextMatches(context)
           || !Number.isInteger(targetTabId) || expected?.tabId !== targetTabId
           || !GSTAccountProfiles.matchesIdentity(context.context, expected, targetTabId)
           || expected.profileKey !== accountProfileKey || !currentIdentity
-          || !["extended", "custom", "native", "disabled"].includes(mode)
+          || !["tool", "extended", "custom", "native", "disabled"].includes(mode)
           || !Number.isSafeInteger(message.updatedAt) || message.updatedAt <= (stored?.updatedAt || 0)) {
         respond({ accepted: false, reason: "account_identity_mismatch" });
         return;

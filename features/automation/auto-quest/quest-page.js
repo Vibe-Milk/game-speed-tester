@@ -320,6 +320,9 @@
     try {
       if (run.phase === "farm" && !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.()) {
         const disabled = globalThis.GSTFarmPolicy?.isDisabled?.() === true;
+        if (globalThis.GSTFarmPolicy?.isTool?.()) {
+          stop("Auto Quest: bước đánh quái cần controller Farm của tool, hiện chưa triển khai.", true); return false;
+        }
         stop(disabled
           ? "Auto Quest đã dừng: chế độ Disabled khóa Auto Farm; quest cần đánh quái không thể tiếp tục."
           : "Auto Quest đã dừng: chế độ Native không dùng hỗ trợ farm của extension. Auto Farm đang bật được giữ nguyên.", true);
@@ -429,6 +432,9 @@
         if (!GSTFarmQuest.ready()) {
           const lockedMode = !globalThis.GSTFarmPolicy?.hasExtensionAssistance?.();
           const disabled = globalThis.GSTFarmPolicy?.isDisabled?.() === true;
+          if (globalThis.GSTFarmPolicy?.isTool?.()) {
+            stop("Auto Quest: bước đánh quái cần controller Farm của tool, hiện chưa triển khai.", true); return false;
+          }
           stop(lockedMode ? (disabled ? "Auto Quest đã dừng: chế độ Disabled khóa hỗ trợ farm của extension."
             : "Auto Quest đã dừng: chế độ Native không dùng hỗ trợ farm của extension.")
             : "Bộ lọc farm đã đổi; dừng Auto Quest để không đánh sai mục tiêu.", lockedMode);
@@ -659,7 +665,9 @@
         else if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.()
             && (active(s).some((q) => selected.includes(String(q.id)) && !complete(s, q) && localKill(s, q))
               || eligibleOffers(s).some((q) => selected.includes(String(q.id)) && localKill(s, q))))
-          message = globalThis.GSTFarmPolicy?.isDisabled?.()
+          message = globalThis.GSTFarmPolicy?.isTool?.()
+            ? "Bộ điều khiển Farm của tool chưa được triển khai; quest cần đánh quái chưa thể chạy."
+            : globalThis.GSTFarmPolicy?.isDisabled?.()
             ? "Chế độ Disabled khóa Auto Farm; quest cần đánh quái chưa thể chạy."
             : "Chế độ Native không cho Auto Quest mượn hỗ trợ farm của extension; các quest cần đánh quái chưa thể chạy.";
         else if (s.auto.on) message = "Tắt Auto Farm trước; Auto Quest sẽ tự bật khi cần và tắt khi đủ mục tiêu.";

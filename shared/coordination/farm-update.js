@@ -2,6 +2,7 @@
   "use strict";
   // One native update wrapper shared by all temporary update callbacks.
   const bindings = new WeakMap(), gates = new WeakMap(), quarantines = new WeakMap();
+  const farmActions = new WeakMap();
   function canGuard(auto) {
     if (!auto || (typeof auto !== "object" && typeof auto !== "function")) return false;
     const own = Object.getOwnPropertyDescriptor(auto, "update");
@@ -37,6 +38,23 @@
     return true;
   }
   globalThis.GSTFarmUpdate = {
+    movementOwned(scene) {
+      const own = farmActions.get(scene);
+      return !!own && own.auto === scene.auto && !!own.steer
+        && scene.autoX === own.steer[0] && scene.autoY === own.steer[1];
+    },
+    manualActions(scene) {
+      const own = scene && farmActions.get(scene);
+      if (own) { own.pending = null; own.lockId = null; }
+    },
+    forgetActions(scene) { if (scene) farmActions.delete(scene); },
+    releaseActions(scene) {
+      const own = scene && farmActions.get(scene);
+      if (!own || own.auto !== scene.auto) return;
+      if (own.pending && scene.pendingSkill === own.pending) scene.pendingSkill = null;
+      if (own.lockId && scene.lockId === own.lockId) scene.lockId = 0;
+      farmActions.delete(scene);
+    },
     installGate(scene) {
       if (!scene || gates.has(scene)) return !!scene && this.gateReady(scene);
       if (typeof scene.events?.on !== "function" || typeof scene.events?.off !== "function") return false;
@@ -57,7 +75,7 @@
         } finally { gate.busy = false; }
       };
       gate.get = function () {
-        if (globalThis.GSTFarmPolicy?.isCustom?.() && !secure(gate.value)) {
+        if (globalThis.GSTFarmPolicy?.isNative?.() !== true && !secure(gate.value)) {
           gate.busy = true;
           try { globalThis.GSTCustomFarm?.pauseOwnership?.(scene, "Custom Farm tạm dừng: controller không tương thích."); }
           finally { gate.busy = false; }
@@ -67,7 +85,7 @@
       };
       gate.set = function (next) {
         if (next !== gate.value) globalThis.GSTIntentAuthority?.invalidate?.();
-        if (globalThis.GSTFarmPolicy?.isCustom?.() && next !== gate.value) {
+        if (globalThis.GSTFarmPolicy?.isNative?.() !== true && next !== gate.value) {
           if (!secure(next)) {
             globalThis.GSTCustomFarm?.pauseOwnership?.(scene, "Custom Farm từ chối controller thay thế không tương thích.");
             throw new Error("Custom Farm: unsupported replacement controller");
@@ -75,6 +93,7 @@
           globalThis.GSTCustomFarm?.pauseOwnership?.(scene, "Custom Farm tạm dừng: controller đã thay đổi; hãy bật lại.");
         }
         gate.value = next;
+        globalThis.GSTFarmActivation?.sync?.();
       };
       gate.dispose = () => this.removeGate(scene);
       try { Object.defineProperty(scene, "auto", { configurable: true, enumerable: descriptor.enumerable,
@@ -119,7 +138,7 @@
     runRecovery(scene, host, ...args) {
       const auto = scene?.auto;
       const entry = auto && bindings.get(auto);
-      if (globalThis.GSTFarmPolicy?.isCustom?.()) return { ran: false };
+      if (globalThis.GSTFarmPolicy?.isNative?.() !== true) return { ran: false };
       if (!entry || auto.update !== entry.wrapper || !auto.on || typeof auto.resting !== "boolean"
           || typeof entry.original !== "function" || !host || typeof host !== "object") return { ran: false };
       const wasResting = auto.resting;
@@ -154,9 +173,8 @@
         entry.wrapper = function (...args) {
           if (this === auto) {
             for (const handler of entry.ordered) if (handler.callback.apply(this, args) === true) return;
-            if (globalThis.GSTFarmPolicy?.isCustom?.()) {
-              if (entry.scene) return globalThis.GSTCustomFarm?.update?.(entry.scene, args[0], args[1], args[2]) ?? true;
-              return;
+            if (globalThis.GSTFarmPolicy?.isNative?.() !== true) {
+              return; // Tool controller is not implemented; never call legacy Custom or native Farm.
             }
           }
           let nativeArgs = args;
@@ -164,7 +182,25 @@
             nativeArgs = [...args];
             nativeArgs[0] = GSTFarmCombat.host(scene, args[0]);
           }
-          if (this !== auto) return globalThis.GSTFarmPolicy?.isCustom?.() ? undefined : original.apply(this, args);
+          if (this !== auto) return (globalThis.GSTFarmPolicy?.isNative?.() !== true) ? undefined : original.apply(this, args);
+          // Record only actions actually written by native Farm, so controller
+          // selection can release them without touching manual/other owners.
+          const host = nativeArgs[0];
+          const own = farmActions.get(scene)?.auto === auto ? farmActions.get(scene) : { auto };
+          farmActions.set(scene, own);
+          nativeArgs = [...nativeArgs];
+          nativeArgs[0] = new Proxy(host, { get(target, key) {
+            const value = Reflect.get(target, key);
+            if (typeof value !== "function" || !["steer", "face", "cast"].includes(key)) return value;
+            return function (...callArgs) {
+              const pending = scene.pendingSkill;
+              const result = Reflect.apply(value, target, callArgs);
+              if (key === "steer") own.steer = [scene.autoX, scene.autoY];
+              if (key === "face") own.lockId = scene.lockId;
+              if (scene.pendingSkill && scene.pendingSkill !== pending) own.pending = scene.pendingSkill;
+              return result;
+            };
+          } });
           entry.nativeUpdateDepth++;
           try { return original.apply(this, nativeArgs); }
           finally { entry.nativeUpdateDepth--; }
@@ -180,7 +216,7 @@
         entry.callbacks.delete(token);
         entry.ordered = [...entry.callbacks.values()].sort((a, b) => a.priority - b.priority);
         if (entry.callbacks.size) return;
-        if (globalThis.GSTFarmPolicy?.isCustom?.() && this.gateReady(scene)) return;
+        if (globalThis.GSTFarmPolicy?.isNative?.() !== true && this.gateReady(scene)) return;
         if (auto.update === entry.wrapper) {
           if (entry.descriptor) Object.defineProperty(auto, "update", entry.descriptor);
           else delete auto.update;

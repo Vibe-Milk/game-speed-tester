@@ -100,6 +100,10 @@
     if (!live() || binding.scene !== scene) { invalidate(); return null; }
     return issue("farm", enabled === true).token ?? null;
   }
+  function retireFarm() {
+    if (current?.feature === "farm" && live()) return issue("farm", false).token ?? null;
+    return null;
+  }
   function withIntent(token, callback) {
     if (!validate(token, token?.feature, token?.enabled, token?.profileKey)) return false;
     const previous = applying; applying = token;
@@ -113,7 +117,7 @@
       && token.enabled === current.enabled && token.profileKey === current.profileKey
       && token.profileKey === identity.profileKey;
   }
-  globalThis.GSTIntentAuthority = Object.freeze({ handshake, reserve, validate, invalidate, capture, farmChanged, withIntent,
+  globalThis.GSTIntentAuthority = Object.freeze({ handshake, reserve, validate, invalidate, capture, farmChanged, retireFarm, withIntent,
     hasIntent: () => !!current && live(), current: () => live() && current ? { ...current } : null });
   function onMessage(event) {
     if (event.source !== window || event.origin !== origin) return;

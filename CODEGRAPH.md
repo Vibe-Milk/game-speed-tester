@@ -2,6 +2,8 @@
 
 > Bản đồ tĩnh về entry point, bridge, dependency và ownership của extension. Tài liệu không tự sinh từ code và không phải bằng chứng gameplay.
 
+> **Hiện trạng Farm:** xem “Tách controller Farm — phase đầu” bên dưới. Mô tả extended/Custom trong các bảng lịch sử chỉ định vị code được giữ lại, không còn là mode có thể chạy.
+
 ## 1. Đọc từ đâu?
 
 - Xác định tính năng tại **bảng định tuyến** (mục 5), sau đó đọc implementation và call site thật.
@@ -68,8 +70,8 @@ flowchart TD
   D --> H["Callbacks theo priority tăng dần"]
   H --> T{"Handler trả true?"}
   T -- Có --> O["Handler xử lý lượt update"]
-  T -- Không --> P{"Custom policy?"}
-  P -- Có --> X["GSTCustomFarm · controller thử nghiệm"]
+  T -- Không --> P{"Policy khác native?"}
+  P -- Có --> X["Farm tool chưa triển khai · dừng lượt"]
   P -- Không --> N["Fallback: auto.update gốc"]
   N --> C["features/automation/auto-farm/farm-combat.js có thể bọc host khi active"]
   H --- F["routing / behavior / quest / seals / map / realm / chest / harvest"]
@@ -138,12 +140,18 @@ Khi `farm-session.js` xác nhận ngắt Farm do native shutdown sau hồi sinh,
 
 - Với Auto Farm ở chế độ radius, `farm-page.js` giữ `session.home` cố định trước thao tác tay và xuất `GSTHarvest.farmBoundary(scene)`; `shared/navigation/farm-routing.js` dùng ranh giới này để giới hạn đích native, `clear/route` (gồm hop qua route) và steer của `scene.auto.walk`. Các owner Quest/Realm/Harvest/Map/Safety làm native walk nhường lượt mà không ghi vector của họ. `farm-map.js` kiểm tra điểm đầu, mọi chặng và đích của route trong cùng vòng tròn, đồng thời đợi/defer nếu vị trí hiện tại không có tuyến hợp lệ vào trong. `farm-boss-safety.js` giới hạn farm-owned né/rút lui theo cùng gốc và bán kính; các emergency handoff do Realm/map travel yêu cầu giữ phạm vi map độc lập hiện có. FarmMap giữ mục tiêu còn hợp lệ qua Q và hồi phục; chỉ dùng ưu tiên boss/cảnh giới khi chọn mục tiêu tiếp theo. Nếu nhân vật ở ngoài vòng, FarmMap dùng đường đi riêng qua dispatcher để trở lại điểm hợp lệ, cho phép chặng vòng ngoài kể cả đi ngang hoặc tạm xa tâm; khi đã vào trong thì không đi ra lại, giữ nguyên gốc và chờ thử lại có giới hạn khi đường bị chặn. Whole-map không dùng nhánh quay vòng này; scout chỉ chạy khi không còn actor hợp lệ đã biết. `target_decision` và `farm_boundary_denied` được throttle theo khóa và thời gian để tránh log mỗi frame.
 
-### Custom Auto Farm thử nghiệm
+### Tách controller Farm — phase đầu
 
-- `features/automation/auto-farm/farm-custom.js` là decision owner riêng; nó được thêm vào manifest MAIN sau `farm-policy-main.js` và trước các owner dùng dispatcher. Nó giữ state/target/action theo scene, chỉ dùng actor đang hiển thị, và giới hạn một action đang chờ. ON/OFF vẫn đến từ controller native scene, nhưng native decision fallback không chạy trong policy custom.
-- `farm-map.js`, `farm-behavior.js`, `farm-combat.js`, `farm-routing.js` tiếp tục là owner của extended/native modes và không chạy native pick/idle/walk/recovery decisions trong custom. `GSTNavigation.walk()` chuyển sang adapter `leg()` + `route/clear/steer` trong custom, dùng cho Quest/Map/Seal/Harvest/Safety. Boss safety, defense, seals, quest, revive, potion và flight giữ adapter riêng; custom dừng/nhường khi các owner đó đang xử lý.
-- Popup lưu mode mặc định và bộ lọc theo hồ sơ Farm hiện có; bridge giữ lựa chọn mode của từng tab riêng trong `sessionStorage` để một tab không đổi engine hoặc tắt Farm ở tab khác. Farm ON, custom activation intent, pending actions và opt-in stats thuộc tab/scene; stats opt-in lưu cục bộ theo tab, không ghi vào global fallback hoặc hồ sơ account. FarmSession keep-after-death được đọc để dừng hoặc giữ phiên custom sau khi chết; custom không tự restore sau reload/reconnect.
-- Quy trình dùng/so sánh và giới hạn số liệu xem `CUSTOM_AUTO_FARM.md`. Runtime chưa được kiểm tra.
+- Quản lý tính năng chỉ có hai lựa chọn mới: `native` (Farm của game) và `tool` (chưa triển khai). `farm-policy.js` và bản MAIN đồng bộ; `extended`/`custom` cũ được đọc thành `tool`, `disabled` giữ nguyên khóa bật. Không xóa dữ liệu Farm cũ. MAIN khởi động đóng ở `tool` cho tới khi nhận cấu hình.
+- `hasExtensionAssistance`, `isExtended`, `isCustom` hiện luôn false: các controller Farm cũ không được kích hoạt. `farm-custom.js` cũng từ chối configure/update/activation riêng. Farm-only encounter, respawn observer, routing, defense, behavior, map, party, seals và safety không được bật; dịch vụ dùng chung không bị gỡ. Các phần Harvest độc lập tiếp tục dùng API hiện có.
+- `farm-page.js` quan sát controller qua timer/preupdate và tái sử dụng `GSTFarmUpdate.installGate`. Wrapper ở `scene.toggleAutoFarm` chặn bật trước khi game hủy click-order/ngắm/thiền; wrapper `auto.toggle` chặn lời gọi bật trực tiếp. V được xử lý đồng bộ, không để Phaser giữ yêu cầu từ trước lần chuyển mode. Scene/controller cũ không được dùng wrapper đã hết quyền.
+- Dispatcher giữ callback owner độc lập theo priority hiện có. Sau callback, chỉ policy `native` được gọi update gốc; các policy khác không gọi native hay Custom. `runRecovery` cũng từ chối native khi không chọn native. Gate bảo vệ controller thay thế; không hỗ trợ can thiệp descriptor tùy ý từ bên ngoài.
+- Dispatcher ghi lại steer/face/pending thực sự do native Farm tạo. Khi đổi controller, Farm bị dừng qua toggle OFF với host bảo vệ movement, không gọi đường scene hủy click-order. Chỉ nhả vector còn khớp và action còn thuộc Farm; thao tác tay làm mất attribution. Không hủy hành động đã gửi tới game/server.
+- Chọn controller không bật Farm. Đổi lựa chọn và lần cấu hình đầu đều để OFF. `GSTFarmSession.setPolicyMode` xóa ý định khôi phục cũ. `GSTIntentAuthority.retireFarm()` chỉ thay token Farm hiện hành bằng OFF, giữ lifecycle và token Harvest; scene/identity thật sự thay đổi vẫn invalidate toàn bộ.
+- Bridge giữ mode theo tab/identity ở `gst:farm-policy-tab:v1`, normalize cả dữ liệu session cũ. Popup phân biệt lưu/gửi cấu hình với trạng thái MAIN được đọc lại. `disabled` chỉ có option ẩn để trình bày khóa đã lưu; người dùng chủ động chọn một trong hai controller mới để rời khóa.
+- Quest giữ phần độc lập; bước cần Farm tool từ chối rõ “chưa triển khai”. Bộ lọc/bán kính tool là cấu hình chuẩn bị, không áp dụng vào native. Tách pickup và thu gọn toàn bộ UI thuộc task sau. Simulation có nhặt gần độc lập trong snapshot; phase này không thay đổi simulation hoặc khẳng định chặn được nhặt server.
+- Chỉ control thống kê Custom cũ được ẩn ở phase tách (`gst:custom-farm-stats-enabled:v1` và `gst:custom-farm-stats:v1` giữ nguyên, runtime Custom bị khóa). Quyết định phục hồi thống kê và danh mục đầy đủ control ẩn thuộc task UI sau.
+- Runtime chưa được xác minh; không chạy test/lint/typecheck/QA/gameplay cho phase này.
 
 ## 5. Bảng định tuyến theo yêu cầu
 

@@ -1,24 +1,20 @@
-// Canonical helper for popup/ISOLATED. Keep the MAIN copy byte-identical with:
-// Copy-Item -LiteralPath .\features\automation\auto-farm\farm-policy.js -Destination .\features\automation\auto-farm\farm-policy-main.js
+// Canonical popup/ISOLATED helper; keep farm-policy-main.js byte-identical.
 (() => {
   "use strict";
-  const modes = Object.freeze(["extended", "custom", "native", "disabled"]);
-  const DEFAULT_MODE = "extended";
-  const normalize = (value) => modes.includes(value) ? value : DEFAULT_MODE;
-  // MAIN starts closed to farm assistance until the stored mode arrives over
-  // the bridge. The configured default remains `extended` for saved settings.
-  let activeMode = "native";
-
+  // Legacy values remain readable, but never select a retired controller.
+  const modes = Object.freeze(["tool", "native", "disabled", "extended", "custom"]);
+  const normalize = (value) => value === "native" || value === "disabled" ? value : "tool";
+  let activeMode = "tool"; // Closed until verified configuration arrives.
   globalThis.GSTFarmPolicy = Object.freeze({
-    modes,
-    defaultMode: DEFAULT_MODE,
-    normalize,
+    modes, defaultMode: "tool", normalize,
     mode: () => activeMode,
     isNative: () => activeMode === "native",
-    isExtended: () => activeMode === "extended",
-    isCustom: () => activeMode === "custom",
+    isTool: () => activeMode === "tool",
+    isExtended: () => false,
+    isCustom: () => false,
     isDisabled: () => activeMode === "disabled",
-    hasExtensionAssistance: () => activeMode === "extended" || activeMode === "custom",
+    blocksNativeDecisions: () => activeMode !== "native",
+    hasExtensionAssistance: () => false,
     setMode(value) { activeMode = normalize(value); return activeMode; },
     read(preferences) { return normalize(preferences?.policyMode); },
     withMode(preferences, mode) { return { ...(preferences ?? {}), policyMode: normalize(mode) }; },

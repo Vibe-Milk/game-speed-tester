@@ -1,3 +1,5 @@
+> **Đã ngừng controller thử nghiệm:** `custom` và `extended` cũ hiện được đọc thành `tool`. Farm của tool chưa triển khai, luôn OFF và không dùng native dự phòng. Nội dung dưới đây là tài liệu lịch sử, không phải hướng dẫn bật controller hiện tại. Chọn Farm của game trong Quản lý tính năng để dùng native, rồi bật riêng trong game. Khóa `disabled` cũ chỉ được mở khi người dùng chủ động chọn controller.
+
 # Custom Auto Farm thử nghiệm
 
 ## Bật trong một tab

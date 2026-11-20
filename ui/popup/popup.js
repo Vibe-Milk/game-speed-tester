@@ -473,7 +473,7 @@ async function refreshFarm() {
     if (!Number.isInteger(tabId)) throw new Error("No bound game tab.");
     const status = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-status" });
     if (document.activeElement !== farmCustomStats) farmCustomStats.checked = status.customComparisonEnabled === true;
-    if (["extended", "custom", "native", "disabled"].includes(status.policyMode)) {
+    if (["tool", "native", "disabled"].includes(status.policyMode)) {
       farmTabPolicyMode = status.policyMode;
       if (farmPolicyPending === 0) {
         farmPolicyMode.value = status.policyMode;
@@ -486,8 +486,8 @@ async function refreshFarm() {
     const farmLabel = status.autoOn === true ? "BẬT" : status.autoOn === false ? "TẮT" : "CHƯA RÕ";
     autoFarmValue.textContent = status.autoOn === true ? "Đang bật" : status.autoOn === false ? "Đã tắt" : "Chưa rõ";
     autoFarmValue.dataset.state = status.autoOn === true ? "on" : status.autoOn === false ? "off" : "unknown";
-    farmPolicyRuntimeStatus.textContent = status.policyMode === "custom"
-      ? `Custom Farm thử nghiệm trong tab này: ${status.customState || "WAITING_FOR_DATA"} · ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`
+    farmPolicyRuntimeStatus.textContent = status.policyMode === "tool"
+      ? `Farm của tool: chưa triển khai · trạng thái Farm ${farmLabel}.`
       : `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
     const customStats = status.customStats;
     const statsLabel = customStats ? ` · So sánh tab: chạy ${Math.floor(customStats.elapsed/1000)}s, tạm dừng ${Math.floor(customStats.paused/1000)}s, kẹt ${Math.floor(customStats.stuck/1000)}s, chết ${customStats.observedDeaths}, mục tiêu có cờ chết ${customStats.observedKills}; XP/phút không khả dụng, potion không thể quy kết.` : "";
@@ -517,12 +517,11 @@ let farmPolicyPending = 0;
 let farmPolicyRequestRevision = 0;
 let farmPolicyWaiters = [];
 let selectingFarmPolicy = false;
-const farmPolicyLabels = Object.freeze({ extended: "Tool hỗ trợ", custom: "Thử nghiệm · Custom Farm", native: "Theo game gốc", disabled: "Khóa Auto Farm" });
+const farmPolicyLabels = Object.freeze({ tool: "Farm của tool", native: "Farm của game", disabled: "Khóa Auto Farm cũ" });
 const farmPolicyDescriptions = Object.freeze({
-  extended: "Đang chọn Tool hỗ trợ: dùng farm gốc với các hỗ trợ đã cài của extension.",
-  custom: "Đang chọn Custom Farm thử nghiệm: vòng quyết định riêng dùng dữ liệu đang hiển thị; mặc định tắt cho tới khi bật Auto Farm trong game. Kết quả chưa được đo kiểm.",
-  native: "Đang chọn Theo game gốc: farm gốc tự điều khiển, không có hỗ trợ farm riêng của extension.",
-  disabled: "Đang chọn Khóa Auto Farm: dừng farm đang chạy và chặn các đường bật được hỗ trợ."
+  tool: "Bộ điều khiển Farm của tool chưa được triển khai. Farm OFF; không dùng Farm gốc hoặc Custom Farm cũ làm dự phòng.",
+  native: "Farm của game: bật/tắt riêng trong game; quyết định Farm của tool không chạy. Bộ lọc và bán kính tool không áp dụng cho Farm game.",
+  disabled: "Khóa Auto Farm cũ được giữ nguyên. Chọn Farm của game hoặc Farm của tool để rời khóa; sau khi chọn Farm vẫn OFF."
 });
 function normalizeFarmTargetMode(mode) {
   return mode === "level" ? "maxLevel" : mode === "bossFirst" ? "bossLevel"
@@ -575,22 +574,21 @@ function syncFarmPolicyUI(raw = {}) {
     ? `Tab này dùng ${farmPolicyLabels[farmTabPolicyMode]}; mặc định đã lưu là ${farmPolicyLabels[confirmedMode]}.`
     : farmPolicyDescriptions[farmPolicyMode.value] ?? "Đang đọc chế độ…";
   const tabMode = farmTabPolicyMode ?? confirmedMode;
-  const extended = confirmedMode === "extended";
-  const assisted = extended || confirmedMode === "custom";
+  const assisted = tabMode === "tool";
   farmControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
-  farmRightControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  farmRightControls.disabled = true; // Retired Farm behaviors; preferences remain stored.
   farmCustomStats.disabled = !farmSyncReady || tabMode !== "custom" || !accountAllowed;
   syncBossTargetControls();
-  breakSeals.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  breakSeals.disabled = true;
   shortcutControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
-  farmAssistanceAvailability.hidden = assisted || !farmSyncReady;
+  farmAssistanceAvailability.hidden = !farmSyncReady;
   farmAssistanceAvailability.textContent = !accountAllowed
     ? "Xác nhận nick trong tab game trước khi sửa cài đặt riêng."
     : confirmedMode === "disabled"
     ? "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng dùng lại khi bạn mở khóa và chọn chế độ phù hợp."
-    : confirmedMode === "custom"
-    ? "Custom Farm là thử nghiệm riêng; bật riêng trong tab bạn muốn so sánh. Thống kê nếu bật được lưu cục bộ theo tab."
-    : "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng chỉ áp dụng ở Tool hỗ trợ.";
+    : tabMode === "tool"
+    ? "Farm của tool chưa được triển khai. Cài đặt chỉ được lưu để xây lại; các hành vi Farm cũ đều không chạy."
+    : "Farm của game dùng quy tắc game gốc; các cài đặt Farm tool chỉ được giữ lại, không áp dụng.";
 }
 function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {}) {
   const keepDraft = preserveDraft && farmHasDraft();
@@ -730,9 +728,9 @@ farmPolicyMode.addEventListener("change", async () => {
     if (localAccepted) farmTabPolicyMode = committed.policyMode;
     syncFarmPreferences(committed);
     farmPolicyFeedback.textContent = committed.policyMode === mode && localAccepted
-      ? `Đã lưu mặc định ${farmPolicyLabels[mode]} và áp dụng trong tab này. Các tab đang mở khác giữ chế độ riêng của chúng.`
+      ? `Đã lưu mặc định ${farmPolicyLabels[mode]} và gửi tới tab này; xem trạng thái thực tế phía trên. Các tab đang mở khác giữ chế độ riêng của chúng.`
       : localAccepted
-        ? `Đã đồng bộ chế độ ${farmPolicyLabels[committed.policyMode]} mới nhất và áp dụng trong tab này.`
+        ? `Đã gửi chế độ ${farmPolicyLabels[committed.policyMode]} mới nhất tới tab này; xem trạng thái thực tế phía trên.`
         : "Đã lưu chế độ hồ sơ, nhưng chưa xác nhận được chế độ cục bộ của tab này.";
   } catch {
     if (requestRevision === farmPolicyRequestRevision) {
@@ -790,7 +788,7 @@ function syncBossTargetControls() {
   const mode = farmTargetMode.value || farmConfirmed.targetMode || "all";
   const excluded = farmExcludeBoss.checked;
   const ordinaryOnly = ["highLevel", "lowLevel"].includes(mode);
-  const unavailable = !farmSyncReady || !["extended", "custom"].includes(farmConfirmed.policyMode)
+  const unavailable = !farmSyncReady || !["tool"].includes(farmConfirmed.policyMode)
     || farmPreferenceWritesPending > 0 || farmPolicyPending > 0;
   farmBossFilter.disabled = unavailable || excluded || ordinaryOnly;
   farmExcludeBoss.disabled = unavailable;
@@ -1080,7 +1078,7 @@ function commitFarmHpThresholds() {
       }
       if (!saved) farmRetreatThresholdError.textContent = "Chưa lưu được cặp ngưỡng HP; cài đặt đã lưu trước đó được giữ.";
       if (farmHpThresholdFollowupRequested && farmHpThresholdFollowupCount < 2
-          && ["extended", "custom"].includes(farmConfirmed.policyMode)) {
+          && ["tool"].includes(farmConfirmed.policyMode)) {
         farmHpThresholdFollowupRequested = false;
         farmHpThresholdFollowupCount++;
         farmHpThresholdCommit = null;
@@ -1102,11 +1100,11 @@ for (const input of [farmRetreatHpPercent, farmRecoveryHpPercent]) {
   input.addEventListener("input", () => {
     farmHpEditRevision++;
     if (farmHpThresholdCommit && farmHpThresholdFollowupCount < 2
-        && ["extended", "custom"].includes(farmConfirmed.policyMode)) farmHpThresholdFollowupRequested = true;
+        && ["tool"].includes(farmConfirmed.policyMode)) farmHpThresholdFollowupRequested = true;
     farmRetreatThresholdError.textContent = "";
   });
   input.addEventListener("blur", (event) => {
-    if (!["extended", "custom"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
+    if (!["tool"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
         || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
     void commitFarmHpThresholds();
   });
@@ -1120,7 +1118,7 @@ farmRadius.addEventListener("input", () => {
   farmMessage("Bản nháp chưa lưu.");
 });
 farmRadius.addEventListener("blur", (event) => {
-  if (!["extended", "custom"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
+  if (!["tool"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
       || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
   void commitFarmRadius();
 });
@@ -1135,7 +1133,7 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (farmPolicyPending > 0) await new Promise((resolve) => farmPolicyWaiters.push(resolve));
   const startedWrites = [...new Map([...writesAtRequest, ...farmWrites.entries()]).entries()];
   const pending = [];
-  const active = ["extended", "custom"].includes(farmConfirmed.policyMode);
+  const active = ["tool"].includes(farmConfirmed.policyMode);
   const mode = activeFarmTargetMode(), targetDraft = farmLevelDraft();
   if (farmSingleCommit) pending.push(farmSingleCommit);
   else if (active && ["maxLevel", "minLevel"].includes(mode) && targetDraft.dirty) pending.push(commitFarmSingle(mode));
@@ -1151,12 +1149,12 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
     // A write may finish while the user is still editing. Drain a small,
     // bounded number of latest complete pairs; leave any newer draft visible.
     for (let attempt = 0; attempt < 3 && farmHpThresholdDraft().dirty; attempt++) {
-      if (!["extended", "custom"].includes(farmConfirmed.policyMode)) break;
+      if (!["tool"].includes(farmConfirmed.policyMode)) break;
       if (!farmHpThresholdDraft().valid) break;
       results = [...results, await commitFarmHpThresholds()];
     }
   }
-  if (active && !["extended", "custom"].includes(farmConfirmed.policyMode))
+  if (active && !["tool"].includes(farmConfirmed.policyMode))
     return { saved: false, reason: "policy-changed" };
   const writes = new Map([...startedWrites, ...farmWrites.entries()]);
   const writeEntries = [...writes.entries()];
@@ -1168,7 +1166,7 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (!active) {
     if (discardInactiveDrafts) {
       // Re-check in case a newer confirmed policy arrived while writes settled.
-      if (["extended", "custom"].includes(farmConfirmed.policyMode)) return { saved: false, reason: "policy-changed" };
+      if (["tool"].includes(farmConfirmed.policyMode)) return { saved: false, reason: "policy-changed" };
       if (failedOtherWrite) return { saved: false, reason: "persistence" };
       if (farmHasDraft()) {
         farmHpSyncedEditRevision = farmHpEditRevision;
