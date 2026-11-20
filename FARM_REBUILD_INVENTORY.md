@@ -49,3 +49,8 @@ Phase names refer to the agreed medium tasks: Task 4 targets/routing; Task 5 app
 ## Validation limits
 
 Source/diff review only. Tests, lint, typecheck, browser QA and gameplay: NOT RUN. CI: NOT CHECKED. Runtime: UNVERIFIED.
+
+
+## Task 4 planner availability
+
+The saved radius/monster filters now feed a read-only target/route proposal on the existing status path. Farm stays OFF/unimplemented; there is no executable movement/combat controller. No hidden feature above has been restored. Planning uses radius only regardless of retained legacy whole-map/idle flags. The preview origin is not an activation origin; Task 5 must bind a fresh explicit start and current ownership before consuming plans. See the Task 4 section of CODEGRAPH.md for lifecycle, query bounds and limitations.

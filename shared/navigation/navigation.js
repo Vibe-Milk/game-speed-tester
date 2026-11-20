@@ -215,8 +215,29 @@
     owner.directUntil = -Infinity;
     owner.checkpointRetryAt = -Infinity;
   }
+  // Read-only route proposal. Never schedules movement or mutates native Farm.
+  function planRoute(host, from, goal, allowed = () => true) {
+    const valid = (point) => point && [point.x, point.y].every(finite) && allowed(point) === true;
+    const clear = (a, b) => host.clear(a.x, a.y, b.x, b.y) === true;
+    try {
+      if (!valid(from) || !valid(goal) || typeof host?.clear !== "function"
+          || typeof host?.route !== "function") return null;
+      if (clear(from, goal)) return [[goal.x, goal.y]];
+      const raw = host.route(from.x, from.y, goal.x, goal.y);
+      if (!Array.isArray(raw) || !raw.length || raw.length > 256 || !raw.every(validPoint)) return null;
+      const path = [], points = [...raw, [goal.x, goal.y]];
+      let previous = from;
+      for (const pair of points) {
+        const next = { x: pair[0], y: pair[1] };
+        if (!valid(next) || !clear(previous, next)) return null;
+        if (Math.hypot(next.x - previous.x, next.y - previous.y) > 1e-6) path.push([...pair]);
+        previous = next;
+      }
+      return path.length ? path : [[goal.x, goal.y]];
+    } catch { return null; }
+  }
   globalThis.GSTNavigation = {
-    schedule, leg, resetLeg, customStep,
+    schedule, leg, resetLeg, customStep, planRoute,
     cancel(scene, nav) {
       const entry = movers.get(scene);
       if (entry?.intent?.nav === nav) entry.intent = null;

@@ -1527,6 +1527,7 @@
         preferLoot: data.preferLoot !== false, selfDefense: data.selfDefense === true, autoEncounter: data.autoEncounter === true, excludeBoss: data.excludeBoss === true,
         bossFilter: data.bossFilter === "world" ? "world" : "all" };
       globalThis.GSTFarmSkillDiagnostics?.setContext?.(sceneNow(), settings);
+      globalThis.GSTFarmPlanner?.configure?.(sceneNow(), settings);
       stage = "policy";
       const modeScene = sceneNow();
       if (configuredPolicyMode === null || configuredPolicyMode !== settings.policyMode) {
@@ -1648,12 +1649,17 @@
         || globalThis.GSTFarmSession?.status(scene) || globalThis.GSTFarmSeals?.status(scene) || message);
       const defenseInfo = autoOn === false && !defense ? globalThis.GSTFarmDefense?.status(scene, true) : "";
       const encounterInfo = globalThis.GSTFarmEncounter?.status(scene) || "";
+      // Status may compute a read-only proposal, never an activation/action.
+      globalThis.GSTFarmPlanner?.configure?.(scene, settings);
+      const proposal = globalThis.GSTFarmPlanner?.preview?.(scene);
+      const planner = proposal ? { state: proposal.state, reason: proposal.reason,
+        executable: false, targetId: proposal.targetId, waypointCount: proposal.path.length } : null;
       window.postMessage({ channel: "gst:farm-status:v1", requestId: data.requestId,
         configurationReceived, configurationReady: globalThis.GSTFarmConfigurationReady === true,
         message: (settings.policyMode === "extended" && targetFilterActive() ? `${filterLabel()}. ` : "") + (shortcutMessage
           || (dead && respawnMessage ? respawnMessage : primary)) + (defenseInfo ? ` · ${defenseInfo}` : ""),
         encounterStatus: encounterInfo,
-        autoOn, dead, policyMode: settings.policyMode, customState: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.state?.(scene) ?? "WAITING_FOR_DATA" : null, customComparisonEnabled: settings.customComparisonEnabled === true, customStats: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.stats?.(scene) ?? null : null, active: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.active?.(scene) === true : session !== null, radius: settings.radius }, origin);
+        planner, autoOn, dead, policyMode: settings.policyMode, customState: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.state?.(scene) ?? "WAITING_FOR_DATA" : null, customComparisonEnabled: settings.customComparisonEnabled === true, customStats: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.stats?.(scene) ?? null : null, active: settings.policyMode === "custom" ? globalThis.GSTCustomFarm?.active?.(scene) === true : session !== null, radius: settings.radius }, origin);
     }
   });
   window.addEventListener("pagehide", () => {

@@ -160,6 +160,13 @@
       autoOn: typeof event.data.autoOn === "boolean" ? event.data.autoOn : null,
       dead: typeof event.data.dead === "boolean" ? event.data.dead : null,
       policyMode: ["tool", "extended", "custom", "native", "disabled"].includes(event.data.policyMode) ? event.data.policyMode : null,
+      planner: event.data.planner && ["WAITING", "SEARCHING", "PLANNED"].includes(event.data.planner.state) ? {
+        state: event.data.planner.state, executable: false,
+        reason: typeof event.data.planner.reason === "string" ? event.data.planner.reason.slice(0, 60) : "",
+        targetId: Number.isSafeInteger(event.data.planner.targetId) ? event.data.planner.targetId : null,
+        waypointCount: Number.isSafeInteger(event.data.planner.waypointCount)
+          ? Math.max(0, Math.min(257, event.data.planner.waypointCount)) : 0
+      } : null,
       customState: ["OFF","PAUSED","SEARCH","APPROACH","COMBAT","LOOT","RECOVERY","DEAD","WAITING_FOR_DATA"].includes(event.data.customState) ? event.data.customState : null,
       customComparisonEnabled: event.data.customComparisonEnabled === true,
       customStats: event.data.customStats && typeof event.data.customStats === "object" ? {
