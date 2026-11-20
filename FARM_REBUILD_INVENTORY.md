@@ -75,3 +75,7 @@ Rebuilt Farm options and controller selection are now on **Auto của tool**. Po
 ## Skill mode restoration
 
 The rebuilt skill section now offers default game selection and custom priority. Stored `skillMode` is `game`/`custom`; fresh records default to game, legacy records with slot/priority arrays retain custom including intentional all-off settings. Custom values persist while hidden in game mode. This restores no retired extended/Custom automation: only native `castSkills` is reused behind tool safety/action gates, with private session rotation. Tool pickup remains blocked.
+
+## Live Farm interaction revision
+
+Tool Farm now retains ON when yielding to click movement/attack and resumes after the order ends plus two seconds without manual input. Skill mode, selected slots and priority apply after the current action boundary without resetting ON or the fixed origin. This supersedes the earlier stop-on-skill-edit rule; other lifecycle stops remain. Skill requests require separate observed cooldown evidence and use retry backoff when unconfirmed. This does not restore retired automation or unblock Tool loot.

@@ -282,7 +282,7 @@
               <option value="game">Mặc định theo game</option>
               <option value="custom">Tùy chỉnh</option>
             </select>
-            <p class="hint" data-help-for='label[for="farmSkillMode"]'>Mặc định: dùng riêng cách chọn chiêu luân phiên của game theo các ô đang gán, vẫn qua giới hạn an toàn của tool. Không bật vòng Farm gốc. Tùy chỉnh: chọn ô và xét lại từ đầu thứ tự ưu tiên sau mỗi lần dùng. Đổi chế độ dừng Farm; cần bật lại.</p>
+            <p class="hint" data-help-for='label[for="farmSkillMode"]'>Mặc định: dùng riêng cách chọn chiêu luân phiên của game theo các ô đang gán, vẫn qua giới hạn an toàn của tool. Không bật vòng Farm gốc. Tùy chỉnh: chọn ô và xét lại từ đầu thứ tự ưu tiên sau mỗi lần dùng. Đổi cách dùng kỹ năng giữ Farm bật; áp dụng sau hành động đang thực hiện.</p>
             <fieldset id="farmCustomSkillControls">
             <p class="field-title">Ô kỹ năng tự dùng</p>
             <div class="button-row">
@@ -293,10 +293,10 @@
               <label class="check-row"><input id="farmSkill5" type="checkbox" value="5"><span>Ô 5</span></label>
               <label class="check-row"><input id="farmSkill6" type="checkbox" value="6"><span>Ô 6</span></label>
             </div>
-            <p class="hint" role="note">Trong Tùy chỉnh, bỏ chọn tất cả để chỉ đánh thường. Tool đọc kỹ năng hiện đang gán vào ô 1–6, giữ nguyên hồi chiêu và năng lượng của game. Đổi cấu hình sẽ dừng Farm; bật lại để áp dụng.</p>
+            <p class="hint" role="note">Trong Tùy chỉnh, bỏ chọn tất cả để chỉ đánh thường. Tool đọc kỹ năng hiện đang gán vào ô 1–6, giữ nguyên hồi chiêu và năng lượng của game. Đổi ô hoặc thứ tự kỹ năng giữ Farm bật; áp dụng sau hành động đang thực hiện.</p>
             <label for="farmSkillPriority">Thứ tự ưu tiên</label>
             <input id="farmSkillPriority" type="text" value="1 2 3 4 5 6" autocomplete="off" aria-describedby="farmSkillPriorityError">
-            <p class="hint" data-help-for='label[for="farmSkillPriority"]'>Nhập đủ 1–6, mỗi số một lần, ví dụ 3 1 5 2 6 4. Bỏ qua chiêu chưa sẵn sàng; sau một lần dùng thành công ở client, xét lại từ đầu. Đây không phải combo tuần tự. Chiêu có đích dịch chuyển chưa xác định sẽ được bỏ qua để giữ bán kính.</p>
+            <p class="hint" data-help-for='label[for="farmSkillPriority"]'>Nhập đủ 1–6, mỗi số một lần, ví dụ 3 1 5 2 6 4. Bỏ qua chiêu chưa sẵn sàng; sau mỗi lần yêu cầu chiêu, chờ hoàn tất và kiểm tra hồi chiêu game rồi xét lại từ đầu. Đây không phải combo tuần tự. Chiêu có đích dịch chuyển chưa xác định sẽ được bỏ qua để giữ bán kính.</p>
             <p id="farmSkillPriorityError" class="field-error" role="alert"></p>
             <button id="saveFarmSkillPriority" type="button">Lưu thứ tự</button>
             </fieldset>

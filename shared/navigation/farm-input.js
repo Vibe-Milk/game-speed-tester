@@ -14,10 +14,13 @@
         const original = scene.startClickOrder;
         const descriptor = Object.getOwnPropertyDescriptor(scene, "startClickOrder");
         entry = { callbacks: new Map(), descriptor };
-        const keepFarm = () => globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true
-          && scene.auto?.on === true && typeof scene.auto.pause === "function";
+        const toolOwns = () => globalThis.GSTFarmPolicy?.isTool?.() === true
+          && globalThis.GSTToolFarm?.active?.(scene) === true;
+        const keepFarm = () => scene.auto?.on === true && (toolOwns()
+          || globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true && typeof scene.auto.pause === "function");
         entry.pauseClick = () => {
           if (!scene.clickOrder || !keepFarm()) return;
+          if (toolOwns()) { globalThis.GSTToolFarm.manual(scene); return; }
           scene.auto.pause(scene.now());
           scene.autoX = scene.autoY = 0;
         };
@@ -30,10 +33,11 @@
             try { observer(accepted); } catch { /* Diagnostics must not break native input. */ }
           }
           if (!accepted) return;
-          if (!keepFarm() || args[2] !== 0 || typeof scene.toggleAutoFarm !== "function")
+          if (!keepFarm() || (!toolOwns() && args[2] !== 0) || typeof scene.toggleAutoFarm !== "function")
             return original.apply(this, args);
           // Suppress only the synchronous OFF request made by native click movement.
           // Explicit toggles outside this call retain their normal behavior.
+          if (toolOwns()) globalThis.GSTToolFarm.manual(scene);
           const toggle = scene.toggleAutoFarm;
           const toggleDescriptor = Object.getOwnPropertyDescriptor(scene, "toggleAutoFarm");
           const preserve = function (...toggleArgs) {

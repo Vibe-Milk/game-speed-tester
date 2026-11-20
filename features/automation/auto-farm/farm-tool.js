@@ -6,7 +6,7 @@
   const key = (o) => JSON.stringify([o.policyMode, o.identityVerified, o.identityBlocked, o.accountProfileKey,
     o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.targetMode,
     o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter,
-    o.skillMode, o.skillEnabled, o.skillPriority, o.pickupMode]);
+    o.pickupMode]);
   function otherOwner(scene, allowHarvest = false) {
     return [globalThis.GSTHarvest, globalThis.GSTQuest, globalThis.GSTMapTravel,
       globalThis.GSTFarmSeals, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense]
@@ -29,6 +29,7 @@
     const s = scene && sessions.get(scene); if (!s) return;
     reason ??= s.enabled ? "Bạn đã tắt Farm của tool." : s.message;
     s.enabled = false; s.skillAction = null; s.lifecycle = null; s.state = "OFF"; s.message = reason; messages.set(scene, reason); release(s);
+    globalThis.GSTFarmSkills?.reset?.(scene);
     globalThis.GSTFarmPlanner?.reset?.(scene);
   }
   function halt(s, reason) {
@@ -45,6 +46,10 @@
     const s = scene && sessions.get(scene);
     if (s && (s.auto !== scene.auto || s.key !== key(options))) {
       halt(s, "Đã đổi cấu hình hoặc nhân vật; bật Farm lại để bắt đầu phiên mới."); dispose(scene);
+    } else if (s) {
+      // Skill-only changes keep the current lifecycle, origin and issued action.
+      if (s.enabled) s.pendingOptions = { ...options };
+      else s.options = { ...options };
     }
   }
   function context(s, starting = false) {
@@ -73,12 +78,14 @@
       if (!intent || intent.lifecycle !== s.lifecycle || intent.feature === "farm" && !intent.enabled
           || intent.feature === "harvest" && intent.enabled && globalThis.GSTHarvest?.needsFarmCoordination?.())
         return "Quyền bật Farm đã hết hiệu lực.";
-      if (Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > o.radius) return "Đã ra ngoài bán kính Farm; bật lại để đặt tâm mới.";
+
     }
     return "";
   }
   function pauseReason(s, starting = false, ignoreClick = false) {
     const scene = s.scene;
+    if (s.enabled && Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius)
+      return "Đã ra ngoài bán kính Farm; đang chờ bạn quay lại vùng Farm.";
     if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
     if (document.hidden) return "Tab game đang bị ẩn.";
     if (!document.hasFocus()) return "Tab game chưa có focus; quay lại tab game rồi thử lại.";
@@ -172,7 +179,7 @@
     if (!GSTFarmPlanner.begin(scene, origin)) return false;
     s.origin = origin; s.map = scene.autoHost().mapKey(); s.collision = scene.collision;
     s.lifecycle = intent.lifecycle; s.lastTime = scene.now(); s.enabled = true;
-    s.skillRotation = { nextSlot: 0 }; s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
+    GSTFarmSkills.reset(scene); s.pendingOptions = null; s.skillRotation = { nextSlot: 0 }; s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
     messages.delete(scene); s.state = "SEARCH"; s.message = "Farm của tool: tìm quái trong bán kính đã lưu.";
     return true;
   }
@@ -186,6 +193,14 @@
     s.lastTime = time;
     if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
     s.skillAction = null;
+    if (s.pendingOptions) {
+      const next = s.pendingOptions; s.pendingOptions = null;
+      const changed = JSON.stringify([s.options.skillMode, s.options.skillEnabled, s.options.skillPriority])
+        !== JSON.stringify([next.skillMode, next.skillEnabled, next.skillPriority]);
+      s.options = next;
+      if (changed) s.skillRotation = { nextSlot: 0 };
+      const error = context(s); if (error) { halt(s, error); return; }
+    }
     const plan = GSTFarmPlanner.plan(scene);
     if (plan.state !== "PLANNED") { release(s); s.state = "SEARCH"; s.message = "Đang chờ mục tiêu hoặc đường đi hợp lệ."; return; }
     const target = host.enemies().find((e) => e.id === plan.targetId && !e.dead
@@ -239,10 +254,11 @@
   globalThis.GSTToolFarm = Object.freeze({ configure, prepare, start, stop, dispose, movementOwned,
     active: (scene) => sessions.get(scene)?.enabled === true,
     state: (scene) => sessions.get(scene)?.state ?? "OFF",
-    status: (scene) => sessions.get(scene)?.message ?? messages.get(scene) ?? "Farm của tool: dùng nút/phím Farm để bắt đầu.",
+    status: (scene) => (sessions.get(scene)?.message ?? messages.get(scene) ?? "Farm của tool: dùng nút/phím Farm để bắt đầu.")
+      + (GSTFarmSkills.status(scene) ? " · " + GSTFarmSkills.status(scene) : ""),
     manual(scene) {
       const s = scene && sessions.get(scene); if (!s?.enabled) return;
-      release(s); s.lockId = null; s.manualUntil = performance.now() + 700;
+      release(s); s.lockId = null; s.manualUntil = performance.now() + 2000;
     } });
   window.addEventListener("pagehide", () => { for (const scene of [...scenes]) { halt(sessions.get(scene), "Trang đã đóng; cần bật Farm lại."); dispose(scene); } });
 })();

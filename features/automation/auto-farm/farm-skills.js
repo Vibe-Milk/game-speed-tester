@@ -1,6 +1,10 @@
 (() => {
   "use strict";
-  const finite = Number.isFinite;
+  const finite = Number.isFinite, attempts = new WeakMap(), results = new WeakMap();
+  function ledger(scene) {
+    if (!attempts.has(scene)) attempts.set(scene, new Map());
+    return attempts.get(scene);
+  }
   // True means a client-side skill issue was observed, not a server hit/receipt.
   function tryPriority(scene, host, options, target, allowed, permitted, decision = null) {
     const time = scene.now(), self = scene.self;
@@ -12,11 +16,16 @@
     const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
     for (const slot of options.skillPriority ?? []) {
       if (!selected.includes(slot) || !available.includes(slot) || !/^[1-6]$/.test(slot)) continue;
+      const previous = ledger(scene).get(slot);
+      if (previous && performance.now() < previous.retryAt) continue;
       const kit = host.kit(slot), full = scene.skills?.find((entry) => entry.key === slot)?.kit;
       if (!kit || !full || full.id !== kit.id || full.unlock !== undefined && !finite(full.unlock)
           || scene.profile.level < full.unlock && !scene.gmSkills) continue;
       const cooldown = (self.cd?.[slot] ?? 0) - (time - scene.selfAt);
-      if (!finite(cooldown) || cooldown > 0 || scene.skillWait(slot) > 0
+      // Native skillWait permits an 80ms early margin. Automation waits for
+      // the observed global action lock as well, without changing native rules.
+      if (!finite(cooldown) || cooldown > 0 || (self.cl ?? 0) - (time - scene.selfAt) > 0
+          || scene.skillWait(slot) > 0
           || !finite(kit.range) || kit.range < 0) continue;
       const gauge = host.gauge?.();
       if (finite(kit.res) && gauge && (kit.res > 0 && gauge.v + kit.res >= gauge.max
@@ -63,10 +72,15 @@
       if (!issued) continue;
       const completion = (finite(full.contact) ? full.contact : 0)
         + Math.max(0, (full.hits || 1) - 1) * (finite(full.interval) ? full.interval : 0.25);
-      return { slot, id: kit.id, snapshotAt: scene.selfAt,
+      const action = { slot, id: kit.id, snapshotAt: scene.selfAt,
+        previousExpiry: scene.selfAt + (self.cd?.[slot] ?? 0), confirmed: false,
+        deadline: performance.now() + 1800,
         until: Math.max(...[time + 0.15, time + completion, time + full.lock,
           time + full.moveLock, scene.lockUntil, scene.skillLockUntil,
           scene.moveLockUntil, scene.castAt].filter(finite)) };
+      ledger(scene).set(slot, { id: kit.id, failures: previous?.id === kit.id ? previous.failures : 0, retryAt: Infinity });
+      results.set(scene, `Ô ${slot}: đã yêu cầu, chưa xác nhận hồi chiêu từ game.`);
+      return action;
     }
     return null;
   }
@@ -89,9 +103,36 @@
       && globalThis.GSTFarmMonsterClassification?.classify(enemy)
       && allowed({ x: enemy.x, y: enemy.y }));
     const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
+    const previousSlot = rotation.nextSlot;
     auto.castSkills.call(rotation, adapter, target, enemies, scene.px, scene.py, distance);
+    if (action) {
+      action.rotation = rotation; action.nextSlot = rotation.nextSlot;
+      rotation.nextSlot = previousSlot; // Commit rotation only with cooldown evidence.
+    }
     return action;
   }
   globalThis.GSTFarmSkills = Object.freeze({ tryPriority, tryDefault,
-    waiting(scene, action, time) { return !!action && (time < action.until || scene.selfAt <= action.snapshotAt); } });
+    reset(scene) { attempts.delete(scene); results.delete(scene); },
+    status: (scene) => results.get(scene) ?? "",
+    waiting(scene, action, time) {
+      if (!action) return false;
+      const entry = ledger(scene).get(action.slot);
+      const cd = scene.self?.cd?.[action.slot];
+      if (!action.confirmed && scene.selfAt > action.snapshotAt && finite(cd) && cd > 0
+          && scene.selfAt + cd > action.previousExpiry + 0.05) {
+        action.confirmed = true;
+        if (entry) { entry.failures = 0; entry.retryAt = 0; }
+        if (action.rotation) action.rotation.nextSlot = action.nextSlot;
+        results.set(scene, `Ô ${action.slot}: đã quan sát hồi chiêu từ game; không xác nhận sát thương.`);
+      }
+      if (!action.confirmed && performance.now() < action.deadline) return true;
+      if (!action.confirmed) {
+        if (entry && entry.retryAt === Infinity) {
+          entry.failures = Math.min(3, entry.failures + 1);
+          entry.retryAt = performance.now() + Math.min(4000, 500 * 2 ** entry.failures);
+        }
+        results.set(scene, `Ô ${action.slot}: chưa có xác nhận hồi chiêu; giãn lần thử lại.`);
+      }
+      return time < action.until;
+    } });
 })();
