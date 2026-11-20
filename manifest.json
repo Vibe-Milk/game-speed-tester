@@ -90,7 +90,6 @@
         "ui/interface/feature-toasts.js",
         "features/automation/auto-harvest/harvest-options.js",
         "core/content.js",
-        "ui/interface/game-panel-scroll.js",
         "ui/interface/font-options.js",
         "ui/interface/font.js",
         "features/automation/auto-potion/potion-content.js",
