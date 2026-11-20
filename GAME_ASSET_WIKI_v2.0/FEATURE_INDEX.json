@@ -1,0 +1,830 @@
+{
+  "schema_version": "2.0",
+  "purpose": "Feature-to-source navigation derived from the five module indexes",
+  "source_manifest": "SOURCE_MANIFEST.json",
+  "features": [
+    {
+      "id": "game_autofarm",
+      "label": "Auto Farm của game",
+      "keywords": [
+        "auto farm",
+        "auto luyện",
+        "tự luyện",
+        "farm",
+        "V$",
+        "toggleAutoFarm"
+      ],
+      "description": "Controller Auto Farm trong WorldScene, không phải hệ thống Auto Farm của extension/tool.",
+      "entry_points": [
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_controller",
+          "module_feature_label": "Auto Farm gốc: bộ điều khiển",
+          "primary_search_anchor": "class V${constructor(){M(this,\"on\",!1)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_toggle",
+          "module_feature_label": "Điểm bật/tắt Auto Farm gốc",
+          "primary_search_anchor": "toggleAutoFarm(){var e,i;this.cancelClickOrder()",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_targets",
+          "module_feature_label": "Lọc quái và chọn mục tiêu",
+          "primary_search_anchor": "const p=t.inCombat(),u=k=>p&&!!k.aggro",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_navigation",
+          "module_feature_label": "Di chuyển tự động và tránh kẹt",
+          "primary_search_anchor": "walk(t,e,i,n,s,o,r){if(se(i,n,this.lastX",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_loot",
+          "module_feature_label": "Nhặt đồ đi kèm Auto Farm gốc",
+          "primary_search_anchor": "idle(t,e,i,n){const s=r=>",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_scene_bridge",
+          "module_feature_label": "Cầu nối scene và tick Auto Farm",
+          "primary_search_anchor": "M(this,\"auto\",new V$)",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Cần tra thêm implementation của extension/tool trước khi tách hoặc chặn Auto Farm game.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "loot_and_auto_pickup",
+      "label": "Nhặt đồ và lọc loot",
+      "keywords": [
+        "nhặt đồ",
+        "loot",
+        "pickup",
+        "autoLootAt",
+        "lootMin",
+        "lootRecover",
+        "lọc đồ"
+      ],
+      "description": "Định vị nhặt từ Auto Farm client, action pickup, lọc loot và nhặt theo tick simulation.",
+      "entry_points": [
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_loot",
+          "module_feature_label": "Nhặt đồ đi kèm Auto Farm gốc",
+          "primary_search_anchor": "idle(t,e,i,n){const s=r=>",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "loot_pickup_handler",
+          "module_feature_label": "Xử lý nhặt đồ",
+          "primary_search_anchor": "pickup(t,n,e=!1){if(n.dead||n.room!==t||n.realm)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "loot_filter_actions",
+          "module_feature_label": "Bộ lọc nhặt đồ và thu hồi",
+          "primary_search_anchor": "case\"pickup\":this.pickup(i,t,e!==\"auto\");return;",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "simulation_auto_pickup",
+          "module_feature_label": "Auto-loot theo tick của simulation",
+          "primary_search_anchor": "this.time>=h.autoLootAt&&(h.autoLootAt=this.time+.2,o.loot.length&&this.pickup(o,h))",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Không đồng nhất nhặt do V$ gọi với nhặt định kỳ ở sim; khi can thiệp phải xem cả hai.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "monster_and_combat",
+      "label": "Quái vật và chiến đấu",
+      "keywords": [
+        "quái",
+        "monster",
+        "combat",
+        "đánh quái",
+        "target",
+        "skill"
+      ],
+      "description": "Tìm mục tiêu farm, tick quái/combat và phản hồi hiệu ứng; phân biệt logic simulation với render.",
+      "entry_points": [
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_targets",
+          "module_feature_label": "Lọc quái và chọn mục tiêu",
+          "primary_search_anchor": "const p=t.inCombat(),u=k=>p&&!!k.aggro",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "skill_queue",
+          "module_feature_label": "Hàng đợi kỹ năng",
+          "primary_search_anchor": "flushSkill(){var i;const e=this.pendingSkill;if(e){if(this.dead||this.uiBlocked||this.leaving||this.now()>e.until",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "monster_combat_tick",
+          "module_feature_label": "Tick quái vật và combat",
+          "primary_search_anchor": "this.updateMonsters(o,t),this.updateShots(o,t)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "ChieuMau",
+          "source_file": "ChieuMau-qVW4fvFM.js",
+          "wiki_file": "modules/ChieuMau.md",
+          "feature_id": "combat_effect_pool",
+          "module_feature_label": "Pool hiệu ứng",
+          "primary_search_anchor": "class Ro{constructor(e){g(this,\"px\",new Float32Array(L))",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Hiệu ứng ChieuMau không chứng minh quy tắc gây sát thương.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "movement_and_interaction",
+      "label": "Di chuyển và tương tác",
+      "keywords": [
+        "move",
+        "walk",
+        "path",
+        "di chuyển",
+        "tọa độ",
+        "pickTarget",
+        "interact"
+      ],
+      "description": "Tra cứu đường di chuyển Auto Farm, di chuyển scene và chọn mục tiêu tương tác.",
+      "entry_points": [
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "world_tick_orchestration",
+          "module_feature_label": "Điều phối cập nhật world",
+          "primary_search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "target_interaction",
+          "module_feature_label": "Chọn mục tiêu và tương tác",
+          "primary_search_anchor": "pickTarget(){var s,o,r,h;if((s=this.realmUI)!=null&&s.target)return{realm:this.realmUI.target}",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_navigation",
+          "module_feature_label": "Di chuyển tự động và tránh kẹt",
+          "primary_search_anchor": "walk(t,e,i,n,s,o,r){if(se(i,n,this.lastX",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Cách điều khiển driver/đồng bộ server cần đối chiếu các điểm gọi và driver thực tế.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "harvest_and_resources",
+      "label": "Thu hoạch tài nguyên",
+      "keywords": [
+        "harvest",
+        "thu hoạch",
+        "node",
+        "resources"
+      ],
+      "description": "Định vị action harvest của simulation và tương tác với node tại scene.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "resource_harvest_action",
+          "module_feature_label": "Thu hoạch tài nguyên",
+          "primary_search_anchor": "case\"harvest\":{const g=Number(e),k=i.nodes[g];",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "target_interaction",
+          "module_feature_label": "Chọn mục tiêu và tương tác",
+          "primary_search_anchor": "pickTarget(){var s,o,r,h;if((s=this.realmUI)!=null&&s.target)return{realm:this.realmUI.target}",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Không kết luận toàn bộ hành vi thu hoạch chỉ từ callsite; đọc điều kiện ở source trước khi sửa.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "network_and_reconnect",
+      "label": "Kết nối, WebSocket và reconnect",
+      "keywords": [
+        "connection",
+        "disconnect",
+        "WebSocket",
+        "WebRTC",
+        "reconnect",
+        "driver",
+        "kết nối"
+      ],
+      "description": "Điểm vào transport, WebSocket shim và vòng cập nhật scene.",
+      "entry_points": [
+        {
+          "module_id": "index-ymL7Xfvg",
+          "source_file": "index-ymL7Xfvg.js",
+          "wiki_file": "modules/index.md",
+          "feature_id": "online_transport",
+          "module_feature_label": "Online connection lifecycle",
+          "primary_search_anchor": "class vy{constructor(t,e){_(this,\"online\",!0);",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "tm-direct",
+          "source_file": "tm-direct.js",
+          "wiki_file": "modules/tm-direct.md",
+          "feature_id": "direct_ws_routing",
+          "module_feature_label": "Định tuyến WebSocket",
+          "primary_search_anchor": "function WebSocketShim(url, protocols) {",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "tm-direct",
+          "source_file": "tm-direct.js",
+          "wiki_file": "modules/tm-direct.md",
+          "feature_id": "direct_ws_fallback",
+          "module_feature_label": "Fallback socket",
+          "primary_search_anchor": "function fallback() {",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "world_tick_orchestration",
+          "module_feature_label": "Điều phối cập nhật world",
+          "primary_search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Chưa có source server hoặc thứ tự tải tm-direct/tm-guard; LocalDriver cũng thiếu.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "snapshot_and_state",
+      "label": "Snapshot và đồng bộ trạng thái",
+      "keywords": [
+        "snapshot",
+        "snap2",
+        "state",
+        "delta",
+        "entity",
+        "đồng bộ"
+      ],
+      "description": "Nơi tạo snapshot trong simulation, giải mã ở entry và đọc snapshot qua guard script.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "world_snapshots",
+          "module_feature_label": "Snapshot thế giới",
+          "primary_search_anchor": "snapshotPlayers(){const t=new Map",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "index-ymL7Xfvg",
+          "source_file": "index-ymL7Xfvg.js",
+          "wiki_file": "modules/index.md",
+          "feature_id": "snapshot_decode",
+          "module_feature_label": "Snapshot decoding",
+          "primary_search_anchor": "class yy{constructor(){_(this,\"self\",{});_(this,\"seen\",new Set)}decode(t){",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "tm-guard",
+          "source_file": "tm-guard.js",
+          "wiki_file": "modules/tm-guard.md",
+          "feature_id": "tribulation_button",
+          "module_feature_label": "Nút độ kiếp",
+          "primary_search_anchor": "function tribButton(on) {",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Chỉ là các điểm định vị; không chứng minh toàn bộ end-to-end protocol.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "startup_and_scene",
+      "label": "Khởi động và vòng đời scene",
+      "keywords": [
+        "startup",
+        "boot",
+        "Phaser",
+        "WorldScene",
+        "scene",
+        "init",
+        "lab"
+      ],
+      "description": "Định vị khởi động dữ liệu, Phaser runtime, WorldScene và nhánh lab.",
+      "entry_points": [
+        {
+          "module_id": "index-ymL7Xfvg",
+          "source_file": "index-ymL7Xfvg.js",
+          "wiki_file": "modules/index.md",
+          "feature_id": "application_boot",
+          "module_feature_label": "Startup and game initialization",
+          "primary_search_anchor": "async function cP(){var D,C,R,F;AM(),GM();",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "index-ymL7Xfvg",
+          "source_file": "index-ymL7Xfvg.js",
+          "wiki_file": "modules/index.md",
+          "feature_id": "join_session",
+          "module_feature_label": "Session acquisition",
+          "primary_search_anchor": "async function rP(){var t;let n=\"\";for(;;){",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "index-ymL7Xfvg",
+          "source_file": "index-ymL7Xfvg.js",
+          "wiki_file": "modules/index.md",
+          "feature_id": "lab_startup",
+          "module_feature_label": "Lab boot branch",
+          "primary_search_anchor": "import(\"./boot-DGR3-xtV.js\")",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "scene_lifecycle",
+          "module_feature_label": "Khởi tạo và vòng đời scene",
+          "primary_search_anchor": "class g6 extends tt.Scene{constructor(){super(\"world\")",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "scene_system",
+          "module_feature_label": "Scene và scene manager",
+          "primary_search_anchor": "this.sys=new c(this,n),this.game,this.anims,this.cache,this.registry,this.sound",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Thiếu source boot lab và LocalDriver; mô tả framework không đồng nghĩa hành vi app.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "items_and_inventory",
+      "label": "Vật phẩm, trang bị, túi đồ",
+      "keywords": [
+        "items",
+        "gear",
+        "inventory",
+        "bag",
+        "túi đồ",
+        "icon",
+        "loot"
+      ],
+      "description": "Tra cứu metadata vật phẩm, icon, HUD và xử lý gear nhặt được.",
+      "entry_points": [
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "item_metadata",
+          "module_feature_label": "Metadata item",
+          "primary_search_anchor": "function En(){return A??(A=Promise.all([fetch(\"data/items/items-meta.json\")",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "gear_icons",
+          "module_feature_label": "Icon gear",
+          "primary_search_anchor": "function K(n){n={...n,id:tn(n.id)??n.id}",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "hud_and_minimap",
+          "module_feature_label": "HUD và minimap",
+          "primary_search_anchor": "updateHud(){var l,c,d,p;const e=this.self;if(!e)return",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "loot_pickup_handler",
+          "module_feature_label": "Xử lý nhặt đồ",
+          "primary_search_anchor": "pickup(t,n,e=!1){if(n.dead||n.room!==t||n.realm)",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Dữ liệu JSON tải lúc chạy không có trong 9 file JS.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "controls_and_inputs",
+      "label": "Phím điều khiển và input",
+      "keywords": [
+        "keybind",
+        "controls",
+        "bàn phím",
+        "phím V",
+        "input"
+      ],
+      "description": "Định vị phím mặc định, cấu hình lưu và phím gọi Auto Farm game.",
+      "entry_points": [
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "default_controls",
+          "module_feature_label": "Bindings mặc định",
+          "primary_search_anchor": "const I=[[\"W\",87,\"Đi lên\"]",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "controls_storage",
+          "module_feature_label": "Lưu điều khiển",
+          "primary_search_anchor": "Z=\"tm-controls-v1\"",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "game_autofarm_toggle",
+          "module_feature_label": "Điểm bật/tắt Auto Farm gốc",
+          "primary_search_anchor": "toggleAutoFarm(){var e,i;this.cancelClickOrder()",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "loader_input_physics",
+          "module_feature_label": "Loader, input và physics",
+          "primary_search_anchor": "LoaderPlugin:t(74261),MergeXHRSettings:t(3374),MultiFile:t(26430)",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Phím V Auto Farm được ghi trong WorldScene; không suy ra tính năng tool.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "visuals_and_effects",
+      "label": "Render nhân vật và hiệu ứng",
+      "keywords": [
+        "animation",
+        "effects",
+        "particles",
+        "render",
+        "vfx",
+        "hiệu ứng"
+      ],
+      "description": "Tra cứu animation nhân vật, renderer scene, pool và texture hiệu ứng.",
+      "entry_points": [
+        {
+          "module_id": "Character",
+          "source_file": "Character-cz94XTen.js",
+          "wiki_file": "modules/Character.md",
+          "feature_id": "animation_playback",
+          "module_feature_label": "Phát animation",
+          "primary_search_anchor": "play(t,i){if(this.labForce&&([t,i]=this.labForce)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "Character",
+          "source_file": "Character-cz94XTen.js",
+          "wiki_file": "modules/Character.md",
+          "feature_id": "animation_tick",
+          "module_feature_label": "Cập nhật frame",
+          "primary_search_anchor": "update(t,i=1){if(!this.clip)return",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "Character",
+          "source_file": "Character-cz94XTen.js",
+          "wiki_file": "modules/Character.md",
+          "feature_id": "character_feet",
+          "module_feature_label": "Tọa độ chân",
+          "primary_search_anchor": "feet(){const t=this.view,i=t.frame",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "ChieuMau",
+          "source_file": "ChieuMau-qVW4fvFM.js",
+          "wiki_file": "modules/ChieuMau.md",
+          "feature_id": "combat_effect_pool",
+          "module_feature_label": "Pool hiệu ứng",
+          "primary_search_anchor": "class Ro{constructor(e){g(this,\"px\",new Float32Array(L))",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "ChieuMau",
+          "source_file": "ChieuMau-qVW4fvFM.js",
+          "wiki_file": "modules/ChieuMau.md",
+          "feature_id": "effect_textures",
+          "module_feature_label": "Texture hiệu ứng",
+          "primary_search_anchor": "Ft=\"juice:glow\",Io=\"juice:scorch\"",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "world_tick_orchestration",
+          "module_feature_label": "Điều phối cập nhật world",
+          "primary_search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Không suy ra cơ chế combat chỉ từ animation hoặc VFX.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "guard_and_mobile",
+      "label": "Guard và nút độ kiếp mobile",
+      "keywords": [
+        "guard",
+        "guard-ok",
+        "tribulation",
+        "độ kiếp",
+        "mobile"
+      ],
+      "description": "Tra cứu thông điệp guard, hook WebRTC và nút độ kiếp.",
+      "entry_points": [
+        {
+          "module_id": "tm-guard",
+          "source_file": "tm-guard.js",
+          "wiki_file": "modules/tm-guard.md",
+          "feature_id": "guard_challenge",
+          "module_feature_label": "Xác nhận guard",
+          "primary_search_anchor": "function feed(data) {",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "tm-guard",
+          "source_file": "tm-guard.js",
+          "wiki_file": "modules/tm-guard.md",
+          "feature_id": "tribulation_button",
+          "module_feature_label": "Nút độ kiếp",
+          "primary_search_anchor": "function tribButton(on) {",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "tm-guard",
+          "source_file": "tm-guard.js",
+          "wiki_file": "modules/tm-guard.md",
+          "feature_id": "webrtc_feed_hook",
+          "module_feature_label": "Hook WebRTC",
+          "primary_search_anchor": "window.__tmGuard = { feed: feed };",
+          "confidence": "inferred"
+        }
+      ],
+      "caution": "Thứ tự nạp script và quyền truy cập hook bên ngoài chưa rõ.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "equipment_and_forge",
+      "label": "Trang bị, forge và chuyển đổi state",
+      "keywords": [
+        "forge",
+        "equipment",
+        "rèn",
+        "trang bị"
+      ],
+      "description": "Điểm di trú dữ liệu trang bị và metadata/icon.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "equipment_forge_migration",
+          "module_feature_label": "Chuyển đổi trang bị và rèn",
+          "primary_search_anchor": "function ta(a,t)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "item_metadata",
+          "module_feature_label": "Metadata item",
+          "primary_search_anchor": "function En(){return A??(A=Promise.all([fetch(\"data/items/items-meta.json\")",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "items",
+          "source_file": "items-CCENVhBq.js",
+          "wiki_file": "modules/items.md",
+          "feature_id": "gear_icons",
+          "module_feature_label": "Icon gear",
+          "primary_search_anchor": "function K(n){n={...n,id:tn(n.id)??n.id}",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Đường di trú dữ liệu không chứng minh mọi UI hay quá trình rèn.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "mentor_and_party",
+      "label": "Sư đồ, đệ tử và tổ đội",
+      "keywords": [
+        "sư đồ",
+        "đệ tử",
+        "party",
+        "mentor",
+        "pupil"
+      ],
+      "description": "Điểm xử lý action sư đồ và XP tổ đội.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "mentor_pupil",
+          "module_feature_label": "Sư đồ",
+          "primary_search_anchor": "function Mm(a,t,n,e){",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Các state ngoài module cần xác minh khi có thay đổi gameplay.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "donation",
+      "label": "Donation và quà nạp",
+      "keywords": [
+        "donation",
+        "nạp",
+        "incense",
+        "claim"
+      ],
+      "description": "Điểm xử lý action donation trong simulation.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "donation_actions",
+          "module_feature_label": "Quà nạp",
+          "primary_search_anchor": "function oo(a,t,n){var i,o;if(!t.startsWith(\"donation-\"))return!1;",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Module donation-BLL6eTTD.js không nằm trong bộ 9 source, nên không có đủ code để xác minh chức năng phụ thuộc.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "simulation_events",
+      "label": "Event và tick simulation",
+      "keywords": [
+        "event",
+        "tick",
+        "queue",
+        "endTick"
+      ],
+      "description": "Gom/dọn các event simulation và cập nhật world.",
+      "entry_points": [
+        {
+          "module_id": "sim",
+          "source_file": "sim-B1iiLlB3.js",
+          "wiki_file": "modules/sim.md",
+          "feature_id": "event_lifecycle",
+          "module_feature_label": "Sự kiện và vòng đời tick",
+          "primary_search_anchor": "eventsFor(t){const n=t.room",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "WorldScene",
+          "source_file": "WorldScene-bJccyikN.js",
+          "wiki_file": "modules/WorldScene.md",
+          "feature_id": "world_tick_orchestration",
+          "module_feature_label": "Điều phối cập nhật world",
+          "primary_search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Event hiển thị không đồng nhất với protocol server.",
+      "classification": "navigation_index_not_runtime_proof"
+    },
+    {
+      "id": "phaser_framework",
+      "label": "Phaser API (framework)",
+      "keywords": [
+        "Phaser",
+        "GameObjects",
+        "SceneManager",
+        "Arcade",
+        "Matter",
+        "Loader"
+      ],
+      "description": "Tìm các export và nhóm API framework, không phải logic game.",
+      "entry_points": [
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "phaser_exports",
+          "module_feature_label": "Export Phaser",
+          "primary_search_anchor": "p.exports=h,t.g.Phaser=h",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "framework_namespaces",
+          "module_feature_label": "Namespace framework",
+          "primary_search_anchor": "Game:t(50127),GameObjects:t(77856),Geom:t(55738),Input:t(14350),Loader:t(57777)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "game_runtime",
+          "module_feature_label": "Game runtime",
+          "primary_search_anchor": "this.config=new e(w),this.renderer=null,this.domContainer=null,this.canvas=null",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "game_objects",
+          "module_feature_label": "Game objects",
+          "primary_search_anchor": "GameObject:t(95643),BitmapText:t(22186),Blitter:t(6107),Bob:t(46590),Container:t(31559)",
+          "confidence": "verified"
+        },
+        {
+          "module_id": "phaser-framework-bundle",
+          "source_file": "phaser-DRI6y8R5.js",
+          "wiki_file": "modules/phaser.md",
+          "feature_id": "scene_events",
+          "module_feature_label": "Điểm nối event SceneManager",
+          "primary_search_anchor": "f.events.once(r.READY,this.bootQueue,this)",
+          "confidence": "verified"
+        }
+      ],
+      "caution": "Không đọc toàn bộ Phaser nếu nhiệm vụ chỉ liên quan gameplay; chuyển sang WorldScene/sim.",
+      "classification": "navigation_index_not_runtime_proof"
+    }
+  ]
+}

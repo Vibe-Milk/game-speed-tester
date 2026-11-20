@@ -1,0 +1,263 @@
+{
+  "schema_version": "2.0",
+  "chat_id": "01",
+  "source_files": [
+    {
+      "file": "phaser-DRI6y8R5.js",
+      "sha256": "5920a4fd5e79aa7f0f3f87a914b4591ba68a8a87a0f6a5c3d49005a870a5d7b1",
+      "size_bytes": 1205225
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "phaser-framework-bundle",
+      "source_file": "phaser-DRI6y8R5.js",
+      "wiki_file": "phaser.md",
+      "role": "Bundle Phaser dùng module nội bộ; module lõi tập hợp và xuất các namespace framework.",
+      "features": [
+        {
+          "feature_id": "phaser_exports",
+          "label": "Export Phaser",
+          "summary": "Module lõi gán object namespace vào p.exports và t.g.Phaser; cuối bundle xuất alias ESM P và p.",
+          "locators": [
+            {
+              "symbol": "Phaser",
+              "kind": "export",
+              "search_anchor": "p.exports=h,t.g.Phaser=h",
+              "byte_offset": null,
+              "notes": "Trong module lõi 85454."
+            },
+            {
+              "symbol": null,
+              "kind": "export",
+              "search_anchor": "export{Ot as P,Dt as p};",
+              "byte_offset": null,
+              "notes": "Export ESM ở cuối tệp."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "framework_namespaces",
+          "label": "Namespace framework",
+          "summary": "Object lõi gom các namespace như Game, GameObjects, Input, Loader, Physics, Scene và Scenes.",
+          "locators": [
+            {
+              "symbol": "Game",
+              "kind": "other",
+              "search_anchor": "Game:t(50127),GameObjects:t(77856),Geom:t(55738),Input:t(14350),Loader:t(57777)",
+              "byte_offset": null,
+              "notes": "Danh sách namespace trong module 85454."
+            }
+          ],
+          "related_modules": [
+            "50127",
+            "77856",
+            "14350",
+            "57777",
+            "44563",
+            "97482",
+            "62194"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_runtime",
+          "label": "Game runtime",
+          "summary": "Module Game khởi tạo config, renderer/canvas fields, events, input, scene manager, scale, sound, loop và plugin manager.",
+          "locators": [
+            {
+              "symbol": "Game",
+              "kind": "class",
+              "search_anchor": "this.config=new e(w),this.renderer=null,this.domContainer=null,this.canvas=null",
+              "byte_offset": null,
+              "notes": "Vùng khởi tạo object tại module 50127."
+            }
+          ],
+          "related_modules": [
+            "50127"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "scene_system",
+          "label": "Scene và scene manager",
+          "summary": "Scene khai báo facade như sys, game, add, input, load, time, tweens và physics; Scenes chứa SceneManager, ScenePlugin, Settings và Systems.",
+          "locators": [
+            {
+              "symbol": "Scene",
+              "kind": "class",
+              "search_anchor": "this.sys=new c(this,n),this.game,this.anims,this.cache,this.registry,this.sound",
+              "byte_offset": null,
+              "notes": "Module Scene 97482."
+            },
+            {
+              "symbol": "SceneManager",
+              "kind": "other",
+              "search_anchor": "SceneManager:t(60903),ScenePlugin:t(52209),Settings:t(55681),Systems:t(2368)",
+              "byte_offset": null,
+              "notes": "Namespace Scenes module 62194."
+            }
+          ],
+          "related_modules": [
+            "97482",
+            "62194",
+            "50127"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_objects",
+          "label": "Game objects",
+          "summary": "Namespace GameObjects liệt kê GameObject, nhiều loại object và factories/components.",
+          "locators": [
+            {
+              "symbol": "GameObject",
+              "kind": "class",
+              "search_anchor": "GameObject:t(95643),BitmapText:t(22186),Blitter:t(6107),Bob:t(46590),Container:t(31559)",
+              "byte_offset": null,
+              "notes": "Module 77856."
+            }
+          ],
+          "related_modules": [
+            "77856"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "loader_input_physics",
+          "label": "Loader, input và physics",
+          "summary": "Namespace lõi công khai Loader, Input và Physics; Physics chứa Arcade và Matter.",
+          "locators": [
+            {
+              "symbol": "LoaderPlugin",
+              "kind": "other",
+              "search_anchor": "LoaderPlugin:t(74261),MergeXHRSettings:t(3374),MultiFile:t(26430)",
+              "byte_offset": null,
+              "notes": "Namespace Loader module 57777."
+            },
+            {
+              "symbol": "InputPlugin",
+              "kind": "other",
+              "search_anchor": "InputManager:t(7003),InputPlugin:t(48205),InputPluginCache:t(89639),Keyboard:t(51442)",
+              "byte_offset": null,
+              "notes": "Namespace Input module 14350."
+            },
+            {
+              "symbol": null,
+              "kind": "other",
+              "search_anchor": "p.exports={Arcade:t(27064),Matter:t(3875)}",
+              "byte_offset": null,
+              "notes": "Namespace Physics module 44563."
+            }
+          ],
+          "related_modules": [
+            "57777",
+            "14350",
+            "44563"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "scene_events",
+          "label": "Điểm nối event SceneManager",
+          "summary": "SceneManager đăng ký READY để gọi bootQueue và phát SYSTEM_READY; đây là một phần giao tiếp event, không mô tả toàn bộ lifecycle.",
+          "locators": [
+            {
+              "symbol": "SceneManager.bootQueue",
+              "kind": "event",
+              "search_anchor": "f.events.once(r.READY,this.bootQueue,this)",
+              "byte_offset": null,
+              "notes": "Module 60903."
+            }
+          ],
+          "related_modules": [
+            "50127",
+            "60903",
+            "93055"
+          ],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "Phaser",
+          "kind": "export",
+          "role": "Object namespace được module lõi xuất và gán global.",
+          "locators": [
+            {
+              "symbol": "Phaser",
+              "kind": "other",
+              "search_anchor": "p.exports=h,t.g.Phaser=h",
+              "byte_offset": null,
+              "notes": "Module lõi 85454."
+            }
+          ]
+        },
+        {
+          "symbol": "Game",
+          "kind": "class",
+          "role": "Object Game; khởi tạo runtime fields và các manager chính.",
+          "locators": [
+            {
+              "symbol": "Game",
+              "kind": "other",
+              "search_anchor": "this.config=new e(w),this.renderer=null,this.domContainer=null,this.canvas=null",
+              "byte_offset": null,
+              "notes": "Module 50127."
+            }
+          ]
+        },
+        {
+          "symbol": "Scene",
+          "kind": "class",
+          "role": "Object Scene khai báo facade và manager tham chiếu.",
+          "locators": [
+            {
+              "symbol": "Scene",
+              "kind": "other",
+              "search_anchor": "this.sys=new c(this,n),this.game,this.anims,this.cache,this.registry,this.sound",
+              "byte_offset": null,
+              "notes": "Module 97482."
+            }
+          ]
+        },
+        {
+          "symbol": "SceneManager",
+          "kind": "object",
+          "role": "Thành phần được liệt kê trong namespace Scenes.",
+          "locators": [
+            {
+              "symbol": "SceneManager",
+              "kind": "other",
+              "search_anchor": "SceneManager:t(60903),ScenePlugin:t(52209),Settings:t(55681),Systems:t(2368)",
+              "byte_offset": null,
+              "notes": "Namespace Scenes module 62194."
+            }
+          ]
+        },
+        {
+          "symbol": "GameObject",
+          "kind": "class",
+          "role": "Base game object được liệt kê trong namespace GameObjects.",
+          "locators": [
+            {
+              "symbol": "GameObject",
+              "kind": "other",
+              "search_anchor": "GameObject:t(95643),BitmapText:t(22186),Blitter:t(6107)",
+              "byte_offset": null,
+              "notes": "Namespace GameObjects module 77856."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependencies": [],
+  "unresolved": [
+    "Không có source map hoặc build manifest; phiên bản và build options chưa xác minh.",
+    "Không có mã game cụ thể trong tệp được giao; cấu hình runtime và cách game sử dụng API chưa xác minh.",
+    "Không chạy runtime hoặc kiểm thử theo task; kết luận dựa trên cấu trúc tĩnh và substring nguồn."
+  ]
+}

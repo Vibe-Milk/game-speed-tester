@@ -1,0 +1,246 @@
+{
+  "schema_version": "2.0",
+  "scope": "JS file imports explicitly present in sources; runtime links are noted separately",
+  "files_present": [
+    "Character-cz94XTen.js",
+    "ChieuMau-qVW4fvFM.js",
+    "WorldScene-bJccyikN.js",
+    "index-ymL7Xfvg.js",
+    "items-CCENVhBq.js",
+    "phaser-DRI6y8R5.js",
+    "sim-B1iiLlB3.js",
+    "tm-direct.js",
+    "tm-guard.js"
+  ],
+  "direct_imports": [
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\"",
+      "target_available": true,
+      "source_wiki": "Character.md",
+      "target_wiki": "index.md"
+    },
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\"",
+      "target_available": true,
+      "source_wiki": "Character.md",
+      "target_wiki": "phaser.md"
+    },
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "sim-B1iiLlB3.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./sim-B1iiLlB3.js\"",
+      "target_available": true,
+      "source_wiki": "Character.md",
+      "target_wiki": "sim.md"
+    },
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "Character-cz94XTen.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./Character-cz94XTen.js\"",
+      "target_available": true,
+      "source_wiki": "ChieuMau.md",
+      "target_wiki": "Character.md"
+    },
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\"",
+      "target_available": true,
+      "source_wiki": "ChieuMau.md",
+      "target_wiki": "index.md"
+    },
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\"",
+      "target_available": true,
+      "source_wiki": "ChieuMau.md",
+      "target_wiki": "phaser.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "Character-cz94XTen.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./Character-cz94XTen.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "Character.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "ChieuMau-qVW4fvFM.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./ChieuMau-qVW4fvFM.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "ChieuMau.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\"",
+      "target_available": false,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": null
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "index.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "items-CCENVhBq.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./items-CCENVhBq.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "items.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "phaser.md"
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "sim-B1iiLlB3.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./sim-B1iiLlB3.js\"",
+      "target_available": true,
+      "source_wiki": "WorldScene.md",
+      "target_wiki": "sim.md"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "LocalDriver-DA7Qxqfm.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./LocalDriver-DA7Qxqfm.js\")",
+      "target_available": false,
+      "source_wiki": "index.md",
+      "target_wiki": null
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "WorldScene-bJccyikN.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./WorldScene-bJccyikN.js\")",
+      "target_available": true,
+      "source_wiki": "index.md",
+      "target_wiki": "WorldScene.md"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "boot-DGR3-xtV.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./boot-DGR3-xtV.js\")",
+      "target_available": false,
+      "source_wiki": "index.md",
+      "target_wiki": null
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "items-CCENVhBq.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./items-CCENVhBq.js\")",
+      "target_available": true,
+      "source_wiki": "index.md",
+      "target_wiki": "items.md"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./phaser-DRI6y8R5.js\")",
+      "target_available": true,
+      "source_wiki": "index.md",
+      "target_wiki": "phaser.md"
+    },
+    {
+      "source_file": "items-CCENVhBq.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\"",
+      "target_available": false,
+      "source_wiki": "items.md",
+      "target_wiki": null
+    },
+    {
+      "source_file": "items-CCENVhBq.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\"",
+      "target_available": true,
+      "source_wiki": "items.md",
+      "target_wiki": "index.md"
+    },
+    {
+      "source_file": "sim-B1iiLlB3.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\"",
+      "target_available": false,
+      "source_wiki": "sim.md",
+      "target_wiki": null
+    },
+    {
+      "source_file": "sim-B1iiLlB3.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\"",
+      "target_available": true,
+      "source_wiki": "sim.md",
+      "target_wiki": "index.md"
+    }
+  ],
+  "missing_files": [
+    "LocalDriver-DA7Qxqfm.js",
+    "boot-DGR3-xtV.js",
+    "donation-BLL6eTTD.js"
+  ],
+  "related_runtime_interfaces": [
+    {
+      "modules": [
+        "WorldScene",
+        "sim"
+      ],
+      "description": "WorldScene autoHost pickup calls act(\"pickup\",\"auto\"); sim dispatches case \"pickup\" and also invokes periodic auto-pickup in the simulation tick.",
+      "status": "statically observed callsites, not proven complete runtime flow"
+    },
+    {
+      "modules": [
+        "tm-direct",
+        "tm-guard"
+      ],
+      "description": "Both scripts replace window.WebSocket; load order and composition unknown.",
+      "status": "unresolved load order"
+    },
+    {
+      "modules": [
+        "index-ymL7Xfvg",
+        "WorldScene"
+      ],
+      "description": "Entry bundle dynamically imports WorldScene and creates Phaser world scene.",
+      "status": "static import and initialization evidence"
+    }
+  ]
+}

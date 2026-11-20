@@ -1,0 +1,106 @@
+{
+  "schema_version": "2.0",
+  "description": "Manifest của đúng 9 file JS được cung cấp khi lập GAME_ASSET_WIKI_v2.0",
+  "source_count": 9,
+  "total_size_bytes": 3821084,
+  "hash_algorithm": "SHA-256",
+  "hash_scope": "original source bytes (UTF-8 files)",
+  "files": [
+    {
+      "filename": "phaser-DRI6y8R5.js",
+      "path": "source/phaser-DRI6y8R5.js",
+      "module_id": "phaser-framework-bundle",
+      "wiki_path": "modules/phaser.md",
+      "chat_id": "01",
+      "size_bytes": 1205225,
+      "sha256": "5920a4fd5e79aa7f0f3f87a914b4591ba68a8a87a0f6a5c3d49005a870a5d7b1",
+      "physical_lines": 68
+    },
+    {
+      "filename": "WorldScene-bJccyikN.js",
+      "path": "source/WorldScene-bJccyikN.js",
+      "module_id": "WorldScene",
+      "wiki_path": "modules/WorldScene.md",
+      "chat_id": "02",
+      "size_bytes": 1100111,
+      "sha256": "47d7592e4e88fcea6194732153a80eea699799784b8d10106005a495384d0e63",
+      "physical_lines": 1136
+    },
+    {
+      "filename": "index-ymL7Xfvg.js",
+      "path": "source/index-ymL7Xfvg.js",
+      "module_id": "index-ymL7Xfvg",
+      "wiki_path": "modules/index.md",
+      "chat_id": "03",
+      "size_bytes": 829377,
+      "sha256": "89e74ddadef391b89014311cf47288ca30ff27cd96121d9e88149f17d1addcb2",
+      "physical_lines": 478
+    },
+    {
+      "filename": "sim-B1iiLlB3.js",
+      "path": "source/sim-B1iiLlB3.js",
+      "module_id": "sim",
+      "wiki_path": "modules/sim.md",
+      "chat_id": "04",
+      "size_bytes": 378921,
+      "sha256": "1b1cd59d6d9391298f8a840736722b9ec4f736bc24eb40de43670126e3af1d71",
+      "physical_lines": 1
+    },
+    {
+      "filename": "ChieuMau-qVW4fvFM.js",
+      "path": "source/ChieuMau-qVW4fvFM.js",
+      "module_id": "ChieuMau",
+      "wiki_path": "modules/ChieuMau.md",
+      "chat_id": "05",
+      "size_bytes": 207944,
+      "sha256": "7fcf9fa7046f4b38b0bdfd1df3b82b758dc16cfcd494e0cdf43d4ef227f9b900",
+      "physical_lines": 1
+    },
+    {
+      "filename": "Character-cz94XTen.js",
+      "path": "source/Character-cz94XTen.js",
+      "module_id": "Character",
+      "wiki_path": "modules/Character.md",
+      "chat_id": "05",
+      "size_bytes": 70343,
+      "sha256": "d1d738dbcc444ae30665b1d46978d96c4578b1c62277adbf2a64ef59b01c3671",
+      "physical_lines": 1
+    },
+    {
+      "filename": "items-CCENVhBq.js",
+      "path": "source/items-CCENVhBq.js",
+      "module_id": "items",
+      "wiki_path": "modules/items.md",
+      "chat_id": "05",
+      "size_bytes": 18515,
+      "sha256": "15982067271a5aa26a97cb3d269ba8351cda206063a6003257857a6d45c9ca87",
+      "physical_lines": 13
+    },
+    {
+      "filename": "tm-direct.js",
+      "path": "source/tm-direct.js",
+      "module_id": "tm-direct",
+      "wiki_path": "modules/tm-direct.md",
+      "chat_id": "05",
+      "size_bytes": 5362,
+      "sha256": "ac013042e8be620365ae650b48d4da80c40f0efa3ac9a2d061d74372f01a3965",
+      "physical_lines": 71
+    },
+    {
+      "filename": "tm-guard.js",
+      "path": "source/tm-guard.js",
+      "module_id": "tm-guard",
+      "wiki_path": "modules/tm-guard.md",
+      "chat_id": "05",
+      "size_bytes": 5286,
+      "sha256": "4a9ef0f8ae1a11556ba4f3ef386de7bc0c76cf0fa32b97d5309db4dff9dada47",
+      "physical_lines": 66
+    }
+  ],
+  "missing_referenced_files": [
+    "LocalDriver-DA7Qxqfm.js",
+    "boot-DGR3-xtV.js",
+    "donation-BLL6eTTD.js"
+  ],
+  "note": "Không sử dụng hoặc so sánh dữ liệu với Wiki v1.0."
+}

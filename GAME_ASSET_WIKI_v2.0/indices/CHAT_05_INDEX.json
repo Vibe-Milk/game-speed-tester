@@ -1,0 +1,534 @@
+{
+  "schema_version": "2.0",
+  "chat_id": "05",
+  "source_files": [
+    {
+      "file": "ChieuMau-qVW4fvFM.js",
+      "sha256": "7fcf9fa7046f4b38b0bdfd1df3b82b758dc16cfcd494e0cdf43d4ef227f9b900",
+      "size_bytes": 207944
+    },
+    {
+      "file": "Character-cz94XTen.js",
+      "sha256": "d1d738dbcc444ae30665b1d46978d96c4578b1c62277adbf2a64ef59b01c3671",
+      "size_bytes": 70343
+    },
+    {
+      "file": "items-CCENVhBq.js",
+      "sha256": "15982067271a5aa26a97cb3d269ba8351cda206063a6003257857a6d45c9ca87",
+      "size_bytes": 18515
+    },
+    {
+      "file": "tm-direct.js",
+      "sha256": "ac013042e8be620365ae650b48d4da80c40f0efa3ac9a2d061d74372f01a3965",
+      "size_bytes": 5362
+    },
+    {
+      "file": "tm-guard.js",
+      "sha256": "4a9ef0f8ae1a11556ba4f3ef386de7bc0c76cf0fa32b97d5309db4dff9dada47",
+      "size_bytes": 5286
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "ChieuMau",
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "wiki_file": "ChieuMau.md",
+      "role": "Hiệu ứng/render chiến đấu bằng Phaser; không xác nhận logic sát thương.",
+      "features": [
+        {
+          "feature_id": "combat_effect_pool",
+          "label": "Pool hiệu ứng",
+          "summary": "Ro khởi tạo các pool hạt, decal, arc, ring, light, sprite sheet, ghost và damage number.",
+          "locators": [
+            {
+              "symbol": "Ro",
+              "kind": "class",
+              "search_anchor": "class Ro{constructor(e){g(this,\"px\",new Float32Array(L))",
+              "byte_offset": null,
+              "notes": "Lớp minified; anchor đầu constructor."
+            }
+          ],
+          "related_modules": [
+            "Character"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "impact_feedback_config",
+          "label": "Cấu hình phản hồi",
+          "summary": "Các cấu hình light/crit/finisher/hurt/ult giữ tham số stop và shake.",
+          "locators": [
+            {
+              "symbol": "T",
+              "kind": "state",
+              "search_anchor": "T={light:{stop:.045,shake:1.6",
+              "byte_offset": null,
+              "notes": "Cấu hình trong bundle."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "effect_textures",
+          "label": "Texture hiệu ứng",
+          "summary": "Định nghĩa key glow và scorch; constructor tạo texture canvas nếu thiếu.",
+          "locators": [
+            {
+              "symbol": null,
+              "kind": "state",
+              "search_anchor": "Ft=\"juice:glow\",Io=\"juice:scorch\"",
+              "byte_offset": null,
+              "notes": "Hằng key texture."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "Ro",
+          "kind": "class",
+          "role": "Quản lý pool và lớp render hiệu ứng.",
+          "locators": [
+            {
+              "symbol": "Ro",
+              "kind": "other",
+              "search_anchor": "class Ro{constructor(e)",
+              "byte_offset": null,
+              "notes": "Constructor minified."
+            }
+          ]
+        },
+        {
+          "symbol": "C/J/a/b/c",
+          "kind": "export",
+          "role": "Hai alias export; ý nghĩa semantic chưa xác định.",
+          "locators": [
+            {
+              "symbol": "C/J/a/b/c",
+              "kind": "export",
+              "search_anchor": "export{ye as C,Ro as J,It as a,Bt as b,de as c}",
+              "byte_offset": null,
+              "notes": "Export cuối file."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module_id": "Character",
+      "source_file": "Character-cz94XTen.js",
+      "wiki_file": "Character.md",
+      "role": "Lớp hiển thị sprite và điều khiển animation nhân vật.",
+      "features": [
+        {
+          "feature_id": "animation_playback",
+          "label": "Phát animation",
+          "summary": "play chọn clip theo animation/hướng, lưu trạng thái và áp dụng frame.",
+          "locators": [
+            {
+              "symbol": "K.play",
+              "kind": "function",
+              "search_anchor": "play(t,i){if(this.labForce&&([t,i]=this.labForce)",
+              "byte_offset": null,
+              "notes": "Trong lớp K."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "animation_tick",
+          "label": "Cập nhật frame",
+          "summary": "update tích lũy thời gian và tiến frame theo FPS/loop của clip.",
+          "locators": [
+            {
+              "symbol": "K.update",
+              "kind": "function",
+              "search_anchor": "update(t,i=1){if(!this.clip)return",
+              "byte_offset": null,
+              "notes": "Trong lớp K."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "character_feet",
+          "label": "Tọa độ chân",
+          "summary": "feet lấy điểm chân từ cache theo frame hoặc đọc alpha pixel và cache kết quả.",
+          "locators": [
+            {
+              "symbol": "K.feet",
+              "kind": "function",
+              "search_anchor": "feet(){const t=this.view,i=t.frame",
+              "byte_offset": null,
+              "notes": "Trong lớp K."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "K",
+          "kind": "class",
+          "role": "Animation/display object; có play/update/feet/apply.",
+          "locators": [
+            {
+              "symbol": "K",
+              "kind": "other",
+              "search_anchor": "class K{",
+              "byte_offset": null,
+              "notes": "Tên class minified."
+            }
+          ]
+        },
+        {
+          "symbol": "export aliases",
+          "kind": "export",
+          "role": "Public exports được đặt alias ngắn.",
+          "locators": [
+            {
+              "symbol": null,
+              "kind": "export",
+              "search_anchor": "export{I as A,Qt as C,Y as D",
+              "byte_offset": null,
+              "notes": "Đọc toàn bộ export statement cuối file."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module_id": "items",
+      "source_file": "items-CCENVhBq.js",
+      "wiki_file": "items.md",
+      "role": "Tra cứu item/gear, icon và thiết lập phím điều khiển.",
+      "features": [
+        {
+          "feature_id": "default_controls",
+          "label": "Bindings mặc định",
+          "summary": "Mảng I định nghĩa phím di chuyển, chiến đấu, kỹ năng và giao diện.",
+          "locators": [
+            {
+              "symbol": "I",
+              "kind": "state",
+              "search_anchor": "const I=[[\"W\",87,\"Đi lên\"]",
+              "byte_offset": null,
+              "notes": "Bảng điều khiển đầu file."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "controls_storage",
+          "label": "Lưu điều khiển",
+          "summary": "Pn nạp/kiểm tra localStorage theo khóa tm-controls-v1; An ghi cấu hình.",
+          "locators": [
+            {
+              "symbol": "Z/Pn/An",
+              "kind": "function",
+              "search_anchor": "Z=\"tm-controls-v1\"",
+              "byte_offset": null,
+              "notes": "Theo dõi tiếp các hàm Pn và An kế bên."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "item_metadata",
+          "label": "Metadata item",
+          "summary": "En tải items-meta.json và items.json để nạp metadata, atlas và recipes.",
+          "locators": [
+            {
+              "symbol": "En",
+              "kind": "function",
+              "search_anchor": "function En(){return A??(A=Promise.all([fetch(\"data/items/items-meta.json\")",
+              "byte_offset": null,
+              "notes": "Runtime fetch; dữ liệu ngoài source."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "gear_icons",
+          "label": "Icon gear",
+          "summary": "K tra id qua resolver/prefix và trả đường dẫn icon hoặc null.",
+          "locators": [
+            {
+              "symbol": "K",
+              "kind": "function",
+              "search_anchor": "function K(n){n={...n,id:tn(n.id)??n.id}",
+              "byte_offset": null,
+              "notes": "Resolver minified."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "Pn",
+          "kind": "function",
+          "role": "Đọc và xác thực cấu hình phím.",
+          "locators": [
+            {
+              "symbol": "Pn",
+              "kind": "function",
+              "search_anchor": "function Pn(){const n=In()",
+              "byte_offset": null,
+              "notes": "Đầu hàm."
+            }
+          ]
+        },
+        {
+          "symbol": "En",
+          "kind": "function",
+          "role": "Nạp metadata và recipe.",
+          "locators": [
+            {
+              "symbol": "En",
+              "kind": "function",
+              "search_anchor": "function En(){return A??",
+              "byte_offset": null,
+              "notes": "Đầu hàm."
+            }
+          ]
+        },
+        {
+          "symbol": "K",
+          "kind": "function",
+          "role": "Tra đường dẫn icon gear.",
+          "locators": [
+            {
+              "symbol": "K",
+              "kind": "function",
+              "search_anchor": "function K(n){n={...n,id:tn(n.id)",
+              "byte_offset": null,
+              "notes": "Đầu hàm."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module_id": "tm-direct",
+      "source_file": "tm-direct.js",
+      "wiki_file": "tm-direct.md",
+      "role": "WebSocket shim ưu tiên endpoint direct rồi fallback same-origin.",
+      "features": [
+        {
+          "feature_id": "direct_ws_routing",
+          "label": "Định tuyến WebSocket",
+          "summary": "Chỉ URL game trên production host và không protocols mới dùng DirectSocket.",
+          "locators": [
+            {
+              "symbol": "WebSocketShim",
+              "kind": "function",
+              "search_anchor": "function WebSocketShim(url, protocols) {",
+              "byte_offset": null,
+              "notes": "Điều kiện routing trong thân hàm."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "direct_ws_fallback",
+          "label": "Fallback socket",
+          "summary": "Timeout 2500ms hoặc lỗi trước open sẽ đóng direct và tạo Native socket cùng URL ban đầu, trừ khi game đã đóng.",
+          "locators": [
+            {
+              "symbol": "fallback",
+              "kind": "function",
+              "search_anchor": "function fallback() {",
+              "byte_offset": null,
+              "notes": "Đọc cùng DirectSocket."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "DirectSocket",
+          "kind": "function",
+          "role": "Facade relay event/properties/send/close.",
+          "locators": [
+            {
+              "symbol": "DirectSocket",
+              "kind": "function",
+              "search_anchor": "function DirectSocket(url) {",
+              "byte_offset": null,
+              "notes": "Constructor facade."
+            }
+          ]
+        },
+        {
+          "symbol": "DIRECT",
+          "kind": "state",
+          "role": "Endpoint đích và timeout/cache keys.",
+          "locators": [
+            {
+              "symbol": "DIRECT",
+              "kind": "state",
+              "search_anchor": "var DIRECT = 'wss://ws.nghichthienky.online/ws'",
+              "byte_offset": null,
+              "notes": "Hằng cấu hình."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "module_id": "tm-guard",
+      "source_file": "tm-guard.js",
+      "wiki_file": "tm-guard.md",
+      "role": "Xử lý guard challenge và nút độ kiếp mobile qua socket/global hooks.",
+      "features": [
+        {
+          "feature_id": "guard_challenge",
+          "label": "Xác nhận guard",
+          "summary": "Đọc ev có e=guard, hiện countdown và gửi guard-ok khi bấm nút.",
+          "locators": [
+            {
+              "symbol": "feed/show",
+              "kind": "function",
+              "search_anchor": "function feed(data) {",
+              "byte_offset": null,
+              "notes": "feed parse event; show tạo dialog."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "tribulation_button",
+          "label": "Nút độ kiếp",
+          "summary": "Dựa trên tg trong snap/snap2; hiện nút khi mobile landscape và gửi tribulation action.",
+          "locators": [
+            {
+              "symbol": "tribButton",
+              "kind": "function",
+              "search_anchor": "function tribButton(on) {",
+              "byte_offset": null,
+              "notes": "Nút chỉ được tạo khi cần."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "webrtc_feed_hook",
+          "label": "Hook WebRTC",
+          "summary": "Công bố __tmGuard.feed; chú thích nêu external feed/send qua __tmSend.",
+          "locators": [
+            {
+              "symbol": "__tmGuard",
+              "kind": "other",
+              "search_anchor": "window.__tmGuard = { feed: feed };",
+              "byte_offset": null,
+              "notes": "Hook global; integration bên ngoài chưa xác minh."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "inferred"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "feed",
+          "kind": "function",
+          "role": "Parse snapshot và guard event.",
+          "locators": [
+            {
+              "symbol": "feed",
+              "kind": "function",
+              "search_anchor": "function feed(data) {",
+              "byte_offset": null,
+              "notes": "Parser."
+            }
+          ]
+        },
+        {
+          "symbol": "out",
+          "kind": "function",
+          "role": "Gửi action qua hook hoặc socket.",
+          "locators": [
+            {
+              "symbol": "out",
+              "kind": "function",
+              "search_anchor": "function out(m) { try { if (window.__tmSend)",
+              "byte_offset": null,
+              "notes": "Sender."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\""
+    },
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\""
+    },
+    {
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "target_file": "Character-cz94XTen.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./Character-cz94XTen.js\""
+    },
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\""
+    },
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\""
+    },
+    {
+      "source_file": "Character-cz94XTen.js",
+      "target_file": "sim-B1iiLlB3.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./sim-B1iiLlB3.js\""
+    },
+    {
+      "source_file": "items-CCENVhBq.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\""
+    },
+    {
+      "source_file": "items-CCENVhBq.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\""
+    }
+  ],
+  "unresolved": [
+    "Trong bộ 9 source, index, phaser và sim đã có source và tài liệu riêng; donation-BLL6eTTD.js không có trong ZIP.",
+    "tm-direct.js and tm-guard.js both replace window.WebSocket; their load order and wrapping interaction are unknown from the supplied files.",
+    "ChieuMau and Character use minified aliases; semantic names for several exports/imports require caller analysis outside the supplied evidence."
+  ]
+}

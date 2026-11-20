@@ -1,0 +1,459 @@
+{
+  "schema_version": "2.0",
+  "chat_id": "04",
+  "source_files": [
+    {
+      "file": "sim-B1iiLlB3.js",
+      "sha256": "1b1cd59d6d9391298f8a840736722b9ec4f736bc24eb40de43670126e3af1d71",
+      "size_bytes": 378921
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "sim",
+      "source_file": "sim-B1iiLlB3.js",
+      "wiki_file": "sim.md",
+      "role": "Minified simulation runtime containing state migration, game actions, donation and mentor/pupil handling, movement, and client snapshots.",
+      "features": [
+        {
+          "feature_id": "mentor_pupil",
+          "label": "Sư đồ",
+          "summary": "Handles mentor/pupil commands, request expiry, level eligibility, party experience bonus, milestone rewards, and state persistence.",
+          "locators": [
+            {
+              "symbol": "Mm",
+              "kind": "function",
+              "search_anchor": "function Mm(a,t,n,e){",
+              "byte_offset": null,
+              "notes": "Action handler for baisu/nhantro/duoitro/roisu/sudo."
+            },
+            {
+              "symbol": "xm",
+              "kind": "function",
+              "search_anchor": "function xm(a){",
+              "byte_offset": null,
+              "notes": "Party experience multiplier."
+            },
+            {
+              "symbol": "sudo",
+              "kind": "literal",
+              "search_anchor": "const di=\"sudo\"",
+              "byte_offset": null,
+              "notes": "State extension ID; not a filename."
+            }
+          ],
+          "related_modules": [
+            "index-ymL7Xfvg.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "equipment_forge_migration",
+          "label": "Chuyển đổi trang bị và rèn",
+          "summary": "Migrates owned equipment and forge fields, initializing a versioned forge receipt.",
+          "locators": [
+            {
+              "symbol": "ta",
+              "kind": "function",
+              "search_anchor": "function ta(a,t)",
+              "byte_offset": null,
+              "notes": "Equipment conversion helper."
+            },
+            {
+              "symbol": "Tm",
+              "kind": "function",
+              "search_anchor": "function Tm(a,t=new Date().toISOString(),n=[])",
+              "byte_offset": null,
+              "notes": "Whitespace-free exact source anchor is `function Tm(a,t=new Date().toISOString(),n=[])`; migrates forge state and receipt."
+            }
+          ],
+          "related_modules": [
+            "index-ymL7Xfvg.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "donation_actions",
+          "label": "Quà nạp",
+          "summary": "Processes donation claim/incense actions; referenced donation data and helpers are imported from the donation bundle.",
+          "locators": [
+            {
+              "symbol": "oo",
+              "kind": "function",
+              "search_anchor": "function oo(a,t,n){var i,o;if(!t.startsWith(\"donation-\"))return!1;",
+              "byte_offset": null,
+              "notes": "Local handler; imported donation implementation details are unresolved."
+            }
+          ],
+          "related_modules": [
+            "donation-BLL6eTTD.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "action_dispatch",
+          "label": "Điều phối hành động",
+          "summary": "A switch dispatches player actions, including use, harvest, fast travel, travel, equipment, and other operations.",
+          "locators": [
+            {
+              "symbol": null,
+              "kind": "other",
+              "search_anchor": "case\"fasttravel\":",
+              "byte_offset": null,
+              "notes": "Anchor appears within a larger minified action switch."
+            }
+          ],
+          "related_modules": [
+            "index-ymL7Xfvg.js",
+            "donation-BLL6eTTD.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "world_snapshots",
+          "label": "Snapshot thế giới",
+          "summary": "Builds per-room player/monster snapshots and serializes self state, visible entities, deltas, and removed entity IDs.",
+          "locators": [
+            {
+              "symbol": "snapshotPlayers",
+              "kind": "function",
+              "search_anchor": "snapshotPlayers(){const t=new Map",
+              "byte_offset": null,
+              "notes": "Builds nearby room snapshot/cache."
+            },
+            {
+              "symbol": "snapshot",
+              "kind": "function",
+              "search_anchor": "snapshot(t,n){var l,w,x;",
+              "byte_offset": null,
+              "notes": "Builds self state and entity/event deltas."
+            },
+            {
+              "symbol": "playerSnapshot",
+              "kind": "function",
+              "search_anchor": "playerSnapshot(t){var w,x,p;",
+              "byte_offset": null,
+              "notes": "Player wire view."
+            },
+            {
+              "symbol": "monsterSnapshotBuild",
+              "kind": "function",
+              "search_anchor": "monsterSnapshotBuild(t,n,e=\"\"){var u;",
+              "byte_offset": null,
+              "notes": "Monster wire view."
+            }
+          ],
+          "related_modules": [
+            "index-ymL7Xfvg.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "event_lifecycle",
+          "label": "Sự kiện và vòng đời tick",
+          "summary": "Collects nearby room events plus global/player events, then clears room and player queues at tick end.",
+          "locators": [
+            {
+              "symbol": "eventsFor",
+              "kind": "function",
+              "search_anchor": "eventsFor(t){const n=t.room",
+              "byte_offset": null,
+              "notes": "Combines visible room events and queued events."
+            },
+            {
+              "symbol": "endTick",
+              "kind": "function",
+              "search_anchor": "endTick(){for(const t of this.rooms.values())",
+              "byte_offset": null,
+              "notes": "Clears room/player event queues and global events."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "loot_pickup_handler",
+          "label": "Xử lý nhặt đồ",
+          "summary": "pickup(t,n,e=!1) kiểm tra sống/phòng/realm, khoảng cách, quyền sở hữu và hạn dùng; xử lý gear, items, thu hồi bột và thông báo.",
+          "locators": [
+            {
+              "symbol": "pickup",
+              "kind": "function",
+              "search_anchor": "pickup(t,n,e=!1){if(n.dead||n.room!==t||n.realm)",
+              "byte_offset": null,
+              "notes": "Hàm xử lý loot trong simulation."
+            }
+          ],
+          "related_modules": [
+            "WorldScene-bJccyikN.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "loot_filter_actions",
+          "label": "Bộ lọc nhặt đồ và thu hồi",
+          "summary": "Action pickup truyền cờ e!==\"auto\"; lọc loot-filter cập nhật lootMin trong khoảng 0..4, loot-recover điều khiển thu hồi. Điều kiện lọc gear trong pickup phụ thuộc cờ auto/thủ công.",
+          "locators": [
+            {
+              "symbol": "pickup",
+              "kind": "event",
+              "search_anchor": "case\"pickup\":this.pickup(i,t,e!==\"auto\");return;",
+              "byte_offset": null,
+              "notes": "Nhánh phân biệt action pickup arg auto."
+            },
+            {
+              "symbol": "loot-filter",
+              "kind": "event",
+              "search_anchor": "case\"loot-filter\":{const g=Number(e);Number.isInteger(g)",
+              "byte_offset": null,
+              "notes": "Đặt ngưỡng lọc lootMin."
+            },
+            {
+              "symbol": "loot-recover",
+              "kind": "event",
+              "search_anchor": "case\"loot-recover\":{(e===\"on\"||e===\"off\")",
+              "byte_offset": null,
+              "notes": "Bật/tắt hành vi thu hồi."
+            }
+          ],
+          "related_modules": [
+            "WorldScene-bJccyikN.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "simulation_auto_pickup",
+          "label": "Auto-loot theo tick của simulation",
+          "summary": "Khi người chơi ở đúng phòng, còn sống và đến kỳ autoLootAt, simulation cập nhật deadline +0.2 và gọi pickup cho loot đang có. Luồng này riêng với nhặt đồ do V$ client gọi.",
+          "locators": [
+            {
+              "symbol": "autoLootAt",
+              "kind": "state",
+              "search_anchor": "this.time>=h.autoLootAt&&(h.autoLootAt=this.time+.2,o.loot.length&&this.pickup(o,h))",
+              "byte_offset": null,
+              "notes": "Callsite trong vòng cập nhật phòng."
+            },
+            {
+              "symbol": "autoLootAt",
+              "kind": "state",
+              "search_anchor": "b(this,\"autoLootAt\",0)",
+              "byte_offset": null,
+              "notes": "Khởi tạo state người chơi."
+            }
+          ],
+          "related_modules": [
+            "WorldScene-bJccyikN.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "monster_combat_tick",
+          "label": "Tick quái vật và combat",
+          "summary": "Simulation gọi updateMonsters rồi updateShots và combat.tick trong tick phòng; chỉ xác nhận callsite/thứ tự nhìn thấy, không khẳng định cơ chế xử lý cụ thể chưa đọc.",
+          "locators": [
+            {
+              "symbol": "updateMonsters",
+              "kind": "function",
+              "search_anchor": "this.updateMonsters(o,t),this.updateShots(o,t)",
+              "byte_offset": null,
+              "notes": "Callsite cập nhật monster và shots."
+            },
+            {
+              "symbol": "updateMonsters",
+              "kind": "function",
+              "search_anchor": "updateMonsters(t,n){var r,c,d,f,v;",
+              "byte_offset": null,
+              "notes": "Định nghĩa trong bundle."
+            },
+            {
+              "symbol": "combat.tick",
+              "kind": "function",
+              "search_anchor": "this.combat.tick(o,t)",
+              "byte_offset": null,
+              "notes": "Callsite combat trong tick phòng."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "resource_harvest_action",
+          "label": "Thu hoạch tài nguyên",
+          "summary": "Action harvest kiểm tra node, điều kiện tương tác, khoảng cách và trạng thái người chơi; thiết lập harvest duration và anim.",
+          "locators": [
+            {
+              "symbol": "harvest",
+              "kind": "event",
+              "search_anchor": "case\"harvest\":{const g=Number(e),k=i.nodes[g];",
+              "byte_offset": null,
+              "notes": "Nhánh action harvest."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "Mm",
+          "kind": "function",
+          "role": "Mentor/pupil command handler.",
+          "locators": [
+            {
+              "symbol": "Mm",
+              "kind": "other",
+              "search_anchor": "function Mm(a,t,n,e){",
+              "byte_offset": null,
+              "notes": "Search exact anchor in original source."
+            }
+          ]
+        },
+        {
+          "symbol": "Tm",
+          "kind": "function",
+          "role": "Equipment and forge migration helper.",
+          "locators": [
+            {
+              "symbol": "Tm",
+              "kind": "other",
+              "search_anchor": "function Tm(a,t=new Date().toISOString(),n=[])",
+              "byte_offset": null,
+              "notes": "Search exact anchor in original source."
+            }
+          ]
+        },
+        {
+          "symbol": "oo",
+          "kind": "function",
+          "role": "Donation action handler.",
+          "locators": [
+            {
+              "symbol": "oo",
+              "kind": "other",
+              "search_anchor": "function oo(a,t,n){var i,o;if(!t.startsWith(\"donation-\"))return!1;",
+              "byte_offset": null,
+              "notes": "Imported donation data source is a separate file dependency."
+            }
+          ]
+        },
+        {
+          "symbol": "snapshotPlayers",
+          "kind": "function",
+          "role": "Builds per-room snapshot indexes.",
+          "locators": [
+            {
+              "symbol": "snapshotPlayers",
+              "kind": "other",
+              "search_anchor": "snapshotPlayers(){const t=new Map",
+              "byte_offset": null,
+              "notes": "Search exact anchor in original source."
+            }
+          ]
+        },
+        {
+          "symbol": "snapshot",
+          "kind": "function",
+          "role": "Builds per-player snapshots and entity deltas.",
+          "locators": [
+            {
+              "symbol": "snapshot",
+              "kind": "other",
+              "search_anchor": "snapshot(t,n){var l,w,x;",
+              "byte_offset": null,
+              "notes": "Search exact anchor in original source."
+            }
+          ]
+        },
+        {
+          "symbol": "eventsFor",
+          "kind": "function",
+          "role": "Collects visible and queued events.",
+          "locators": [
+            {
+              "symbol": "eventsFor",
+              "kind": "other",
+              "search_anchor": "eventsFor(t){const n=t.room",
+              "byte_offset": null,
+              "notes": "Search exact anchor in original source."
+            }
+          ]
+        },
+        {
+          "symbol": "di",
+          "kind": "state",
+          "role": "Literal state extension ID `sudo`.",
+          "locators": [
+            {
+              "symbol": "di",
+              "kind": "other",
+              "search_anchor": "const di=\"sudo\"",
+              "byte_offset": null,
+              "notes": "Internal ID; not a dependency filename."
+            }
+          ]
+        },
+        {
+          "symbol": "pickup",
+          "kind": "function",
+          "role": "Nhặt loot và gear; áp dụng filter/điều kiện quyền sở hữu, sức chứa, thời gian và khoảng cách.",
+          "locators": [
+            {
+              "symbol": "pickup",
+              "kind": "function",
+              "search_anchor": "pickup(t,n,e=!1){if(n.dead||n.room!==t||n.realm)",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "autoLootAt",
+          "kind": "state",
+          "role": "Mốc thời gian cho nhặt tự động theo tick của simulation.",
+          "locators": [
+            {
+              "symbol": "autoLootAt",
+              "kind": "state",
+              "search_anchor": "this.time>=h.autoLootAt&&(h.autoLootAt=this.time+.2,o.loot.length&&this.pickup(o,h))",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "updateMonsters",
+          "kind": "function",
+          "role": "Logic cập nhật quái; được gọi trong tick phòng.",
+          "locators": [
+            {
+              "symbol": "updateMonsters",
+              "kind": "function",
+              "search_anchor": "updateMonsters(t,n){var r,c,d,f,v;",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "source_file": "sim-B1iiLlB3.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\""
+    },
+    {
+      "source_file": "sim-B1iiLlB3.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\""
+    }
+  ],
+  "unresolved": [
+    "index-ymL7Xfvg.js có trong bộ 9 source và được lập Wiki riêng; donation-BLL6eTTD.js không có source trong ZIP nên triển khai của import donation chưa xác minh.",
+    "The semantic/public names corresponding to this bundle's minified export aliases are not established here.",
+    "Donation implementation details outside the local handler are out of scope where the imported implementation is absent."
+  ]
+}

@@ -1,0 +1,506 @@
+{
+  "schema_version": "2.0",
+  "chat_id": "02",
+  "source_files": [
+    {
+      "file": "WorldScene-bJccyikN.js",
+      "sha256": "47d7592e4e88fcea6194732153a80eea699799784b8d10106005a495384d0e63",
+      "size_bytes": 1100111
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "WorldScene",
+      "source_file": "WorldScene-bJccyikN.js",
+      "wiki_file": "WorldScene.md",
+      "role": "Phaser scene được export tên WorldScene và khởi tạo với scene key world.",
+      "features": [
+        {
+          "feature_id": "scene_lifecycle",
+          "label": "Khởi tạo và vòng đời scene",
+          "summary": "Lớp g6 mở rộng tt.Scene; create đăng ký listener lỗi tải ground và cleanup theo SHUTDOWN.",
+          "locators": [
+            {
+              "symbol": "g6",
+              "kind": "class",
+              "search_anchor": "class g6 extends tt.Scene{constructor(){super(\"world\")",
+              "byte_offset": null,
+              "notes": "Lớp scene và khóa khởi tạo."
+            },
+            {
+              "symbol": "create",
+              "kind": "function",
+              "search_anchor": "async create(){var p,u,m,g;const e=f=>{const y=`ground:${this.map.scene}:`",
+              "byte_offset": null,
+              "notes": "Hàm setup scene và xử lý file tải lỗi."
+            },
+            {
+              "symbol": null,
+              "kind": "event",
+              "search_anchor": "this.events.once(tt.Scenes.Events.SHUTDOWN,()=>{this.load.off(tt.Loader.Events.FILE_LOAD_ERROR,e)",
+              "byte_offset": null,
+              "notes": "Cleanup loader trong callback shutdown."
+            }
+          ],
+          "related_modules": [
+            "./phaser-DRI6y8R5.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "world_tick_orchestration",
+          "label": "Điều phối cập nhật world",
+          "summary": "update cập nhật movement, driver, kỹ năng, nhân vật, UI, weather, target và streaming ground.",
+          "locators": [
+            {
+              "symbol": "update",
+              "kind": "function",
+              "search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+              "byte_offset": null,
+              "notes": "Vòng lặp tick scene."
+            },
+            {
+              "symbol": "sendMove",
+              "kind": "other",
+              "search_anchor": "this.self&&!this.leaving&&(this.move(n),this.sendMove()),this.driver.update(n),this.flushSkill()",
+              "byte_offset": null,
+              "notes": "Callsite movement và driver trong update."
+            }
+          ],
+          "related_modules": [
+            "./sim-B1iiLlB3.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "target_interaction",
+          "label": "Chọn mục tiêu và tương tác",
+          "summary": "pickTarget xét realm và các loại target world; updateOverlay trình bày prompt tùy target.",
+          "locators": [
+            {
+              "symbol": "pickTarget",
+              "kind": "function",
+              "search_anchor": "pickTarget(){var s,o,r,h;if((s=this.realmUI)!=null&&s.target)return{realm:this.realmUI.target}",
+              "byte_offset": null,
+              "notes": "Bắt đầu hàm chọn target."
+            },
+            {
+              "symbol": null,
+              "kind": "other",
+              "search_anchor": "this.target=this.overlay.dialogOpen?this.target:this.pickTarget()",
+              "byte_offset": null,
+              "notes": "Callsite chọn target trong update."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "skill_queue",
+          "label": "Hàng đợi kỹ năng",
+          "summary": "flushSkill hủy pending skill theo điều kiện trạng thái hoặc gọi useSkill khi thời gian chờ kết thúc.",
+          "locators": [
+            {
+              "symbol": "flushSkill",
+              "kind": "function",
+              "search_anchor": "flushSkill(){var i;const e=this.pendingSkill;if(e){if(this.dead||this.uiBlocked||this.leaving||this.now()>e.until",
+              "byte_offset": null,
+              "notes": "Xử lý pendingSkill."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "hud_and_minimap",
+          "label": "HUD và minimap",
+          "summary": "Các hàm updateHud và drawMinimap tổng hợp trạng thái nhân vật và điểm world để trình bày.",
+          "locators": [
+            {
+              "symbol": "updateHud",
+              "kind": "function",
+              "search_anchor": "updateHud(){var l,c,d,p;const e=this.self;if(!e)return",
+              "byte_offset": null,
+              "notes": "Cập nhật HUD khi có self."
+            },
+            {
+              "symbol": "drawMinimap",
+              "kind": "function",
+              "search_anchor": "drawMinimap(){var n,s,o,r,h,l,c;const e=[];for(const d of this.map.gates.filter",
+              "byte_offset": null,
+              "notes": "Tạo danh sách marker minimap."
+            }
+          ],
+          "related_modules": [
+            "./items-CCENVhBq.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "zone_picker_widget",
+          "label": "Widget đổi khu",
+          "summary": "Zv tạo chip và dialog DOM, nhận callback pick để yêu cầu chọn khu.",
+          "locators": [
+            {
+              "symbol": "Zv",
+              "kind": "class",
+              "search_anchor": "class Zv{constructor(t,e){M(this,\"chip\",document.createElement(\"button\"))",
+              "byte_offset": null,
+              "notes": "Constructor widget đổi khu; callback được lưu ở this.pick."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_controller",
+          "label": "Auto Farm gốc: bộ điều khiển",
+          "summary": "V$ quản lý trạng thái on, tâm/radius farm, mục tiêu, bộ nhớ mục tiêu bỏ qua, đường đi, nhặt đồ và nghỉ/hồi sinh. Đây là logic client đọc được trong source, không phải Auto Farm của tool.",
+          "locators": [
+            {
+              "symbol": "V$",
+              "kind": "class",
+              "search_anchor": "class V${constructor(){M(this,\"on\",!1)",
+              "byte_offset": null,
+              "notes": "Lớp V$ trước lớp scene g6."
+            },
+            {
+              "symbol": "V$.toggle",
+              "kind": "function",
+              "search_anchor": "toggle(t){var e;this.radius=a1()",
+              "byte_offset": null,
+              "notes": "Bật/tắt và reset trạng thái controller."
+            }
+          ],
+          "related_modules": [
+            "sim-B1iiLlB3.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_toggle",
+          "label": "Điểm bật/tắt Auto Farm gốc",
+          "summary": "WorldScene.toggleAutoFarm dùng autoHost, syncAutoFarmButtons và bgSync; phím V cũng gọi hàm này.",
+          "locators": [
+            {
+              "symbol": "toggleAutoFarm",
+              "kind": "function",
+              "search_anchor": "toggleAutoFarm(){var e,i;this.cancelClickOrder()",
+              "byte_offset": null,
+              "notes": "Cổng bật/tắt scene."
+            },
+            {
+              "symbol": "V",
+              "kind": "event",
+              "search_anchor": "V:()=>this.toggleAutoFarm()",
+              "byte_offset": null,
+              "notes": "Mapping phím V trong nhánh xử lý input."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_targets",
+          "label": "Lọc quái và chọn mục tiêu",
+          "summary": "V$.update lấy enemy qua host; ưu tiên trường hợp đang chiến đấu, giới hạn bán kính và dùng pick() để chấm điểm mục tiêu theo khoảng cách/trạng thái/nguy hiểm.",
+          "locators": [
+            {
+              "symbol": "V$.update",
+              "kind": "function",
+              "search_anchor": "const p=t.inCombat(),u=k=>p&&!!k.aggro",
+              "byte_offset": null,
+              "notes": "Bộ lọc enemy trong update."
+            },
+            {
+              "symbol": "V$.pick",
+              "kind": "function",
+              "search_anchor": "pick(t,e,i,n,s,o){const r=t.level()",
+              "byte_offset": null,
+              "notes": "Xếp hạng, xác minh khả năng tiếp cận."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_navigation",
+          "label": "Di chuyển tự động và tránh kẹt",
+          "summary": "V$.walk điều hướng theo vị trí mục tiêu; autoHost cung cấp route/clear dựa trên collision; controller ghi nhận kẹt và bỏ qua mục tiêu không thể tiếp cận.",
+          "locators": [
+            {
+              "symbol": "V$.walk",
+              "kind": "function",
+              "search_anchor": "walk(t,e,i,n,s,o,r){if(se(i,n,this.lastX",
+              "byte_offset": null,
+              "notes": "Đường đi và xử lý kẹt."
+            },
+            {
+              "symbol": "autoHost.route",
+              "kind": "function",
+              "search_anchor": "route:(i,n,s,o)=>Fl(e.collision,i,n,s,o,Qe*1.5)",
+              "byte_offset": null,
+              "notes": "Bộ nối đường đi của scene."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_loot",
+          "label": "Nhặt đồ đi kèm Auto Farm gốc",
+          "summary": "V$.idle ưu tiên túi đồ quanh tâm farm, tiếp cận rồi gọi t.pickup(); nếu không nhặt được sẽ tạm bỏ qua hoặc dừng trong trường hợp thất bại lặp lại. autoHost ánh xạ pickup thành act(\"pickup\",\"auto\").",
+          "locators": [
+            {
+              "symbol": "V$.idle",
+              "kind": "function",
+              "search_anchor": "idle(t,e,i,n){const s=r=>",
+              "byte_offset": null,
+              "notes": "Chọn vật phẩm và xử lý quá thời gian nhặt."
+            },
+            {
+              "symbol": "V$.idle.pickup",
+              "kind": "function",
+              "search_anchor": "t.pickup()",
+              "byte_offset": null,
+              "notes": "Callsite khi đã tới gần loot."
+            },
+            {
+              "symbol": "autoHost.pickup",
+              "kind": "function",
+              "search_anchor": "pickup:()=>e.act(\"pickup\",\"auto\")",
+              "byte_offset": null,
+              "notes": "Action gửi vào driver/simulation; kết hợp tra cứu sim case pickup."
+            }
+          ],
+          "related_modules": [
+            "sim-B1iiLlB3.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "game_autofarm_scene_bridge",
+          "label": "Cầu nối scene và tick Auto Farm",
+          "summary": "g6 tạo auto=new V$, autoHost cung cấp trạng thái player/enemies/movement/combat/loot; scene update gọi auto.update khi không bị trạng thái đang aim/pendingSkill cản.",
+          "locators": [
+            {
+              "symbol": "g6.auto",
+              "kind": "state",
+              "search_anchor": "M(this,\"auto\",new V$)",
+              "byte_offset": null,
+              "notes": "State thuộc WorldScene."
+            },
+            {
+              "symbol": "g6.autoHost",
+              "kind": "function",
+              "search_anchor": "autoHost(){const e=this;return{pos:",
+              "byte_offset": null,
+              "notes": "Host API nối scene với controller."
+            },
+            {
+              "symbol": "g6.update",
+              "kind": "function",
+              "search_anchor": "this.auto.update(this.autoHost(),this.now(),n)",
+              "byte_offset": null,
+              "notes": "Điểm gọi update controller trong tick scene."
+            }
+          ],
+          "related_modules": [
+            "sim-B1iiLlB3.js"
+          ],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "g6",
+          "kind": "class",
+          "role": "Scene chính; export alias WorldScene.",
+          "locators": [
+            {
+              "symbol": "g6",
+              "kind": "class",
+              "search_anchor": "class g6 extends tt.Scene{constructor(){super(\"world\")",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "create",
+          "kind": "function",
+          "role": "Thiết lập scene và listener.",
+          "locators": [
+            {
+              "symbol": "create",
+              "kind": "function",
+              "search_anchor": "async create(){var p,u,m,g;const e=f=>{const y=`ground:${this.map.scene}:`",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "update",
+          "kind": "function",
+          "role": "Tick điều phối scene.",
+          "locators": [
+            {
+              "symbol": "update",
+              "kind": "function",
+              "search_anchor": "update(e,i){var l,c,d,p,u,m,g,f,y,b,v,k,w,C,T,q,H,S,E,A,L,P,N,B,j,R,W;if((l=this.liveSkills)==null||l.update()",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "pickTarget",
+          "kind": "function",
+          "role": "Chọn target tương tác.",
+          "locators": [
+            {
+              "symbol": "pickTarget",
+              "kind": "function",
+              "search_anchor": "pickTarget(){var s,o,r,h;if((s=this.realmUI)!=null&&s.target)return{realm:this.realmUI.target}",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "flushSkill",
+          "kind": "function",
+          "role": "Giải quyết kỹ năng pending.",
+          "locators": [
+            {
+              "symbol": "flushSkill",
+              "kind": "function",
+              "search_anchor": "flushSkill(){var i;const e=this.pendingSkill;if(e){if(this.dead||this.uiBlocked||this.leaving||this.now()>e.until",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "Zv",
+          "kind": "class",
+          "role": "Widget DOM chọn khu.",
+          "locators": [
+            {
+              "symbol": "Zv",
+              "kind": "class",
+              "search_anchor": "class Zv{constructor(t,e){M(this,\"chip\",document.createElement(\"button\"))",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "V$",
+          "kind": "class",
+          "role": "Bộ điều khiển Auto Farm tích hợp game, có toggle/update/pick/idle/walk và bộ nhớ trạng thái.",
+          "locators": [
+            {
+              "symbol": "V$",
+              "kind": "class",
+              "search_anchor": "class V${constructor(){M(this,\"on\",!1)",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "toggleAutoFarm",
+          "kind": "function",
+          "role": "Điểm bật/tắt Auto Farm do scene cung cấp, gồm cập nhật nút và trạng thái.",
+          "locators": [
+            {
+              "symbol": "toggleAutoFarm",
+              "kind": "function",
+              "search_anchor": "toggleAutoFarm(){var e,i;this.cancelClickOrder()",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "autoHost",
+          "kind": "function",
+          "role": "Đối tượng host mô tả player, enemies, collisions, skill, loot và actions.",
+          "locators": [
+            {
+              "symbol": "autoHost",
+              "kind": "function",
+              "search_anchor": "autoHost(){const e=this;return{pos:",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "V$.idle",
+          "kind": "function",
+          "role": "Nhặt loot trong vòng lặp Auto Farm khi không có mục tiêu chiến đấu.",
+          "locators": [
+            {
+              "symbol": "idle",
+              "kind": "function",
+              "search_anchor": "idle(t,e,i,n){const s=r=>",
+              "byte_offset": null,
+              "notes": ""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "index-ymL7Xfvg.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./index-ymL7Xfvg.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "items-CCENVhBq.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./items-CCENVhBq.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./phaser-DRI6y8R5.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "Character-cz94XTen.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./Character-cz94XTen.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "sim-B1iiLlB3.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./sim-B1iiLlB3.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "ChieuMau-qVW4fvFM.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./ChieuMau-qVW4fvFM.js\""
+    },
+    {
+      "source_file": "WorldScene-bJccyikN.js",
+      "target_file": "donation-BLL6eTTD.js",
+      "kind": "static_import",
+      "evidence_anchor": "from\"./donation-BLL6eTTD.js\""
+    }
+  ],
+  "unresolved": [
+    "Trong tập 9 source hiện tại, donation-BLL6eTTD.js vắng mặt; các import khác của WorldScene có source nhưng chi tiết giao diện cần tra cứu ở Wiki module tương ứng.",
+    "Các alias import minified không được ánh xạ tới API semantic hoặc implementation bên ngoài trong phạm vi nguồn hiện có."
+  ]
+}

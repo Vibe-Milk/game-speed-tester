@@ -1,0 +1,157 @@
+{
+  "schema_version": "2.0",
+  "purpose": "Tra cứu module theo tính năng trước khi mở code; source là căn cứ cuối cùng.",
+  "start_here": [
+    "README.md",
+    "FEATURE_INDEX.md"
+  ],
+  "lookup_path": [
+    "FEATURE_INDEX.json",
+    "ASSET_INDEX.json",
+    "modules/<module>.md",
+    "source/<exact-file>.js"
+  ],
+  "manifest": "SOURCE_MANIFEST.json",
+  "feature_index": "FEATURE_INDEX.json",
+  "function_map": "FUNCTION_MAP.md",
+  "dependency_map": "DEPENDENCY_MAP.md",
+  "modules": [
+    {
+      "module_id": "phaser-framework-bundle",
+      "source_file": "phaser-DRI6y8R5.js",
+      "wiki_file": "modules/phaser.md",
+      "chat_index": "indices/CHAT_01_INDEX.json",
+      "role": "Bundle Phaser dùng module nội bộ; module lõi tập hợp và xuất các namespace framework.",
+      "feature_ids": [
+        "phaser_exports",
+        "framework_namespaces",
+        "game_runtime",
+        "scene_system",
+        "game_objects",
+        "loader_input_physics",
+        "scene_events"
+      ]
+    },
+    {
+      "module_id": "WorldScene",
+      "source_file": "WorldScene-bJccyikN.js",
+      "wiki_file": "modules/WorldScene.md",
+      "chat_index": "indices/CHAT_02_INDEX.json",
+      "role": "Phaser scene được export tên WorldScene và khởi tạo với scene key world.",
+      "feature_ids": [
+        "scene_lifecycle",
+        "world_tick_orchestration",
+        "target_interaction",
+        "skill_queue",
+        "hud_and_minimap",
+        "zone_picker_widget",
+        "game_autofarm_controller",
+        "game_autofarm_toggle",
+        "game_autofarm_targets",
+        "game_autofarm_navigation",
+        "game_autofarm_loot",
+        "game_autofarm_scene_bridge"
+      ]
+    },
+    {
+      "module_id": "index-ymL7Xfvg",
+      "source_file": "index-ymL7Xfvg.js",
+      "wiki_file": "modules/index.md",
+      "chat_index": "indices/CHAT_03_INDEX.json",
+      "role": "Vite browser entry bundle for application startup, connection setup, data loading, and Phaser world scene initialization.",
+      "feature_ids": [
+        "snapshot_decode",
+        "online_transport",
+        "application_boot",
+        "join_session",
+        "lab_startup"
+      ]
+    },
+    {
+      "module_id": "sim",
+      "source_file": "sim-B1iiLlB3.js",
+      "wiki_file": "modules/sim.md",
+      "chat_index": "indices/CHAT_04_INDEX.json",
+      "role": "Minified simulation runtime containing state migration, game actions, donation and mentor/pupil handling, movement, and client snapshots.",
+      "feature_ids": [
+        "mentor_pupil",
+        "equipment_forge_migration",
+        "donation_actions",
+        "action_dispatch",
+        "world_snapshots",
+        "event_lifecycle",
+        "loot_pickup_handler",
+        "loot_filter_actions",
+        "simulation_auto_pickup",
+        "monster_combat_tick",
+        "resource_harvest_action"
+      ]
+    },
+    {
+      "module_id": "ChieuMau",
+      "source_file": "ChieuMau-qVW4fvFM.js",
+      "wiki_file": "modules/ChieuMau.md",
+      "chat_index": "indices/CHAT_05_INDEX.json",
+      "role": "Hiệu ứng/render chiến đấu bằng Phaser; không xác nhận logic sát thương.",
+      "feature_ids": [
+        "combat_effect_pool",
+        "impact_feedback_config",
+        "effect_textures"
+      ]
+    },
+    {
+      "module_id": "Character",
+      "source_file": "Character-cz94XTen.js",
+      "wiki_file": "modules/Character.md",
+      "chat_index": "indices/CHAT_05_INDEX.json",
+      "role": "Lớp hiển thị sprite và điều khiển animation nhân vật.",
+      "feature_ids": [
+        "animation_playback",
+        "animation_tick",
+        "character_feet"
+      ]
+    },
+    {
+      "module_id": "items",
+      "source_file": "items-CCENVhBq.js",
+      "wiki_file": "modules/items.md",
+      "chat_index": "indices/CHAT_05_INDEX.json",
+      "role": "Tra cứu item/gear, icon và thiết lập phím điều khiển.",
+      "feature_ids": [
+        "default_controls",
+        "controls_storage",
+        "item_metadata",
+        "gear_icons"
+      ]
+    },
+    {
+      "module_id": "tm-direct",
+      "source_file": "tm-direct.js",
+      "wiki_file": "modules/tm-direct.md",
+      "chat_index": "indices/CHAT_05_INDEX.json",
+      "role": "WebSocket shim ưu tiên endpoint direct rồi fallback same-origin.",
+      "feature_ids": [
+        "direct_ws_routing",
+        "direct_ws_fallback"
+      ]
+    },
+    {
+      "module_id": "tm-guard",
+      "source_file": "tm-guard.js",
+      "wiki_file": "modules/tm-guard.md",
+      "chat_index": "indices/CHAT_05_INDEX.json",
+      "role": "Xử lý guard challenge và nút độ kiếp mobile qua socket/global hooks.",
+      "feature_ids": [
+        "guard_challenge",
+        "tribulation_button",
+        "webrtc_feed_hook"
+      ]
+    }
+  ],
+  "source_count": 9,
+  "caveats": [
+    "Module framework là Phaser, không tương đương cơ chế gameplay của game.",
+    "Chỉ chứa 9 file nguồn, không bao gồm các file import bị thiếu.",
+    "Những quan hệ tính năng gộp nhiều module là bản đồ điều hướng, không chứng minh tất cả luồng chạy thực tế."
+  ]
+}

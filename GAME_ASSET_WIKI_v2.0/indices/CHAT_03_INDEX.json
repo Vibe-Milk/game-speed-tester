@@ -1,0 +1,218 @@
+{
+  "schema_version": "2.0",
+  "chat_id": "03",
+  "source_files": [
+    {
+      "file": "index-ymL7Xfvg.js",
+      "sha256": "89e74ddadef391b89014311cf47288ca30ff27cd96121d9e88149f17d1addcb2",
+      "size_bytes": 829377
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "index-ymL7Xfvg",
+      "source_file": "index-ymL7Xfvg.js",
+      "wiki_file": "index.md",
+      "role": "Vite browser entry bundle for application startup, connection setup, data loading, and Phaser world scene initialization.",
+      "features": [
+        {
+          "feature_id": "snapshot_decode",
+          "label": "Snapshot decoding",
+          "summary": "Applies self-state patches, validates path keys, expands compact entity records, and tracks removed entities.",
+          "locators": [
+            {
+              "symbol": "yy",
+              "kind": "class",
+              "search_anchor": "class yy{constructor(){_(this,\"self\",{});_(this,\"seen\",new Set)}decode(t){",
+              "byte_offset": 4905,
+              "notes": "Search exact anchor in original file."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "online_transport",
+          "label": "Online connection lifecycle",
+          "summary": "WebSocket wrapper queues messages, handles snapshots and profiles, pings the server, reconnects, and attempts WebRTC upgrade.",
+          "locators": [
+            {
+              "symbol": "vy",
+              "kind": "class",
+              "search_anchor": "class vy{constructor(t,e){_(this,\"online\",!0);",
+              "byte_offset": 7378,
+              "notes": "Class body includes receive, send, update, close, and upgrade methods."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "application_boot",
+          "label": "Startup and game initialization",
+          "summary": "Loads game data, selects online or local mode, loads required assets, creates the Phaser game, and starts the world scene.",
+          "locators": [
+            {
+              "symbol": "cP",
+              "kind": "function",
+              "search_anchor": "async function cP(){var D,C,R,F;AM(),GM();",
+              "byte_offset": 817802,
+              "notes": "Search exact anchor in original file; function is minified onto a long line."
+            }
+          ],
+          "related_modules": [
+            "LocalDriver-DA7Qxqfm.js",
+            "items-CCENVhBq.js",
+            "WorldScene-bJccyikN.js",
+            "phaser-DRI6y8R5.js"
+          ],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "join_session",
+          "label": "Session acquisition",
+          "summary": "Obtains a token, joins a driver session, updates loading UI, and retries caught join errors.",
+          "locators": [
+            {
+              "symbol": "rP",
+              "kind": "function",
+              "search_anchor": "async function rP(){var t;let n=\"\";for(;;){",
+              "byte_offset": 816977,
+              "notes": "Search exact anchor in original file."
+            }
+          ],
+          "related_modules": [],
+          "confidence": "verified"
+        },
+        {
+          "feature_id": "lab_startup",
+          "label": "Lab boot branch",
+          "summary": "When the lab query parameter is 1, dynamically imports the boot module and calls labBoot.",
+          "locators": [
+            {
+              "symbol": null,
+              "kind": "literal",
+              "search_anchor": "import(\"./boot-DGR3-xtV.js\")",
+              "byte_offset": 822207,
+              "notes": "Branch condition and invocation occur immediately after the import."
+            }
+          ],
+          "related_modules": [
+            "boot-DGR3-xtV.js"
+          ],
+          "confidence": "verified"
+        }
+      ],
+      "important_symbols": [
+        {
+          "symbol": "yy",
+          "kind": "class",
+          "role": "Snapshot decoder and entity ID tracker.",
+          "locators": [
+            {
+              "symbol": "yy",
+              "kind": "other",
+              "search_anchor": "class yy{constructor(){_(this,\"self\",{});_(this,\"seen\",new Set)}decode(t){",
+              "byte_offset": 4905,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "vy",
+          "kind": "class",
+          "role": "Online transport and connection lifecycle manager.",
+          "locators": [
+            {
+              "symbol": "vy",
+              "kind": "other",
+              "search_anchor": "class vy{constructor(t,e){_(this,\"online\",!0);",
+              "byte_offset": 7378,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "rP",
+          "kind": "function",
+          "role": "Join/session acquisition loop.",
+          "locators": [
+            {
+              "symbol": "rP",
+              "kind": "other",
+              "search_anchor": "async function rP(){var t;let n=\"\";for(;;){",
+              "byte_offset": 816977,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "cP",
+          "kind": "function",
+          "role": "Main data loading and game initialization function.",
+          "locators": [
+            {
+              "symbol": "cP",
+              "kind": "other",
+              "search_anchor": "async function cP(){var D,C,R,F;AM(),GM();",
+              "byte_offset": 817802,
+              "notes": ""
+            }
+          ]
+        },
+        {
+          "symbol": "__vite__mapDeps",
+          "kind": "function",
+          "role": "Maps preload dependency indexes to chunk filenames.",
+          "locators": [
+            {
+              "symbol": "__vite__mapDeps",
+              "kind": "other",
+              "search_anchor": "const __vite__mapDeps=",
+              "byte_offset": 0,
+              "notes": "The map contains filename strings; indexes are build internals."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "LocalDriver-DA7Qxqfm.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./LocalDriver-DA7Qxqfm.js\")"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "items-CCENVhBq.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./items-CCENVhBq.js\")"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "phaser-DRI6y8R5.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./phaser-DRI6y8R5.js\")"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "WorldScene-bJccyikN.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./WorldScene-bJccyikN.js\")"
+    },
+    {
+      "source_file": "index-ymL7Xfvg.js",
+      "target_file": "boot-DGR3-xtV.js",
+      "kind": "dynamic_import",
+      "evidence_anchor": "import(\"./boot-DGR3-xtV.js\")"
+    }
+  ],
+  "unresolved": [
+    "LocalDriver-DA7Qxqfm.js và boot-DGR3-xtV.js được tham chiếu bằng dynamic import nhưng không có trong bộ 9 source; chưa thể xác minh triển khai.",
+    "Server implementations behind /api/rtc/config and /api/rtc/offer are not provided in this source bundle.",
+    "Runtime data files under data/ are JSON endpoints and were not included in the assigned JavaScript source file.",
+    "Preload-map-only filenames sim-B1iiLlB3.js, donation-BLL6eTTD.js, Character-cz94XTen.js, and ChieuMau-qVW4fvFM.js do not have literal dynamic import edges in this file; their loading relationship is not established here."
+  ]
+}
