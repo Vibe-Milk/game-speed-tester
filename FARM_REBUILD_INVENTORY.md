@@ -67,3 +67,7 @@ Tool now runs only after fresh explicit ON, with a new fixed start origin. Radiu
 - Skill priority is now implemented in the new Tool controller, with native readiness and completion checks. Changing the configuration stops the active session; fresh ON is required. `anh-bo` is skipped until its teleport destination can be established safely.
 - Pickup-by-game delegates to independent game behavior without running native Farm decisions or tool loot navigation. `farmPickupTool` remains disabled, with clickable explanation. Task 7 cannot be completed under the exclusive-pickup requirement because no supported OFF API was found for independent auto-pickup in the provided source. No simulation/server mutation or fake exclusivity is supplied. A stored tool choice is retained and blocks Tool Farm start until changed explicitly.
 - Read-only source/diff review only; runtime remains unverified and QA still requires separate authorization.
+
+## Navigation relocation
+
+Rebuilt Farm options and controller selection are now on **Auto của tool**. Potion HP/MP and the shared Harvest respawn permission are on **Tiện ích độc lập**. The original Farm page is retained but excluded from navigation/search; its obsolete behaviors remain disabled as recorded above. This move preserves saved preferences and does not restore hidden features or enable tool pickup.

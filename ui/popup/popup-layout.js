@@ -4,7 +4,7 @@
 (() => {
   const container = document.getElementById("featurePanels");
   const overview = document.getElementById("overviewPage");
-  const views = new Map([...container.querySelectorAll(":scope > [data-panel]")]
+  const views = new Map([...container.querySelectorAll(":scope > [data-panel]:not([data-farm-retired])")]
     .map((panel) => [panel.dataset.panel, panel]));
   const navigation = [...document.querySelectorAll("[data-nav-panel]")];
   const pageKey = "popupActivePage";
@@ -55,6 +55,7 @@
   }
 
   function selectPage(page, save = true) {
+    if (page === "farm") page = "tool-auto";
     if (page === "speed") page = "interface";
     if (page !== "overview" && !views.has(page)) return;
     overview.hidden = page !== "overview";

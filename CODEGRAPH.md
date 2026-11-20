@@ -385,3 +385,9 @@ Source identities: WorldScene/sim hashes match v2.0 manifest; index native skill
 
 - `shared/coordination/farm-update.js` calls the existing `GSTToolFarm.stop(scene, reason)` before publishing a replacement `scene.auto`, so release can still recognize the previous controller's owned movement. The existing activation sync disposes the old session afterward; manual and independent feature ownership guards remain in effect.
 - `farm-tool.js` releases its movement and resets the stuck baseline while native movement is blocked by `moveLockUntil`, server `self.ml`, stun or root FX. Approach waits without consuming a stuck retry; legal in-range combat still uses the existing native action checks.
+
+### Tool Auto and independent utilities navigation
+
+- `popup.html` declares `tool-auto` (Auto của tool) and `independent` (Tiện ích độc lập) as normal popup pages. The legacy `farm` page remains hidden/inert with `data-farm-retired`; navigation and search exclude it. Saved/explicit `farm` page links resolve to `tool-auto`, and the dashboard tile opens that page.
+- `farm-layout.js` moves original controller-selection nodes from Feature Management, rebuilt radius/filter/skill/pickup/shortcut groups and Farm status/feedback into `tool-auto`. Original potion controls and the shared Harvest respawn permission move into `independent`; IDs, preference writers and fieldset lock mirroring remain unchanged. Controller selection does not start Farm, legacy runtime gates and the tool pickup blocker remain unchanged.
+- No automation ownership, action scheduling or Harvest behavior changes are part of this UI move. Existing settings and section-open keys are retained.

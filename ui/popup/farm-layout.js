@@ -10,7 +10,16 @@
   archive.inert = true;
   const groups = document.createElement('div');
   groups.className = 'farm-organized';
-  archive.before(groups);
+  const toolBody = byId('toolAutoBody');
+  const independentBody = byId('independentAutoBody');
+  toolBody.append(groups);
+  // Move originals, preserving IDs, listeners, preference writers and locks.
+  const management = byId('farmPolicyMode').closest('details');
+  toolBody.prepend(management);
+  const status = byId('farmStatus');
+  toolBody.parentElement.querySelector(':scope > summary').append(status);
+  toolBody.prepend(byId('farmAssistanceAvailability'));
+  toolBody.append(byId('farmFeedback'));
   const mirrors = [], sections = [];
   function section(key, title, open = true) {
     const node = document.createElement('details');
@@ -43,7 +52,8 @@
   const controls = section('display', 'Phím bật/tắt Farm', false);
   const shortcut = byId('farmShortcutSummary').closest('details');
   move([shortcut], controls);
-  const shared = section('independent', 'Tính năng độc lập với Farm', false);
+  const shared = section('independent', 'Đan và hồi sinh dùng chung', true);
+  independentBody.append(shared.parentElement);
   move([byId('potionSummary').closest('details')], shared);
   // Harvest still consults the Farm profile's autoRespawn flag. Keep it visible
   // and configurable instead of silently disabling Harvest's recovery.

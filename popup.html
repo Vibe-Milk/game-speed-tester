@@ -44,7 +44,8 @@
       <button id="navigationToggle" type="button" aria-expanded="true" aria-controls="navigationItems">Chọn chức năng ▾</button>
       <div id="navigationItems">
       <button type="button" class="nav-item" data-nav-panel="overview" aria-current="page">Tổng quan</button>
-      <button type="button" class="nav-item" data-nav-panel="farm">Auto Farm</button>
+      <button type="button" class="nav-item" data-nav-panel="tool-auto">Auto của tool</button>
+      <button type="button" class="nav-item" data-nav-panel="independent">Tiện ích độc lập</button>
       <button type="button" class="nav-item" data-nav-panel="harvest">Thu hoạch</button>
       <button type="button" class="nav-item" data-nav-panel="quest">Auto Quest</button>
       <button type="button" class="nav-item" data-nav-panel="fps">Hình ảnh &amp; FPS</button>
@@ -74,7 +75,7 @@
             </dl>
           </section>
           <div class="dashboard-grid" aria-label="Mở nhanh tính năng">
-            <button type="button" class="dashboard-tile" data-open-panel="farm"><strong>Auto Farm</strong><span data-summary-for="farm">Đang đọc trạng thái…</span></button>
+            <button type="button" class="dashboard-tile" data-open-panel="tool-auto"><strong>Auto của tool</strong><span data-summary-for="farm">Đang đọc trạng thái…</span></button>
             <button type="button" class="dashboard-tile" data-open-panel="harvest"><strong>Thu hoạch</strong><span data-summary-for="harvest">Đang đọc cài đặt…</span></button>
             <button type="button" class="dashboard-tile" data-open-panel="quest"><strong>Auto Quest</strong><span data-summary-for="quest">Đang đọc trạng thái…</span></button>
             <button type="button" class="dashboard-tile" data-open-panel="fps"><strong>Hình ảnh &amp; FPS</strong><span data-summary-for="fps">Đang đọc cài đặt…</span></button>
@@ -109,7 +110,15 @@
         </fieldset>
       </div>
     </details>
-    <details class="card" data-category="auto" data-panel="farm">
+    <details class="card" data-category="auto" data-panel="tool-auto" hidden>
+      <summary class="feature-heading"><span><strong>Auto của tool</strong><small>Chọn Farm của game hoặc tool và cấu hình tool</small></span></summary>
+      <div class="card-body" id="toolAutoBody"></div>
+    </details>
+    <details class="card" data-category="auto" data-panel="independent" hidden>
+      <summary class="feature-heading"><span><strong>Tiện ích độc lập</strong><small>Đan HP/MP và quyền hồi sinh dùng chung</small></span></summary>
+      <div class="card-body" id="independentAutoBody"><p class="hint" role="note">Các tùy chọn này không bật Farm. Quyền hồi sinh còn phụ thuộc tính năng sử dụng nó.</p></div>
+    </details>
+    <details class="card" data-category="auto" data-panel="farm" hidden inert data-farm-retired="true">
       <summary class="feature-heading"><span><strong>Auto Farm</strong><small>Bán kính, bộ lọc và trạng thái Farm</small></span><span id="farmStatus" class="panel-status" role="status" aria-live="polite">Đang đọc trạng thái…</span></summary>
       <div class="card-body">
         <p id="farmAssistanceAvailability" class="hint" role="status" aria-live="polite" hidden></p>

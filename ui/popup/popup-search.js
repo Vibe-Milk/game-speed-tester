@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const panels = [...document.querySelectorAll('#featurePanels > [data-panel]')];
+  const panels = [...document.querySelectorAll('#featurePanels > [data-panel]:not([data-farm-retired])')];
   const overview = document.getElementById("overviewPage");
   const normalize = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d").replace(/Đ/g, "d").toLocaleLowerCase("vi").replace(/\s+/g, " ").trim();
