@@ -519,11 +519,13 @@ let farmPolicyWaiters = [];
 let selectingFarmPolicy = false;
 const farmPolicyLabels = Object.freeze({ tool: "Farm của tool", native: "Farm của game", disabled: "Khóa Auto Farm cũ" });
 const farmPolicyDescriptions = Object.freeze({
-  tool: "Farm của tool tự đi và đánh thường theo bán kính/bộ lọc. Chọn chế độ để Farm OFF; dùng nút/phím Farm trong game để bắt đầu. Kỹ năng chạy theo ô đã bật và thứ tự ưu tiên; nhặt theo tool chưa khả dụng.",
+  tool: "Farm của tool tự đi và đánh thường theo bán kính/bộ lọc. Chọn chế độ để Farm OFF; dùng nút/phím Farm trong game để bắt đầu. Kỹ năng dùng theo Mặc định theo game hoặc Tùy chỉnh; nhặt theo tool chưa khả dụng.",
   native: "Farm của game: bật/tắt riêng trong game; quyết định Farm của tool không chạy. Bộ lọc và bán kính tool không áp dụng cho Farm game.",
   disabled: "Khóa Auto Farm cũ được giữ nguyên. Chọn Farm của game hoặc Farm của tool để rời khóa; sau khi chọn Farm vẫn OFF."
 });
 const farmActionControls = document.getElementById("farmActionControls");
+const farmSkillMode = document.getElementById("farmSkillMode");
+const farmCustomSkillControls = document.getElementById("farmCustomSkillControls");
 const farmSkillInputs = [1, 2, 3, 4, 5, 6].map((slot) => document.getElementById(`farmSkill${slot}`));
 const farmPriorityInput = document.getElementById("farmSkillPriority");
 const farmPriorityError = document.getElementById("farmSkillPriorityError");
@@ -532,6 +534,9 @@ let farmActionWrites = 0, farmPriorityDirty = false, farmPriorityDraftVersion = 
 function syncFarmActions() {
   const options = GSTFarmPolicy.actions(farmConfirmed);
   if (farmPriorityDraftVersion !== popupAccountContextVersion) { farmPriorityDirty = false; farmPriorityError.textContent = ""; }
+  farmSkillMode.value = options.skillMode;
+  farmCustomSkillControls.hidden = options.skillMode !== "custom";
+  farmCustomSkillControls.disabled = options.skillMode !== "custom";
   for (const input of farmSkillInputs) input.checked = options.skillEnabled.includes(input.value);
   if (!farmPriorityDirty) farmPriorityInput.value = options.skillPriority.join(" ");
   farmPickupGame.checked = options.pickupMode === "game";
@@ -545,6 +550,13 @@ async function saveFarmActions(patch) {
   try { return await saveFarmPatch(patch); }
   finally { farmActionWrites--; syncFarmPolicyUI(farmConfirmed); syncFarmActions(); }
 }
+farmSkillMode.addEventListener("change", async () => {
+  const mode = farmSkillMode.value, version = popupAccountContextVersion;
+  if (farmPriorityDirty && !await commitFarmPriority()) { syncFarmActions(); return; }
+  // Do not apply a selection to a different character after an async draft save.
+  if (version !== popupAccountContextVersion) { syncFarmActions(); return; }
+  await saveFarmActions({ skillMode: mode });
+});
 for (const input of farmSkillInputs) input.addEventListener("change", () => {
   const enabled = farmSkillInputs.filter((row) => row.checked).map((row) => row.value);
   void saveFarmActions({ skillEnabled: enabled });

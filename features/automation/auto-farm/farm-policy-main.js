@@ -9,6 +9,8 @@
     const enabled = Array.isArray(value?.skillEnabled) ? value.skillEnabled : [];
     const priority = Array.isArray(value?.skillPriority) ? value.skillPriority : [];
     return {
+      skillMode: value?.skillMode === "game" || value?.skillMode === "custom" ? value.skillMode
+        : Array.isArray(value?.skillEnabled) || Array.isArray(value?.skillPriority) ? "custom" : "game",
       skillEnabled: slots.filter((slot) => enabled.includes(slot)),
       skillPriority: priority.length === 6 && new Set(priority).size === 6 && priority.every((slot) => slots.includes(slot))
         ? [...priority] : [...slots],

@@ -45,7 +45,7 @@
   const targetColumn = archive.querySelector('.farm-target');
   targetColumn.querySelector('.farm-group-title')?.remove();
   move([targetColumn], targets);
-  move([byId('farmSkillOptions')], section('skills', 'Kỹ năng ưu tiên'));
+  move([byId('farmSkillOptions')], section('skills', 'Cách dùng kỹ năng'));
   move([byId('farmPickupOptions')], section('pickup', 'Nhặt đồ'));
   // Keep the fieldset as the original lock source after moving its controls.
   byId('farmActionControls').hidden = true;

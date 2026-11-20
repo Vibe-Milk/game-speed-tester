@@ -6,7 +6,7 @@
   const key = (o) => JSON.stringify([o.policyMode, o.identityVerified, o.identityBlocked, o.accountProfileKey,
     o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.targetMode,
     o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter,
-    o.skillEnabled, o.skillPriority, o.pickupMode]);
+    o.skillMode, o.skillEnabled, o.skillPriority, o.pickupMode]);
   function otherOwner(scene, allowHarvest = false) {
     return [globalThis.GSTHarvest, globalThis.GSTQuest, globalThis.GSTMapTravel,
       globalThis.GSTFarmSeals, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense]
@@ -56,6 +56,8 @@
         || scene.profile?.name?.normalize?.("NFC") !== o.character
         || (new URLSearchParams(location.search).get("slot") ?? "") !== (o.slot ?? "")) return "Ngữ cảnh Farm đã thay đổi.";
     if (starting && o.pickupMode === "tool") return "Nhặt theo tool đang khóa: chưa có API tắt nhặt gần độc lập của game.";
+    if (o.skillMode === "game" && typeof s.auto.castSkills !== "function")
+      return "Thiếu bộ chọn kỹ năng mặc định của game; Farm đã dừng.";
     const driver = scene.driver;
     if (!driver || driver.closing || driver.reconnecting || driver.displaced
         || !(driver.online === false || driver.link?.open?.() === true)
@@ -136,7 +138,7 @@
     if (!GSTFarmPlanner.begin(scene, origin)) return false;
     s.origin = origin; s.map = scene.autoHost().mapKey(); s.collision = scene.collision;
     s.lifecycle = intent.lifecycle; s.lastTime = scene.now(); s.enabled = true;
-    s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
+    s.skillRotation = { nextSlot: 0 }; s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
     messages.delete(scene); s.state = "SEARCH"; s.message = "Farm của tool: tìm quái trong bán kính đã lưu.";
     return true;
   }
@@ -160,10 +162,12 @@
     const allowed = (point) => point && [point.x, point.y].every(finite) && point.x >= 0 && point.y >= 0
       && point.x < scene.map.w && point.y < scene.map.h
       && Math.hypot(point.x - s.origin.x, point.y - s.origin.y) <= s.options.radius;
-    // Always reconsider from priority[0]. There is no sequential combo cursor.
-    if (s.options.skillEnabled?.length) {
-      s.skillAction = globalThis.GSTFarmSkills?.tryPriority?.(scene, host, s.options, target, allowed,
-        () => !context(s) && !paused(s)) ?? null;
+    // Custom restarts at priority[0]; game mode retains its private rotation.
+    if (s.options.skillMode === "game" || s.options.skillEnabled?.length) {
+      const permitted = () => !context(s) && !paused(s);
+      s.skillAction = s.options.skillMode === "game"
+        ? GSTFarmSkills.tryDefault(scene, host, s.auto, s.skillRotation, target, allowed, permitted)
+        : GSTFarmSkills.tryPriority(scene, host, s.options, target, allowed, permitted);
       if (s.skillAction) { release(s); s.state = "COMBAT"; s.message = `Đã yêu cầu kỹ năng ô ${s.skillAction.slot}; chờ game cập nhật.`; return; }
     }
     if (distance <= plan.reach && host.clear(scene.px, scene.py, target.x, target.y) === true) {

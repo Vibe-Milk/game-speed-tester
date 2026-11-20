@@ -2,7 +2,7 @@
   "use strict";
   const finite = Number.isFinite;
   // True means a client-side skill issue was observed, not a server hit/receipt.
-  function tryPriority(scene, host, options, target, allowed, permitted) {
+  function tryPriority(scene, host, options, target, allowed, permitted, decision = null) {
     const time = scene.now(), self = scene.self;
     if (!["kit", "skills", "cast", "hp", "inCombat"].every((name) => typeof host[name] === "function")
         || typeof scene.skillWait !== "function" || !self || !finite(time)) return null;
@@ -21,21 +21,25 @@
       const gauge = host.gauge?.();
       if (finite(kit.res) && gauge && (kit.res > 0 && gauge.v + kit.res >= gauge.max
           || kit.res < 0 && gauge.v < -kit.res)) continue;
-      let x = target.x, y = target.y;
-      if (kit.heal && kit.dmg <= 0) {
-        if (host.hp() > 0.7 || !host.inCombat()) continue;
-        x = scene.px; y = scene.py;
-      } else if (kit.dmg <= 0) {
-        if (!host.inCombat() || distance > 4 || kit.id === "huyet-te" && host.hp() < 0.5) continue;
-        x = scene.px; y = scene.py;
-      } else if (["self", "ally"].includes(kit.shape)) {
-        if (distance > kit.range + target.radius) continue;
-        x = scene.px; y = scene.py;
-      } else {
-        const range = kit.castRange ?? kit.range;
-        if (!finite(range) || distance > range || !host.clear(scene.px, scene.py, x, y)) continue;
-        if (kit.shape === "cone" && distance > kit.range * 0.9 + target.radius) continue;
+      let x = decision ? decision.x : target.x, y = decision ? decision.y : target.y;
+      if (!decision) {
+        if (kit.heal && kit.dmg <= 0) {
+          if (host.hp() > 0.7 || !host.inCombat()) continue;
+          x = scene.px; y = scene.py;
+        } else if (kit.dmg <= 0) {
+          if (!host.inCombat() || distance > 4 || kit.id === "huyet-te" && host.hp() < 0.5) continue;
+          x = scene.px; y = scene.py;
+        } else if (["self", "ally"].includes(kit.shape)) {
+          if (distance > kit.range + target.radius) continue;
+          x = scene.px; y = scene.py;
+        } else {
+          const range = kit.castRange ?? kit.range;
+          if (!finite(range) || distance > range || !host.clear(scene.px, scene.py, x, y)) continue;
+          if (kit.shape === "cone" && distance > kit.range * 0.9 + target.radius) continue;
+        }
       }
+      if (decision && (!finite(x) || !finite(y)
+          || Math.hypot(x - scene.px, y - scene.py) > 0.05 && !host.clear(scene.px, scene.py, x, y))) continue;
       if (kit.shape === "dash") {
         // Check the entire possible dash, including the longest native form.
         if (distance < 0.8 || host.hp() < 0.35 || !finite(full.range)) continue;
@@ -66,6 +70,28 @@
     }
     return null;
   }
-  globalThis.GSTFarmSkills = Object.freeze({ tryPriority,
+  function tryDefault(scene, host, auto, rotation, target, allowed, permitted) {
+    if (typeof auto.castSkills !== "function" || !rotation) throw new Error("Native skill selector unavailable");
+    let action = null;
+    // Supply only read adapters and one guarded cast. Native update/pick/walk/
+    // idle and the native controller's own nextSlot are never invoked or changed.
+    const adapter = Object.freeze({
+      hp: () => host.hp(), gauge: () => host.gauge?.(), inCombat: () => host.inCombat(),
+      skills: () => host.skills().filter((slot) => /^[1-6]$/.test(slot)), kit: (slot) => host.kit(slot),
+      cast(slot, x, y) {
+        if (action || !permitted()) return false;
+        action = tryPriority(scene, host, { skillEnabled: [slot], skillPriority: [slot] },
+          target, allowed, permitted, { x, y });
+        return !!action; // Advance rotation only after an observed client issue.
+      }
+    });
+    const enemies = host.enemies().filter((enemy) => !enemy.dead && (enemy.hostile || !enemy.aggro)
+      && globalThis.GSTFarmMonsterClassification?.classify(enemy)
+      && allowed({ x: enemy.x, y: enemy.y }));
+    const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
+    auto.castSkills.call(rotation, adapter, target, enemies, scene.px, scene.py, distance);
+    return action;
+  }
+  globalThis.GSTFarmSkills = Object.freeze({ tryPriority, tryDefault,
     waiting(scene, action, time) { return !!action && (time < action.until || scene.selfAt <= action.snapshotAt); } });
 })();

@@ -71,3 +71,7 @@ Tool now runs only after fresh explicit ON, with a new fixed start origin. Radiu
 ## Navigation relocation
 
 Rebuilt Farm options and controller selection are now on **Auto của tool**. Potion HP/MP and the shared Harvest respawn permission are on **Tiện ích độc lập**. The original Farm page is retained but excluded from navigation/search; its obsolete behaviors remain disabled as recorded above. This move preserves saved preferences and does not restore hidden features or enable tool pickup.
+
+## Skill mode restoration
+
+The rebuilt skill section now offers default game selection and custom priority. Stored `skillMode` is `game`/`custom`; fresh records default to game, legacy records with slot/priority arrays retain custom including intentional all-off settings. Custom values persist while hidden in game mode. This restores no retired extended/Custom automation: only native `castSkills` is reused behind tool safety/action gates, with private session rotation. Tool pickup remains blocked.
