@@ -12,7 +12,7 @@
     note.tip.style.top = `${Math.max(8, Math.min(rect.bottom + 6, innerHeight - note.tip.offsetHeight - 8))}px`;
   }
   for (const hint of document.querySelectorAll(".card p.hint, footer p.hint")) {
-    if (hint.id || hint.hasAttribute("role") || !hint.textContent.trim()) continue;
+    if (hint.closest("[data-farm-retired]") || hint.hidden || hint.id || hint.hasAttribute("role") || !hint.textContent.trim()) continue;
     let anchor = hint.dataset.helpFor ? document.querySelector(hint.dataset.helpFor) : hint.previousElementSibling;
     if (!anchor) continue;
     if (anchor.matches("input, select") && anchor.id) anchor = document.querySelector(`label[for="${anchor.id}"]`) ?? anchor;

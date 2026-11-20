@@ -327,3 +327,10 @@ History export `harvest-history-4` passes positionReadiness, positionWaitMs, pos
 and lastPositionCheck through the content allowlist in addition to requestPosition.
 These distinguish pre-interaction waiting from acknowledgement waiting. Snapshot position
 is client-observed evidence, not a server receipt or proof of live server acceptance.
+
+
+## Auto Farm UI rebuilding — simplified panel
+
+`ui/popup/farm-layout.js` now keeps radius, monster filters, shortcut controls and independent potion/shared Harvest recovery controls visible. Other original Farm nodes remain mounted under hidden/inert `data-farm-retired` containers; IDs, listeners and saved options are preserved. `popup-search.js` excludes retired descendants and stale results; `popup-help.js` skips retired/hidden hints. Saved-toggle count/chips are removed; live status and read-only diagnostics remain. Fieldset mirroring preserves source locks, except the shared Harvest permission which uses its own verified-account lock in `popup.js`. Native policy can edit the existing shortcut without enabling tool decisions.
+
+The radius editor reads/stores `radius` independently of legacy `enabled`/`searchScope`. `features/movement/map/map-travel-page.js` gates the effective returnDeath option on `hasExtensionAssistance()` while retaining its saved preference; the old hidden Farm return loop cannot run in native/tool modes. Independent map click travel remains on its original path. See [FARM_REBUILD_INVENTORY.md](FARM_REBUILD_INVENTORY.md) for every hidden control, storage scope, runtime gate and proposed restoration task. The shared Farm `autoRespawn` permission is retained visibly because Harvest consults it; no Harvest controller behavior is changed. Runtime remains unverified.

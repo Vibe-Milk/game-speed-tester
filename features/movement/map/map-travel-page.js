@@ -314,7 +314,8 @@
   }
   function configure(options) {
     configured = true;
-    preferences = { clickMove: options?.clickMove === true, returnDeath: options?.returnDeath === true };
+    preferences = { clickMove: options?.clickMove === true, returnDeath: options?.returnDeath === true
+      && globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true };
     if (!preferences.returnDeath) {
       pending = null; savePending();
       if (job?.mode === "return") release("Đã tắt quay lại vị trí chết.");

@@ -537,7 +537,7 @@ function normalizedFarmPreferences(raw = {}) {
     ? Math.max(1, Math.min(1000, raw.radius)) : 22;
   return {
     policyMode: globalThis.GSTFarmPolicy.read(raw),
-    enabled: raw.enabled === true, radius: raw.enabled === true ? radius : 11,
+    enabled: raw.enabled === true, radius,
     searchScope: raw.enabled === true && raw.searchScope === "map" ? "map" : "radius",
     targetMode: mode, targetLevel: positiveLevel(raw.targetLevel, 1),
     bossFilter: raw.bossFilter === "world" ? "world" : "all",
@@ -577,10 +577,12 @@ function syncFarmPolicyUI(raw = {}) {
   const assisted = tabMode === "tool";
   farmControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
   farmRightControls.disabled = true; // Retired Farm behaviors; preferences remain stored.
+  // This flag is also used by independent Harvest recovery.
+  farmAutoRespawn.disabled = !farmSyncReady || !accountAllowed;
   farmCustomStats.disabled = !farmSyncReady || tabMode !== "custom" || !accountAllowed;
   syncBossTargetControls();
   breakSeals.disabled = true;
-  shortcutControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  shortcutControls.disabled = !farmSyncReady || !["tool", "native"].includes(tabMode) || !accountAllowed;
   farmAssistanceAvailability.hidden = !farmSyncReady;
   farmAssistanceAvailability.textContent = !accountAllowed
     ? "Xác nhận nick trong tab game trước khi sửa cài đặt riêng."
@@ -782,7 +784,8 @@ function farmMessage(message) {
     : farmHpThresholdDraft().error ? ` · ${farmHpThresholdDraft().error}` : farmHasDraft() ? " · Có bản nháp chưa lưu." : "");
 }
 function syncFarmScope() {
-  farmRadius.closest(".input-action").hidden = farmSearchScope.value !== "radius";
+  // The retired whole-map preference must not hide the retained radius editor.
+  farmRadius.closest(".input-action").hidden = false;
 }
 function syncBossTargetControls() {
   const mode = farmTargetMode.value || farmConfirmed.targetMode || "all";
@@ -1027,14 +1030,14 @@ function commitFarmRadius() {
     farmFeedback.textContent = farmRadiusError.textContent;
     return Promise.resolve(false);
   }
-  if (value === farmConfirmed.radius && farmConfirmed.enabled) {
+  if (value === farmConfirmed.radius) {
     farmRadius.value = String(farmConfirmed.radius);
     farmFeedback.textContent = farmHasDraft() ? "Có bản nháp chưa lưu." : "";
     return Promise.resolve(true);
   }
   const save = (async () => {
     farmRadius.disabled = true;
-    const saved = await saveFarmPatch({ enabled: true, radius: value }, undefined, { draftWrite: true });
+    const saved = await saveFarmPatch({ radius: value }, undefined, { draftWrite: true });
     farmRadius.disabled = false;
     if (!saved) {
       farmRadiusError.textContent = "Chưa lưu được giới hạn vùng farm; cài đặt đã lưu trước đó được giữ.";

@@ -60,7 +60,7 @@
       for (const scope of scopes.filter(Boolean)) {
         const panelName = scope.querySelector(":scope > summary strong, .page-heading h2")?.textContent?.trim() ?? "Tính năng";
         for (const node of scope.querySelectorAll(searchable)) {
-          if (node.closest(".feature-search") || node.hidden || !node.textContent.trim()) continue;
+          if (node.closest(".feature-search, [data-farm-retired]") || node.hidden || !node.textContent.trim()) continue;
           let target = node;
           if (node.tagName === "LABEL") target = node.control ?? node;
           if (node.tagName === "SUMMARY") target = node;
@@ -87,6 +87,7 @@
         result.textContent = global ? `${entry.panelName} · ${entry.text}` : entry.text;
         result.title = result.textContent;
         result.addEventListener("click", () => {
+          if (entry.target.closest("[data-farm-retired]")) return;
           if (global) globalThis.GSTPopupLayout?.selectPage(entry.panel.dataset.panel);
           requestAnimationFrame(() => {
             for (let parent = entry.target.parentElement; parent; parent = parent.parentElement) {
