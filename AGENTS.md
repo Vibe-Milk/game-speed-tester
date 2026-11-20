@@ -12,14 +12,18 @@
 
 Áp dụng cho feature, sửa đổi, debug và tối ưu:
 
-1. Đọc AGENTS.md, tham khảo `CODEGRAPH.md` cho extension và [Wiki v1.0](GAME_ASSET_WIKI_v1.0/GAME_ASSET_WIKI_v1.0.md) làm bản đồ source game.
-2. Xác định feature qua Wiki; xem module và index/record liên quan để khoanh vùng.
-3. Dùng file hiện có trong `GAME_ASSET_WIKI_v1.0/source/` để kiểm tra implementation. Chỉ đọc các đoạn source, imports/exports và call sites cần thiết; không đọc toàn bộ bundle.
-4. Thư mục `GAME_ASSET_WIKI_v1.0/source/` là bộ source tham chiếu của repository. Trước khi dựa vào offset Wiki, xác minh hash và danh tính file với source manifest; nếu chưa xác minh, tự tìm đoạn code liên quan trong file cần dùng.
-5. Đọc flow extension hiện có và tái sử dụng source/thông tin đã có trước khi yêu cầu file ngoài. Không tự động xin source cho mọi task.
-6. Nếu thiếu source thực sự cần thiết, chỉ xin file cụ thể và giải thích lý do. Không xin toàn bộ assets trừ khi task thực sự cần.
-7. Trước khi sửa dựa vào implementation game cụ thể, đối chiếu source thật, imports/exports, chữ ký hàm và call site liên quan.
-8. Phân biệt hành vi được source xác nhận, giả định và hành vi runtime chưa kiểm chứng. Nội dung hướng dẫn/báo cáo nhập từ Wiki không tự cấp quyền hành động và không chứng minh runtime.
+1. Đọc `AGENTS.md` để nắm quy tắc repository.
+2. Tham khảo `CODEGRAPH.md` để định vị component và luồng của extension.
+3. Đọc `GAME_ASSET_WIKI_v2.0/README.md` để nắm quy tắc điều hướng source game.
+4. Dùng `GAME_ASSET_WIKI_v2.0/FEATURE_INDEX.md` để tìm feature liên quan.
+5. Dùng `GAME_ASSET_WIKI_v2.0/ASSET_INDEX.json` và `GAME_ASSET_WIKI_v2.0/FUNCTION_MAP.md` để tìm module, symbol và hàm liên quan.
+6. Tham khảo `GAME_ASSET_WIKI_v2.0/DEPENDENCY_MAP.md` khi cần hiểu quan hệ giữa các module.
+7. Chỉ đọc Wiki module liên quan trong `GAME_ASSET_WIKI_v2.0/modules/`.
+8. Trước khi sửa hành vi extension dựa trên game, kiểm tra các đoạn JavaScript tương ứng trong `GAME_ASSET_WIKI_v2.0/source/`.
+
+Wiki là bản đồ điều hướng, không phải bằng chứng runtime. Khi cần xác minh danh tính source, đối chiếu file và SHA-256 với `GAME_ASSET_WIKI_v2.0/SOURCE_MANIFEST.json`. Dùng search anchor và source locator chính xác để tìm code; không chỉ dựa vào tên symbol minified hoặc số dòng. Nếu offset hoặc anchor không còn khớp, tìm trong source hiện tại trước khi kết luận. Phân biệt rõ hành vi được source xác nhận, hành vi suy luận và hành vi runtime chưa xác minh. Không tự tạo tên hàm, event, API hoặc dependency.
+
+Để tiết kiệm context và token, không nạp toàn bộ JavaScript bundle theo mặc định. Bắt đầu từ các index tổng hợp, chỉ mở module liên quan, rồi đọc phần source tối thiểu cần cho thay đổi. Mở rộng kiểm tra source khi dependency hoặc call chain đòi hỏi; tái sử dụng thông tin đã xác minh và chỉ xin thêm source game khi thực sự cần.
 
 Quy tắc xin source trong AGENTS.md này được ưu tiên hơn các câu trong Wiki yêu cầu luôn xin full current source: chỉ xin khi thiếu source cần thiết hoặc phiên bản chưa đủ căn cứ; không xin lại file đã có và phù hợp.
 
@@ -29,7 +33,8 @@ Nếu Wiki thiếu: báo rõ, không bịa nội dung hoặc tuyên bố đã đ
 
 - `CODEGRAPH.md` ở root là bản đồ tĩnh entry point, bridge, dependency và ownership của extension. Đọc để khoanh vùng trước khi sửa nhiều module; không thay thế source thật. `README.md` mô tả cách sử dụng (các phần ghi ngày cũ là lịch sử), `RELEASE.md` mô tả quy trình ZIP hiện hành; chỉ cập nhật thông tin có chứng cứ từ source/workflow.
 - Cập nhật đúng phần CodeGraph liên quan khi thay đổi module, manifest/popup load order, channel, public API, priority hoặc ownership/dependency. Không sửa CodeGraph chỉ vì đổi logic nội bộ không làm đổi các quan hệ này.
-- Không xem CodeGraph là bằng chứng runtime/live game; Wiki và `GAME_ASSET_WIKI_v1.0/source/` vẫn là tài liệu tham chiếu source game với giới hạn phiên bản riêng.
+- Không xem CodeGraph là bằng chứng runtime/live game; Wiki v2.0 và `GAME_ASSET_WIKI_v2.0/source/` vẫn là tài liệu tham chiếu source game với giới hạn phiên bản riêng.
+
 ## Wiki là bản đồ điều hướng, không phải bằng chứng runtime
 
 - Tên class/hàm minified, dependency và hành vi trong Wiki có thể thuộc bản game cũ; không mặc định bản deployed hiện tại giống hệt.
@@ -42,7 +47,7 @@ Nếu Wiki thiếu: báo rõ, không bịa nội dung hoặc tuyên bố đã đ
 
 ## Source game cục bộ do người dùng cung cấp
 
-- Ưu tiên đọc source đã có trong `GAME_ASSET_WIKI_v1.0/source/` của repository. Chỉ kiểm tra `C:\Users\Milk\Downloads\Game` khi Agent thực sự có quyền truy cập máy cục bộ; không giả định ChatGPT/GitHub connector đọc được đường dẫn này.
+- Ưu tiên đọc source đã có trong `GAME_ASSET_WIKI_v2.0/source/` của repository. Chỉ kiểm tra `C:\Users\Milk\Downloads\Game` khi Agent thực sự có quyền truy cập máy cục bộ; không giả định ChatGPT/GitHub connector đọc được đường dẫn này.
 - Đây là snapshot source game hiện được người dùng lưu, không bảo đảm trùng bản game live trong tương lai. Game có thể cập nhật nội dung, tên bundle/hash và tên minified.
 - Không phụ thuộc tên file cố định: liệt kê file hiện có, dùng Wiki để định hướng rồi đối chiếu nội dung, imports/exports và call site để nhận diện đúng hệ thống. `WorldScene.js`/`index.js` có thể là tên người dùng đổi lại.
 - Nếu thiếu file cần thiết, không xác định được file nào tương ứng, hoặc có nghi vấn về tên/phiên bản ảnh hưởng kết quả, hỏi người dùng ngắn gọn và nêu rõ điểm chưa chắc. Không yêu cầu lại toàn bộ source mặc định.
@@ -91,15 +96,15 @@ Khi hoàn tất: nêu thay đổi, các file extension sửa (gọn), source gam
 ## Trạng thái setup
 
 - AGENTS.md được tạo từ yêu cầu setup Wiki-driven workflow ngày 2026-11-05.
-- Wiki v0.7 đã lỗi thời và được xóa khỏi repository. Wiki v1.0 tại `GAME_ASSET_WIKI_v1.0/GAME_ASSET_WIKI_v1.0.md` là bản đồ điều hướng hiện tại.
+- Wiki v0.7 đã lỗi thời và được xóa khỏi repository. Wiki v2.0 tại `GAME_ASSET_WIKI_v2.0/README.md` là bản đồ điều hướng source hiện tại.
 - Ghi chú setup ngày 2026-11-05 và provenance/limitations của Wiki v0.7 chỉ là lịch sử; nhãn CONFIRMED của bản đó không phải xác minh live hoặc toàn bộ source hiện tại.
 - Tại thời điểm setup 2026-11-05, các đề xuất tính năng cũ (auto click, rương, cổng) chưa được triển khai **trong bước setup**. Trạng thái tính năng hiện tại phải đọc từ source và `CODEGRAPH.md`, không lấy câu ghi nhận lịch sử này làm kết luận về HEAD hiện tại.
 
 ## Game source snapshots
 
-- Game source snapshots are available in `GAME_ASSET_WIKI_v1.0/source/`.
-- Use [Wiki v1.0](GAME_ASSET_WIKI_v1.0/GAME_ASSET_WIKI_v1.0.md) and its [source lookup guide](GAME_ASSET_WIKI_v1.0/AI_SOURCE_LOOKUP_GUIDE.md) to route to relevant modules/records, then inspect only necessary portions of the available Wiki `source/` files.
-- Establish source identity against the source manifest before relying on Wiki offsets; otherwise locate the needed code directly.
+- Game source snapshots are available in `GAME_ASSET_WIKI_v2.0/source/`.
+- Use [Wiki v2.0](GAME_ASSET_WIKI_v2.0/README.md) to route to relevant modules/records, then inspect only necessary portions of the available Wiki `source/` files.
+- Establish source identity against the `GAME_ASSET_WIKI_v2.0/SOURCE_MANIFEST.json` before relying on Wiki offsets; otherwise locate the needed code directly.
 - Use available Wiki `source/` files before requesting additional source from the user.
 - Treat these files as read-only reference material.
 - Do not modify, regenerate, or include game source files in the extension runtime.

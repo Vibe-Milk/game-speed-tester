@@ -2,12 +2,17 @@
 
 Source chính: [ThagMilky/game-speed-tester](https://github.com/ThagMilky/game-speed-tester), nhánh `main`. Cài extension trực tiếp từ thư mục chứa `manifest.json` bằng **Load unpacked** tại `chrome://extensions`; không cần build hoặc Node.js. Để chia sẻ với bạn bè, repository đã có GitHub Actions **Release extension** đóng gói ZIP theo phiên bản `manifest.json`; xem [RELEASE.md](RELEASE.md).
 
-Nếu chuyển thư mục Load unpacked sang đường dẫn khác, Chrome có thể tạo ID extension khác và không tự chuyển cài đặt cũ. Cập nhật source local theo quy trình Git hiện có, nhấn **Reload** cho extension rồi tải lại tab game. Gói ZIP Release không chứa Git history hoặc thư mục tài liệu và source tham chiếu `GAME_ASSET_WIKI_v1.0/`.
+Nếu chuyển thư mục Load unpacked sang đường dẫn khác, Chrome có thể tạo ID extension khác và không tự chuyển cài đặt cũ. Cập nhật source local theo quy trình Git hiện có, nhấn **Reload** cho extension rồi tải lại tab game. Gói ZIP Release không chứa Git history hoặc thư mục tài liệu và source tham chiếu `GAME_ASSET_WIKI_v2.0/`.
 
 Chrome Extension Manifest V3 phục vụ kiểm thử anti-cheat có sự cho phép, chỉ trên `https://nghichthienky.online/*`. Mặc định **tắt**; tốc độ **đi bộ 3.5**, **bay 2**; mỗi giá trị điều chỉnh trong **1.0–6.0**.
 
 **Mốc đối chiếu lịch sử:** source extension được đối chiếu tại commit `c82bdc5` (2026-11-08), trước các cập nhật tài liệu và Custom Auto Farm. Các mục ghi ngày cũ bên dưới lưu lịch sử, có thể mô tả giao diện hoặc giới hạn đã được thay thế. Khi nội dung khác nhau, ưu tiên phần tóm tắt này, [CODEGRAPH.md](CODEGRAPH.md), [RELEASE.md](RELEASE.md) và source thật. Đây là đối chiếu tĩnh; **tests/lint/browser/gameplay: NOT RUN; runtime: UNVERIFIED; CI: NOT CHECKED**. Kết quả QA lịch sử không xác minh HEAD hiện tại ([QA-report.md tại commit cũ](https://github.com/ThagMilky/game-speed-tester/blob/036ddbafd3891320039317f7f18dda38db208867/QA-report.md)).
 
+## Tra cứu source game
+
+[GAME_ASSET_WIKI_v2.0](GAME_ASSET_WIKI_v2.0/README.md) là bản đồ điều hướng cho snapshot JavaScript của game. Developer và AI agent bắt đầu từ [Feature Index](GAME_ASSET_WIKI_v2.0/FEATURE_INDEX.md), rồi dùng [Asset Index](GAME_ASSET_WIKI_v2.0/ASSET_INDEX.json), [Function Map](GAME_ASSET_WIKI_v2.0/FUNCTION_MAP.md) và [Dependency Map](GAME_ASSET_WIKI_v2.0/DEPENDENCY_MAP.md) để mở đúng module và đoạn source. Cách này giảm việc đọc lặp lại toàn bộ bundle.
+
+Trước khi triển khai, cần xác minh đoạn source liên quan và danh tính file theo [Source Manifest](GAME_ASSET_WIKI_v2.0/SOURCE_MANIFEST.json); Wiki định hướng chứ không chứng minh hành vi runtime. Wiki ghi chép source game, còn [CODEGRAPH.md](CODEGRAPH.md) mô tả kiến trúc và luồng của extension.
 ## Tính năng chính theo source hiện tại
 
 - **Popup:** điều hướng theo từng trang ở thanh bên: Tổng quan, Auto Farm, Thu hoạch, Bí cảnh, Auto Quest, Tốc độ & bay, Hình ảnh & FPS, Giao diện và Chẩn đoán. Ghi nhớ trang bằng `popupActivePage`; không còn kéo thả thứ tự panel.
