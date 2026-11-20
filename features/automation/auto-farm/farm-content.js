@@ -12,7 +12,7 @@
   let configurationSent = false, loadError = "";
   let accountProfileReady = false, accountProfileVerified = false, accountProfileKey = "", accountId = "";
   let accountSlot = "", accountCharacter = "", accountClassId = "", accountCharacterId = "";
-  const pending = new Map();
+  const pending = new Map(), controlPending = new Map();
   function customStatsEnabled() { try { return sessionStorage.getItem("gst:custom-farm-stats-enabled:v1") === "1"; } catch { return false; } }
   function profileContextMatches(context) {
     const current = context?.context;
@@ -182,8 +182,39 @@
       message: loadError || (typeof event.data.message === "string" ? event.data.message.slice(0, 240) : "No Auto Farm status.")
     });
   });
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:farm:v1"
+        || event.data.type !== "control-result") return;
+    const entry = controlPending.get(event.data.requestId); if (!entry) return;
+    controlPending.delete(event.data.requestId); clearTimeout(entry.timeout);
+    entry.respond({ accepted: event.data.accepted === true, autoOn: event.data.autoOn === true,
+      reason: typeof event.data.reason === "string" ? event.data.reason.slice(0, 240) : "" });
+  });
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (sender.id !== chrome.runtime.id) return;
+    if (message?.type === "gst:farm-control") {
+      const bridge = globalThis.GSTIntentBridge, expected = message.profileIdentity;
+      if (suspended || typeof message.enabled !== "boolean" || controlPending.size >= 16
+          || !bridge?.targetMatches?.(message.targetTabId, expected)) {
+        respond({ accepted: false, reason: "Tab hoặc nhân vật đã thay đổi." }); return;
+      }
+      void bridge.validate(message.token, "farm", message.enabled, expected).then((result) => {
+        if (suspended || !result?.ok || !bridge.targetMatches(message.targetTabId, expected)
+            || !bridge.isCurrent(message.token)) {
+          respond({ accepted: false, reason: "Lệnh bật/tắt đã hết hiệu lực; hãy thử lại." }); return;
+        }
+        const requestId = "control:" + (++sequence);
+        const timeout = setTimeout(() => {
+          if (!controlPending.delete(requestId)) return;
+          respond({ accepted: false, reason: "Chưa nhận được phản hồi từ game; đọc lại trạng thái trước khi thử lại." });
+        }, 1500);
+        controlPending.set(requestId, { respond, timeout });
+        window.postMessage({ channel: "gst:farm:v1", type: "control", requestId,
+          token: message.token, enabled: message.enabled, profileKey: expected.profileKey,
+          policyMode: message.policyMode, cancelOnly: message.cancelOnly === true, expiresAt: Date.now() + 1500 }, origin);
+      }).catch(() => respond({ accepted: false, reason: "Chưa xác nhận được quyền điều khiển Farm." }));
+      return true;
+    }
     if (message?.type === "gst:farm-shortcut") {
       shortcutRevision++;
       configureShortcut(message.preferences);
@@ -311,6 +342,10 @@
   window.addEventListener("pagehide", () => {
     suspended = true;
     clearTimeout(loadTimer); loadTimer = null;
+    for (const entry of controlPending.values()) {
+      clearTimeout(entry.timeout); entry.respond({ accepted: false, reason: "Trang game đang chuyển." });
+    }
+    controlPending.clear();
     for (const entry of pending.values()) {
       clearTimeout(entry.timeout);
       entry.respond({ message: "Page is navigating." });

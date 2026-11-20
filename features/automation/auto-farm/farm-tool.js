@@ -77,14 +77,36 @@
     }
     return "";
   }
-  function paused(s, starting = false) {
+  function pauseReason(s, starting = false) {
     const scene = s.scene;
-    return performance.now() < s.manualUntil || document.hidden || !document.hasFocus() || scene.uiBlocked
-      || scene.chat?.typing || scene.keyCapture || scene.heldAttack || scene.pendingSkill || scene.aiming
-      || scene.self?.med || scene.self?.fish || scene.dashT > 0
-      || otherOwner(scene, starting && globalThis.GSTHarvest?.needsFarmCoordination?.() === true)
-      || globalThis.GSTFarmInput?.movement?.(scene);
+    if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
+    if (document.hidden) return "Tab game đang bị ẩn.";
+    if (!document.hasFocus()) return "Tab game chưa có focus; quay lại tab game rồi thử lại.";
+    if (scene.chat?.typing) return "Đang nhập chat.";
+    if (scene.keyCapture) return "Game đang chờ nhập phím tắt.";
+    if (scene.inputFieldActive?.()) return "Ô nhập của game đang nhận bàn phím.";
+    if (scene.overlay?.dialogOpen) return "Game đang mở hộp thoại.";
+    if (scene.panels?.open) return "Game đang mở bảng thông tin; đóng bảng trước khi bật Farm.";
+    if (scene.uiBlocked) return "Game đang khóa thao tác; kiểm tra hướng màn hình hoặc bảng đang mở.";
+    if (scene.heldAttack) return "Đang giữ đánh thường bằng tay.";
+    if (scene.pendingSkill) return "Đang có kỹ năng chờ xử lý.";
+    if (scene.aiming) return "Đang ngắm kỹ năng bằng tay.";
+    if (scene.self?.med) return "Nhân vật đang thiền; dừng thiền trước khi bật Farm.";
+    if (scene.self?.fish) return "Nhân vật đang câu cá.";
+    if (scene.dashT > 0) return "Nhân vật đang lướt.";
+    const owners = [[globalThis.GSTHarvest, "Thu hoạch"], [globalThis.GSTQuest, "Auto Quest"],
+      [globalThis.GSTMapTravel, "Đi tới bản đồ"], [globalThis.GSTFarmSeals, "Phong ấn"],
+      [globalThis.GSTFarmBossSafety, "Né boss"], [globalThis.GSTFarmDefense, "Tự vệ"]];
+    for (const [owner, name] of owners) {
+      if (starting && owner === globalThis.GSTHarvest && owner?.needsFarmCoordination?.() === true) continue;
+      if (owner?.controls?.(scene) === true) return name + " đang giữ quyền điều khiển.";
+    }
+    if (globalThis.GSTFarmInput?.movement?.(scene))
+      return scene.clickOrder ? "Còn lệnh đi/đánh bằng chuột; dừng lệnh trước khi bật Farm."
+        : "Phím di chuyển hoặc joystick vẫn đang giữ.";
+    return "";
   }
+  const paused = (s, starting = false) => !!pauseReason(s, starting);
   function movementBlocked(scene) {
     const fx = scene.self?.fx ?? "";
     return scene.moveLockUntil > scene.now() || (scene.self?.ml ?? 0) > 0.05
@@ -95,7 +117,7 @@
     try {
       if (!s.auto.on) { stop(s.scene); return; }
       const error = context(s); if (error) { halt(s, error); return; }
-      if (paused(s)) { release(s); s.state = "PAUSED"; s.message = "Farm đang nhường thao tác tay hoặc tính năng khác."; return; }
+      if (paused(s)) { release(s); s.state = "PAUSED"; s.message = pauseReason(s); return; }
       const scene = s.scene, point = s.leg;
       // Native move() cannot advance during these locks. Forget the progress
       // baseline without charging a stuck retry or rejecting the target.
@@ -126,7 +148,7 @@
     }
     const error = context(s, true);
     if (error) { s.message = error; messages.set(scene, error); }
-    if (!error && paused(s, true)) { s.message = "Farm đang nhường thao tác tay hoặc tính năng khác."; messages.set(scene, s.message); return false; }
+    if (!error && paused(s, true)) { s.message = pauseReason(s, true); messages.set(scene, s.message); return false; }
     return !error;
   }
   function start(scene, intent) {

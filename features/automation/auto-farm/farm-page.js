@@ -396,7 +396,12 @@
       return;
     }
     if (scene.chat?.typing || scene.keyCapture || (!scene.auto?.on
-        && (scene.self.dead || scene.uiBlocked || !connected(scene)))) return;
+        && (scene.self.dead || scene.uiBlocked || !connected(scene)))) {
+      shortcutMessage = scene.chat?.typing ? "Đang nhập chat." : scene.keyCapture ? "Game đang chờ nhập phím tắt."
+        : scene.self.dead ? "Nhân vật đã chết." : scene.uiBlocked ? "Game đang khóa thao tác do bảng/ô nhập/hộp thoại hoặc hướng màn hình."
+          : "Kết nối game chưa sẵn sàng.";
+      message = shortcutMessage; return;
+    }
     if (settings.policyMode === "custom" && !scene.auto?.on && !ensureCustomReady(scene)) {
       shortcutMessage = "Custom Farm không khả dụng: không bảo vệ được controller.";
       return;
@@ -1495,6 +1500,39 @@
           || (data.code >= 112 && data.code <= 121 && data.code !== 116)))) {
       shortcut = data.code;
       shortcutMessage = "";
+    }
+    if (data.type === "control" && typeof data.requestId === "string") {
+      const scene = sceneNow(), authority = globalThis.GSTIntentAuthority;
+      let accepted = false, reason = "Lệnh bật/tắt đã hết hiệu lực hoặc khác controller/nhân vật.";
+      const valid = () => !suspended && Number.isFinite(data.expiresAt) && Date.now() <= data.expiresAt
+        && configurationReceived && globalThis.GSTFarmConfigurationReady === true
+        && data.profileKey === settings.accountProfileKey && data.policyMode === settings.policyMode
+        && typeof data.enabled === "boolean"
+        && authority?.validate?.(data.token, "farm", data.enabled, settings.accountProfileKey);
+      try {
+        maintainActivationLock();
+        if (valid() && scene?.auto && typeof scene.toggleAutoFarm === "function") {
+          if (data.cancelOnly === true) {
+            if (data.enabled) authority.retireFarm();
+            reason = "Đã hủy yêu cầu chưa gửi tới Farm.";
+          } else if (scene.auto.on === data.enabled) accepted = true;
+          else {
+            const attempt = { generation: gestureGeneration, scene, auto: scene.auto };
+            shortcutIntent = attempt; shortcutMessage = "";
+            try {
+              authority.withIntent(data.token, () => { if (valid()) scene.toggleAutoFarm(); });
+            } finally { if (shortcutIntent === attempt) shortcutIntent = null; }
+            accepted = scene.auto.on === data.enabled;
+          }
+          if (!data.cancelOnly) reason = accepted ? (data.enabled ? "Farm đã bật." : "Farm đã tắt.")
+            : settings.policyMode === "tool" ? globalThis.GSTToolFarm?.status?.(scene) || message : message;
+          // A refused ON must not remain an authorization for later activation.
+          if (!accepted && data.enabled && valid()) authority.retireFarm();
+        }
+      } catch { reason = "Không bật/tắt được Farm; interface game có thể đã thay đổi."; }
+      window.postMessage({ channel, type: "control-result", requestId: data.requestId,
+        accepted, autoOn: scene?.auto?.on === true, reason }, origin);
+      return;
     }
     if (data.type === "skill-diagnostics" && typeof data.requestId === "string") {
       let result = { accepted: false, enabled: false, reason: "policy_change" };

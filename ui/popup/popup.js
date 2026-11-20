@@ -200,6 +200,55 @@ window.addEventListener("keydown", (event) => {
   capturingShortcut = false;
   saveShortcut(code);
 }, true);
+const farmToggle = document.getElementById("farmToggle");
+const farmToggleFeedback = document.getElementById("farmToggleFeedback");
+let farmTogglePending = false, farmRuntimeOn = null, farmRuntimePolicy = null;
+function syncFarmToggle() {
+  farmToggle.textContent = farmTogglePending ? "Đang yêu cầu…" : farmRuntimeOn === true ? "Tắt Farm" : "Bật Farm";
+  farmToggle.setAttribute("aria-pressed", String(farmRuntimeOn === true));
+  farmToggle.disabled = farmTogglePending || farmRuntimeOn === null || !popupAccountContext?.verified
+    || !["tool", "native"].includes(farmRuntimePolicy);
+}
+window.addEventListener("gst:popup-account-context-change", () => {
+  farmRuntimeOn = null; farmRuntimePolicy = null; syncFarmToggle();
+  farmToggleFeedback.textContent = "Đang đọc trạng thái của nhân vật mới…";
+});
+farmToggle.addEventListener("click", async (event) => {
+  if (!event.isTrusted || farmTogglePending || farmRuntimeOn === null || !popupAccountContext?.verified) return;
+  const expected = popupAccountContext, version = popupAccountContextVersion, tabId = popupAccountTabId;
+  const enabled = !farmRuntimeOn, policyMode = farmRuntimePolicy;
+  if (!Number.isInteger(tabId) || !["tool", "native"].includes(policyMode)) return;
+  farmTogglePending = true; syncFarmToggle();
+  farmToggleFeedback.textContent = "Đang xác nhận yêu cầu với tab game…";
+  // Reserve at the user gesture, before waiting for saves or identity refresh.
+  const reservation = chrome.tabs.sendMessage(tabId, { type: "gst:intent-begin", feature: "farm", enabled,
+    targetTabId: tabId, profileIdentity: GSTAccountProfiles.identity(expected),
+    lifecycle: expected.intentStamp?.lifecycle }).catch(() => null);
+  let submitted = false;
+  try {
+    if (enabled && !(await flushFarmNumericDrafts()).saved)
+      throw new Error("Cài đặt còn chưa lưu hoặc chưa hợp lệ; lưu xong rồi bật lại Farm.");
+    const [binding, intent] = await Promise.all([validatePopupAccountContext(expected, version), reservation]);
+    if (version !== popupAccountContextVersion || !binding.valid || binding.tabId !== tabId || !intent?.ok)
+      throw new Error("Tab, nhân vật hoặc quyền điều khiển đã thay đổi; hãy thử lại.");
+    submitted = true;
+    const result = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-control", enabled, policyMode,
+      targetTabId: tabId, profileIdentity: GSTAccountProfiles.identity(expected), token: intent.token });
+    if (version !== popupAccountContextVersion) return;
+    farmToggleFeedback.textContent = result?.reason || "Chưa nhận được trạng thái xác nhận của game.";
+    // No optimistic ON/OFF. refreshFarm reads the actual game state.
+  } catch (error) {
+    if (version === popupAccountContextVersion)
+      farmToggleFeedback.textContent = error.message || "Không gửi được yêu cầu bật/tắt Farm.";
+  } finally {
+    if (!submitted && enabled) void reservation.then((intent) => {
+      if (intent?.ok) return chrome.tabs.sendMessage(tabId, { type: "gst:farm-control", enabled,
+        policyMode, cancelOnly: true, targetTabId: tabId,
+        profileIdentity: GSTAccountProfiles.identity(expected), token: intent.token });
+    }).catch(() => {});
+    farmTogglePending = false; syncFarmToggle(); void refreshFarm();
+  }
+});
 let farmBusy = false;
 let farmSaveQueue = Promise.resolve();
 const farmWrites = new Map();
@@ -469,9 +518,14 @@ async function refreshFarm() {
   if (farmBusy) return;
   farmBusy = true;
   try {
-    const tabId = popupAccountTabId;
+    const tabId = popupAccountTabId, version = popupAccountContextVersion;
     if (!Number.isInteger(tabId)) throw new Error("No bound game tab.");
     const status = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-status" });
+    if (version !== popupAccountContextVersion || tabId !== popupAccountTabId) return;
+    farmRuntimeOn = typeof status.autoOn === "boolean" ? status.autoOn : null;
+    farmRuntimePolicy = status.policyMode; syncFarmToggle();
+    if (!farmTogglePending && /^Đang đọc trạng thái/.test(farmToggleFeedback.textContent))
+      farmToggleFeedback.textContent = status.message || "Chọn Bật Farm để gửi yêu cầu tới tab game.";
     if (document.activeElement !== farmCustomStats) farmCustomStats.checked = status.customComparisonEnabled === true;
     if (["tool", "native", "disabled"].includes(status.policyMode)) {
       farmTabPolicyMode = status.policyMode;
@@ -487,13 +541,14 @@ async function refreshFarm() {
     autoFarmValue.textContent = status.autoOn === true ? "Đang bật" : status.autoOn === false ? "Đã tắt" : "Chưa rõ";
     autoFarmValue.dataset.state = status.autoOn === true ? "on" : status.autoOn === false ? "off" : "unknown";
     farmPolicyRuntimeStatus.textContent = status.policyMode === "tool"
-      ? `Farm của tool: ${{ OFF: "Đã tắt", SEARCH: "Tìm quái", APPROACH: "Đang đi", COMBAT: "Đánh thường", PAUSED: "Đang nhường" }[status.toolState] || "Chưa rõ"} · ${farmLabel}.`
+      ? `Farm của tool: ${{ OFF: "Đã tắt", SEARCH: "Tìm quái", APPROACH: "Đang đi", COMBAT: "Đánh thường", PAUSED: "Đang nhường" }[status.toolState] || "Chưa rõ"} · ${farmLabel}. ${status.message || ""}`
       : `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
     const customStats = status.customStats;
     const statsLabel = customStats ? ` · So sánh tab: chạy ${Math.floor(customStats.elapsed/1000)}s, tạm dừng ${Math.floor(customStats.paused/1000)}s, kẹt ${Math.floor(customStats.stuck/1000)}s, chết ${customStats.observedDeaths}, mục tiêu có cờ chết ${customStats.observedKills}; XP/phút không khả dụng, potion không thể quy kết.` : "";
     farmStatus.textContent = `${status.policyMode === "tool" ? "Farm của tool" : "Farm của game"}: ${farmLabel}${status.dead ? " · Đã chết" : ""}. ${status.message}${statsLabel}`;
     document.getElementById("farmEncounterStatus").textContent = status.encounterStatus || "";
   } catch {
+    farmRuntimeOn = null; farmRuntimePolicy = null; syncFarmToggle();
     autoFarmValue.textContent = "Chưa rõ";
     autoFarmValue.dataset.state = "unknown";
     farmPolicyRuntimeStatus.textContent = "Auto Farm gốc trong tab đang mở: CHƯA RÕ.";
