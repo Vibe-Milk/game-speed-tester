@@ -144,6 +144,20 @@
     nav.classList.toggle("nav-expanded", value);
     toggle.setAttribute("aria-expanded", String(value));
   }
+  function collapseNav() {
+    if (!nav.classList.contains("nav-collapsible") || !nav.classList.contains("nav-expanded")) return;
+    pinned = false;
+    hovered = false;
+    clearTimeout(closeTimer);
+    expanded(false);
+    if (nav.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    const revision = ++expandedRevision;
+    void chrome.storage.local.set({ [expandedKey]: false }).catch(() => {
+      if (revision === expandedRevision) toggle.title = "Chưa lưu được trạng thái menu.";
+    });
+  }
   function label() {
     const active = items.querySelector('[aria-current="page"]');
     toggle.textContent = `${active?.textContent ?? "Chọn chức năng"} · Chọn mục ▾`;
@@ -187,6 +201,16 @@
       if (revision === expandedRevision) toggle.title = "Chưa lưu được trạng thái menu.";
     });
     event.preventDefault();
+  });
+  items.addEventListener("click", (event) => {
+    if (event.target.closest(".nav-item")) collapseNav();
+  });
+  document.getElementById("overviewPage")?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-open-panel]")) collapseNav();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!nav.classList.contains("nav-collapsible") || !nav.classList.contains("nav-expanded")) return;
+    if (!nav.contains(event.target)) collapseNav();
   });
   new MutationObserver(label).observe(items, { subtree: true, attributes: true, attributeFilter: ["aria-current"] });
   new MutationObserver(orientation).observe(document.body, { attributes: true, attributeFilter: ["class", "data-orientation"] });
