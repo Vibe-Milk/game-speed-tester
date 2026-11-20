@@ -39,10 +39,6 @@
     old.removeInput();
     old.scene.events.off("preupdate", frame);
     old.scene.events.off("shutdown", detach); old.scene.events.off("destroy", detach);
-    if (old.auto.toggle === old.wrapper) {
-      if (old.descriptor) Object.defineProperty(old.auto, "toggle", old.descriptor);
-      else delete old.auto.toggle;
-    }
   }
   function frame() {
     const owner = binding;
@@ -70,32 +66,36 @@
     if (!scene?.sys?.isActive?.() || typeof scene.auto?.toggle !== "function"
         || typeof scene.startClickOrder !== "function" || !scene.events?.on || !scene.events.off) return;
     detach();
-    const auto = scene.auto, original = auto.toggle;
-    const descriptor = Object.getOwnPropertyDescriptor(auto, "toggle");
-    const wrapper = function (...args) {
-      const before = this.on, deathStop = this.stopOnRevive === true, deaths = this.deaths?.length ?? 0;
-      const reason = cause ?? "native_game";
-      const callers = [...String(new Error().stack).matchAll(/[A-Za-z0-9_.-]+\.js:\d+:\d+/g)]
-        .map((match) => match[0]).filter((value) => !value.startsWith("farm-diagnostics.js:")).slice(0, 4);
-      const result = original.apply(this, args);
-      if (this === auto && before !== this.on) {
-        const snapshot = { ...flags(scene), deaths };
-        if (binding?.auto === auto) binding.lastOn = this.on;
-        if (this.on) { onAt = performance.now(); record(scene, "on", reason, callers, snapshot); }
-        else queueMicrotask(() => record(scene, "off", reason === "shortcut" ? reason
-          : deathStop ? "death_limit" : scene.clickOrder ? "click_to_move" : reason, callers,
-          { ...snapshot, clickOrder: !!scene.clickOrder }));
-      }
-      return result;
-    };
+    const auto = scene.auto;
     const removeInput = GSTFarmInput.add(scene, (accepted) => {
       if (!accepted) record(scene, "input", "background_click_blocked");
     });
-    try { auto.toggle = wrapper; }
-    catch { removeInput(); return; }
-    binding = { scene, auto, descriptor, wrapper, removeInput, lastOn: auto.on, modal: false, displaced: false };
+    binding = { scene, auto, removeInput, lastOn: auto.on, modal: false, displaced: false };
     scene.events.on("preupdate", frame); scene.events.on("shutdown", detach); scene.events.on("destroy", detach);
     at = -Infinity; onAt = performance.now();
+  }
+  // Observe the activation owner's call without wrapping/replacing auto.toggle.
+  function observeToggle(scene, callback) {
+    let before, auto, deathStop, deaths, reason, callers;
+    try {
+      auto = scene.auto; before = auto.on; deathStop = auto.stopOnRevive === true;
+      deaths = auto.deaths?.length ?? 0; reason = cause ?? "native_game";
+      callers = [...String(new Error().stack).matchAll(/[A-Za-z0-9_.-]+\.js:\d+:\d+/g)]
+        .map((match) => match[0]).filter((value) => !value.startsWith("farm-diagnostics.js:")).slice(0, 4);
+    } catch { return callback(); }
+    try { return callback(); }
+    finally {
+      try {
+        if (binding?.scene === scene && binding.auto === auto && scene.auto === auto && before !== auto.on) {
+          const snapshot = { ...flags(scene), deaths };
+          binding.lastOn = auto.on;
+          if (auto.on) { onAt = performance.now(); record(scene, "on", reason, callers, snapshot); }
+          else queueMicrotask(() => record(scene, "off", reason === "shortcut" ? reason
+            : deathStop ? "death_limit" : scene.clickOrder ? "click_to_move" : reason, callers,
+            { ...snapshot, clickOrder: !!scene.clickOrder }));
+        }
+      } catch { /* A log failure cannot affect the action or its exception. */ }
+    }
   }
   function toggle(scene, reason) {
     const previous = cause; cause = reason;
@@ -106,10 +106,11 @@
     catch { return { build: "unavailable" }; }
   }
   globalThis.GSTFarmDiagnostics = {
+    observeToggle,
     attach: (scene) => { try { attach(scene); } catch { detach(); } },
     toggleByUser: (scene) => toggle(scene, "shortcut"),
     restore: (scene) => toggle(scene, "restore"),
-    snapshot: () => ({ build: "farm-stop-1", tracking: binding !== null,
+    snapshot: () => ({ build: "farm-stop-2", tracking: binding !== null,
       background: readSnapshot("GSTBackgroundDiagnostics"),
       movement: readSnapshot("GSTMovementDiagnostics"),
       bossSafety: readSnapshot("GSTFarmBossSafety"),

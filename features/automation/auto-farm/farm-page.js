@@ -239,7 +239,7 @@
         descriptor: Object.getOwnPropertyDescriptor(scene.auto, "toggle"),
         sceneOriginal: scene.toggleAutoFarm,
         sceneDescriptor: Object.getOwnPropertyDescriptor(scene, "toggleAutoFarm"), removeUpdate: null };
-      owner.wrapper = function (...args) {
+      owner.run = function (...args) {
         if (activationLock !== owner || sceneNow() !== scene || scene.auto !== owner.auto || this !== owner.auto) return;
         const wasOn = this.on === true;
         const tool = settings.policyMode === "tool";
@@ -261,6 +261,10 @@
         } })] : args;
         const result = owner.original.apply(this, toggleArgs);
         if (movement && scene.autoX === 0 && scene.autoY === 0) [scene.autoX, scene.autoY] = movement;
+        if (this.on === wasOn) {
+          message = "Thao tác bật/tắt Farm không đổi được trạng thái controller; hãy gửi log để kiểm tra.";
+          shortcutMessage = message; return result;
+        }
         const token = wasOn !== (this.on === true)
           ? globalThis.GSTIntentAuthority?.farmChanged?.(scene, this.on === true) : null;
         if (wasOn && !this.on) invalidateFarmGestures();
@@ -278,6 +282,11 @@
             globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, token);
         }
         return result;
+      };
+      owner.wrapper = function (...args) {
+        const run = () => owner.run.apply(this, args);
+        return globalThis.GSTFarmDiagnostics?.observeToggle
+          ? globalThis.GSTFarmDiagnostics.observeToggle(scene, run) : run();
       };
       owner.sceneWrapper = function (...args) {
         if (activationLock !== owner || this !== scene || sceneNow() !== scene || scene.auto !== owner.auto) return;
@@ -1525,7 +1534,8 @@
             accepted = scene.auto.on === data.enabled;
           }
           if (!data.cancelOnly) reason = accepted ? (data.enabled ? "Farm đã bật." : "Farm đã tắt.")
-            : settings.policyMode === "tool" ? globalThis.GSTToolFarm?.status?.(scene) || message : message;
+            : shortcutMessage || (/^(Chưa bật|Không xác nhận|Thao tác)/.test(message) ? message
+              : settings.policyMode === "tool" ? globalThis.GSTToolFarm?.status?.(scene) || message : message);
           // A refused ON must not remain an authorization for later activation.
           if (!accepted && data.enabled && valid()) authority.retireFarm();
         }
