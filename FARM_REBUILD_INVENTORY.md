@@ -59,3 +59,11 @@ The saved radius/monster filters now feed a read-only target/route proposal on t
 ## Task 5 movement/basic combat
 
 Tool now runs only after fresh explicit ON, with a new fixed start origin. Radius and monster filters feed approach/basic attacks; controller selection remains separate from ON. All hidden features in the table remain hidden and disabled. The only extra combat action is native Space/basic; skills 1–6 and tool pickup are not restored. The independent shared Harvest recovery setting remains visible, while tool Farm stops on death. No keep-after-map or returnDeath restoration is enabled. See Task 5 in CODEGRAPH.md for ownership, lifecycle, bounded stuck recovery and validation limits.
+
+
+## Tasks 6–7 status
+
+- New visible controls: `farmSkill1`–`farmSkill6` (saved `F.skillEnabled`, default none), `farmSkillPriority` and its save control (`F.skillPriority`, default 1–6), plus game/tool pickup choices (`F.pickupMode`, default game). No old hidden skill/loot/recovery behavior is reactivated. The scheduler uses current mapped slots rather than stored skill IDs.
+- Skill priority is now implemented in the new Tool controller, with native readiness and completion checks. Changing the configuration stops the active session; fresh ON is required. `anh-bo` is skipped until its teleport destination can be established safely.
+- Pickup-by-game delegates to independent game behavior without running native Farm decisions or tool loot navigation. `farmPickupTool` remains disabled, with clickable explanation. Task 7 cannot be completed under the exclusive-pickup requirement because no supported OFF API was found for independent auto-pickup in the provided source. No simulation/server mutation or fake exclusivity is supplied. A stored tool choice is retained and blocks Tool Farm start until changed explicitly.
+- Read-only source/diff review only; runtime remains unverified and QA still requires separate authorization.

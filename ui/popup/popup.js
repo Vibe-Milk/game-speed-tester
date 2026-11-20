@@ -519,9 +519,60 @@ let farmPolicyWaiters = [];
 let selectingFarmPolicy = false;
 const farmPolicyLabels = Object.freeze({ tool: "Farm của tool", native: "Farm của game", disabled: "Khóa Auto Farm cũ" });
 const farmPolicyDescriptions = Object.freeze({
-  tool: "Farm của tool tự đi và đánh thường theo bán kính/bộ lọc. Chọn chế độ để Farm OFF; dùng nút/phím Farm trong game để bắt đầu. Chưa tự dùng kỹ năng 1–6 hoặc nhặt đồ.",
+  tool: "Farm của tool tự đi và đánh thường theo bán kính/bộ lọc. Chọn chế độ để Farm OFF; dùng nút/phím Farm trong game để bắt đầu. Kỹ năng chạy theo ô đã bật và thứ tự ưu tiên; nhặt theo tool chưa khả dụng.",
   native: "Farm của game: bật/tắt riêng trong game; quyết định Farm của tool không chạy. Bộ lọc và bán kính tool không áp dụng cho Farm game.",
   disabled: "Khóa Auto Farm cũ được giữ nguyên. Chọn Farm của game hoặc Farm của tool để rời khóa; sau khi chọn Farm vẫn OFF."
+});
+const farmActionControls = document.getElementById("farmActionControls");
+const farmSkillInputs = [1, 2, 3, 4, 5, 6].map((slot) => document.getElementById(`farmSkill${slot}`));
+const farmPriorityInput = document.getElementById("farmSkillPriority");
+const farmPriorityError = document.getElementById("farmSkillPriorityError");
+const farmPickupGame = document.getElementById("farmPickupGame"), farmPickupTool = document.getElementById("farmPickupTool");
+let farmActionWrites = 0, farmPriorityDirty = false, farmPriorityDraftVersion = -1, farmPriorityCommit = null;
+function syncFarmActions() {
+  const options = GSTFarmPolicy.actions(farmConfirmed);
+  if (farmPriorityDraftVersion !== popupAccountContextVersion) { farmPriorityDirty = false; farmPriorityError.textContent = ""; }
+  for (const input of farmSkillInputs) input.checked = options.skillEnabled.includes(input.value);
+  if (!farmPriorityDirty) farmPriorityInput.value = options.skillPriority.join(" ");
+  farmPickupGame.checked = options.pickupMode === "game";
+  farmPickupTool.checked = options.pickupMode === "tool"; farmPickupTool.disabled = true;
+  document.getElementById("farmPickupAvailability").textContent = options.pickupMode === "tool"
+    ? "Cài đặt nhặt theo tool chưa thể chạy. Chọn Nhặt theo game trước khi bật Farm của tool."
+    : "Nhặt theo tool đang khóa: chưa có API tắt riêng nhặt gần độc lập của game.";
+}
+async function saveFarmActions(patch) {
+  farmActionWrites++; farmActionControls.disabled = true;
+  try { return await saveFarmPatch(patch); }
+  finally { farmActionWrites--; syncFarmPolicyUI(farmConfirmed); syncFarmActions(); }
+}
+for (const input of farmSkillInputs) input.addEventListener("change", () => {
+  const enabled = farmSkillInputs.filter((row) => row.checked).map((row) => row.value);
+  void saveFarmActions({ skillEnabled: enabled });
+});
+farmPickupGame.addEventListener("change", () => {
+  if (farmPickupGame.checked) void saveFarmActions({ pickupMode: "game" });
+});
+farmPriorityInput.addEventListener("input", () => {
+  farmPriorityDirty = true; farmPriorityDraftVersion = popupAccountContextVersion; farmPriorityError.textContent = "";
+});
+function commitFarmPriority() {
+  if (farmPriorityCommit) return farmPriorityCommit;
+  const value = farmPriorityInput.value, version = popupAccountContextVersion;
+  const priority = value.trim().split(/[\s,→>\-]+/);
+  if (priority.length !== 6 || new Set(priority).size !== 6 || !priority.every((slot) => /^[1-6]$/.test(slot))) {
+    farmPriorityError.textContent = "Nhập đủ 1–6, mỗi số một lần; ví dụ 3 1 5 2 6 4.";
+    return Promise.resolve(false);
+  }
+  farmPriorityCommit = saveFarmActions({ skillPriority: priority }).then((saved) => {
+    if (saved && version === popupAccountContextVersion && farmPriorityInput.value === value) farmPriorityDirty = false;
+    if (version === popupAccountContextVersion) syncFarmActions();
+    return saved;
+  }).finally(() => { farmPriorityCommit = null; });
+  return farmPriorityCommit;
+}
+document.getElementById("saveFarmSkillPriority").addEventListener("click", () => { void commitFarmPriority(); });
+farmPriorityInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); void commitFarmPriority(); }
 });
 function normalizeFarmTargetMode(mode) {
   return mode === "level" ? "maxLevel" : mode === "bossFirst" ? "bossLevel"
@@ -537,6 +588,7 @@ function normalizedFarmPreferences(raw = {}) {
     ? Math.max(1, Math.min(1000, raw.radius)) : 22;
   return {
     policyMode: globalThis.GSTFarmPolicy.read(raw),
+    ...globalThis.GSTFarmPolicy.actions(raw),
     enabled: raw.enabled === true, radius,
     searchScope: raw.enabled === true && raw.searchScope === "map" ? "map" : "radius",
     targetMode: mode, targetLevel: positiveLevel(raw.targetLevel, 1),
@@ -575,6 +627,7 @@ function syncFarmPolicyUI(raw = {}) {
     : farmPolicyDescriptions[farmPolicyMode.value] ?? "Đang đọc chế độ…";
   const tabMode = farmTabPolicyMode ?? confirmedMode;
   const assisted = tabMode === "tool";
+  farmActionControls.disabled = !farmSyncReady || !assisted || !accountAllowed || farmActionWrites > 0;
   farmControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
   farmRightControls.disabled = true; // Retired Farm behaviors; preferences remain stored.
   // This flag is also used by independent Harvest recovery.
@@ -589,7 +642,7 @@ function syncFarmPolicyUI(raw = {}) {
     : confirmedMode === "disabled"
     ? "Tùy chọn hỗ trợ farm đã lưu được giữ nguyên; chúng dùng lại khi bạn mở khóa và chọn chế độ phù hợp."
     : tabMode === "tool"
-    ? "Farm của tool hiện hỗ trợ đi và đánh thường. Bật riêng bằng nút/phím Farm trong game; kỹ năng 1–6, nhặt đồ và các hành vi Farm cũ vẫn tắt."
+    ? "Farm của tool hiện hỗ trợ đi và đánh thường. Bật riêng bằng nút/phím Farm trong game; kỹ năng chạy theo cấu hình đã lưu. Nhặt theo tool đang khóa; các hành vi Farm cũ vẫn tắt."
     : "Farm của game dùng quy tắc game gốc; các cài đặt Farm tool chỉ được giữ lại, không áp dụng.";
 }
 function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {}) {
@@ -647,7 +700,7 @@ function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {})
     clearFarmTargetErrors();
   }
   syncFarmScope(); syncFarmLevelInputs(); farmSummaries();
-  syncFarmPolicyUI(raw);
+  syncFarmPolicyUI(raw); syncFarmActions();
   farmFeedback.textContent = farmHasDraft() ? "Có bản nháp chưa lưu." : "Đã đồng bộ cài đặt.";
   syncBossTargetControls();
 }
@@ -1132,6 +1185,13 @@ farmRadius.addEventListener("keydown", (event) => {
 });
 async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (!farmSyncReady) return { saved: false, reason: "load" };
+  if (farmPriorityDirty) {
+    if ((farmTabPolicyMode ?? farmConfirmed.policyMode) !== "tool") {
+      if (!discardInactiveDrafts) return { saved: false, reason: "inactive-draft" };
+      farmPriorityDirty = false; syncFarmActions();
+    } else if (!await commitFarmPriority()) return { saved: false, reason: "invalid", field: "skillPriority" };
+    if (farmPriorityDirty) return { saved: false, reason: "persistence" };
+  }
   const writesAtRequest = [...farmWrites.entries()];
   if (farmPolicyPending > 0) await new Promise((resolve) => farmPolicyWaiters.push(resolve));
   const startedWrites = [...new Map([...writesAtRequest, ...farmWrites.entries()]).entries()];

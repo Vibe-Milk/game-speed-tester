@@ -70,6 +70,7 @@
       ? { retreatHpPercent, recoveryHpPercent } : { retreatHpPercent: 40, recoveryHpPercent: 100 };
     settings = {
       policyMode,
+      ...globalThis.GSTFarmPolicy?.actions?.(value),
       identityBlocked: value?.identityBlocked === true,
       identityVerified: accountProfileReady && accountProfileVerified,
       accountProfileKey: accountProfileVerified ? accountProfileKey : "",

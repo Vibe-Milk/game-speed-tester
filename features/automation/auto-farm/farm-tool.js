@@ -5,7 +5,8 @@
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   const key = (o) => JSON.stringify([o.policyMode, o.identityVerified, o.identityBlocked, o.accountProfileKey,
     o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.targetMode,
-    o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter]);
+    o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter,
+    o.skillEnabled, o.skillPriority, o.pickupMode]);
   function otherOwner(scene, allowHarvest = false) {
     return [globalThis.GSTHarvest, globalThis.GSTQuest, globalThis.GSTMapTravel,
       globalThis.GSTFarmSeals, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense]
@@ -27,7 +28,7 @@
   function stop(scene, reason) {
     const s = scene && sessions.get(scene); if (!s) return;
     reason ??= s.enabled ? "Bạn đã tắt Farm của tool." : s.message;
-    s.enabled = false; s.lifecycle = null; s.state = "OFF"; s.message = reason; messages.set(scene, reason); release(s);
+    s.enabled = false; s.skillAction = null; s.lifecycle = null; s.state = "OFF"; s.message = reason; messages.set(scene, reason); release(s);
     globalThis.GSTFarmPlanner?.reset?.(scene);
   }
   function halt(s, reason) {
@@ -54,6 +55,7 @@
         || !o.accountProfileKey || String(scene.you) !== o.characterId || scene.profile?.classId !== o.classId
         || scene.profile?.name?.normalize?.("NFC") !== o.character
         || (new URLSearchParams(location.search).get("slot") ?? "") !== (o.slot ?? "")) return "Ngữ cảnh Farm đã thay đổi.";
+    if (starting && o.pickupMode === "tool") return "Nhặt theo tool đang khóa: chưa có API tắt nhặt gần độc lập của game.";
     const driver = scene.driver;
     if (!driver || driver.closing || driver.reconnecting || driver.displaced
         || !(driver.online === false || driver.link?.open?.() === true)
@@ -112,7 +114,10 @@
         scene.events.on("preupdate", s.guard); scene.events.on("shutdown", s.dispose); scene.events.on("destroy", s.dispose);
       } catch { dispose(scene); return false; }
     }
-    return !context(s, true) && !paused(s, true);
+    const error = context(s, true);
+    if (error) { s.message = error; messages.set(scene, error); }
+    if (!error && paused(s, true)) { s.message = "Farm đang nhường thao tác tay hoặc tính năng khác."; messages.set(scene, s.message); return false; }
+    return !error;
   }
   function start(scene, intent) {
     const s = sessions.get(scene);
@@ -123,7 +128,7 @@
     if (!GSTFarmPlanner.begin(scene, origin)) return false;
     s.origin = origin; s.map = scene.autoHost().mapKey(); s.collision = scene.collision;
     s.lifecycle = intent.lifecycle; s.lastTime = scene.now(); s.enabled = true;
-    s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
+    s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
     messages.delete(scene); s.state = "SEARCH"; s.message = "Farm của tool: tìm quái trong bán kính đã lưu.";
     return true;
   }
@@ -135,6 +140,8 @@
     // runs on preupdate to release movement before the next native move().
     if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) { release(s); return; }
     s.lastTime = time;
+    if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
+    s.skillAction = null;
     const plan = GSTFarmPlanner.plan(scene);
     if (plan.state !== "PLANNED") { release(s); s.state = "SEARCH"; s.message = "Đang chờ mục tiêu hoặc đường đi hợp lệ."; return; }
     const target = host.enemies().find((e) => e.id === plan.targetId && !e.dead
@@ -142,6 +149,15 @@
     if (!target || Math.hypot(target.x - plan.target.x, target.y - plan.target.y) > 0.01) { release(s); return; }
     if (target.id !== s.targetId) { s.targetId = target.id; s.retries = 0; s.progressAt = null; }
     const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
+    const allowed = (point) => point && [point.x, point.y].every(finite) && point.x >= 0 && point.y >= 0
+      && point.x < scene.map.w && point.y < scene.map.h
+      && Math.hypot(point.x - s.origin.x, point.y - s.origin.y) <= s.options.radius;
+    // Always reconsider from priority[0]. There is no sequential combo cursor.
+    if (s.options.skillEnabled?.length) {
+      s.skillAction = globalThis.GSTFarmSkills?.tryPriority?.(scene, host, s.options, target, allowed,
+        () => !context(s) && !paused(s)) ?? null;
+      if (s.skillAction) { release(s); s.state = "COMBAT"; s.message = `Đã yêu cầu kỹ năng ô ${s.skillAction.slot}; chờ game cập nhật.`; return; }
+    }
     if (distance <= plan.reach && host.clear(scene.px, scene.py, target.x, target.y) === true) {
       release(s); s.state = "COMBAT"; s.message = "Farm của tool: đánh thường mục tiêu đã chọn.";
       if (time < s.nextAttack || scene.skillWait?.("Space") > 0) return;

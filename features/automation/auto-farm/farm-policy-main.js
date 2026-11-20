@@ -4,8 +4,20 @@
   // Legacy values remain readable, but never select a retired controller.
   const modes = Object.freeze(["tool", "native", "disabled", "extended", "custom"]);
   const normalize = (value) => value === "native" || value === "disabled" ? value : "tool";
+  const slots = Object.freeze(["1", "2", "3", "4", "5", "6"]);
+  function actions(value) {
+    const enabled = Array.isArray(value?.skillEnabled) ? value.skillEnabled : [];
+    const priority = Array.isArray(value?.skillPriority) ? value.skillPriority : [];
+    return {
+      skillEnabled: slots.filter((slot) => enabled.includes(slot)),
+      skillPriority: priority.length === 6 && new Set(priority).size === 6 && priority.every((slot) => slots.includes(slot))
+        ? [...priority] : [...slots],
+      pickupMode: value?.pickupMode === "tool" ? "tool" : "game"
+    };
+  }
   let activeMode = "tool"; // Closed until verified configuration arrives.
   globalThis.GSTFarmPolicy = Object.freeze({
+    actions,
     modes, defaultMode: "tool", normalize,
     mode: () => activeMode,
     isNative: () => activeMode === "native",

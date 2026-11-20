@@ -263,6 +263,32 @@
         </div>
           </div>
         </div>
+        <fieldset id="farmActionControls" disabled>
+          <div id="farmSkillOptions">
+            <p class="field-title">Ô kỹ năng tự dùng</p>
+            <div class="button-row">
+              <label class="check-row"><input id="farmSkill1" type="checkbox" value="1"><span>Ô 1</span></label>
+              <label class="check-row"><input id="farmSkill2" type="checkbox" value="2"><span>Ô 2</span></label>
+              <label class="check-row"><input id="farmSkill3" type="checkbox" value="3"><span>Ô 3</span></label>
+              <label class="check-row"><input id="farmSkill4" type="checkbox" value="4"><span>Ô 4</span></label>
+              <label class="check-row"><input id="farmSkill5" type="checkbox" value="5"><span>Ô 5</span></label>
+              <label class="check-row"><input id="farmSkill6" type="checkbox" value="6"><span>Ô 6</span></label>
+            </div>
+            <p class="hint" role="note">Mặc định chưa bật ô nào. Tool đọc kỹ năng hiện đang gán vào ô 1–6, giữ nguyên hồi chiêu và năng lượng của game. Đổi cấu hình sẽ dừng Farm; bật lại để áp dụng.</p>
+            <label for="farmSkillPriority">Thứ tự ưu tiên</label>
+            <input id="farmSkillPriority" type="text" value="1 2 3 4 5 6" autocomplete="off" aria-describedby="farmSkillPriorityError">
+            <p class="hint" data-help-for='label[for="farmSkillPriority"]'>Nhập đủ 1–6, mỗi số một lần, ví dụ 3 1 5 2 6 4. Bỏ qua chiêu chưa sẵn sàng; sau một lần dùng thành công ở client, xét lại từ đầu. Đây không phải combo tuần tự. Chiêu có đích dịch chuyển chưa xác định sẽ được bỏ qua để giữ bán kính.</p>
+            <p id="farmSkillPriorityError" class="field-error" role="alert"></p>
+            <button id="saveFarmSkillPriority" type="button">Lưu thứ tự</button>
+          </div>
+          <div id="farmPickupOptions">
+            <label class="check-row" for="farmPickupGame"><input id="farmPickupGame" type="radio" name="farmPickupMode" value="game" checked><span>Nhặt theo game</span></label>
+            <p class="hint" data-help-for='label[for="farmPickupGame"]'>Giao cho cơ chế nhặt gần của game. Tool không tự chọn đồ, không đi tới đồ và không chạy vòng Farm gốc chỉ để nhặt. Khả năng tự nhặt phụ thuộc game đang chạy.</p>
+            <label class="check-row" for="farmPickupTool"><input id="farmPickupTool" type="radio" name="farmPickupMode" value="tool" disabled><span>Nhặt theo tool · chưa khả dụng</span></label>
+            <p class="hint" data-help-for='label[for="farmPickupTool"]'>Dự kiến: nhặt sau giao tranh, trong bán kính, bỏ đồ không tới được và nhường thao tác tay. Hiện source có nhặt gần độc lập nhưng chưa thấy API tắt riêng. Lựa chọn đang khóa để tránh hai cơ chế tranh nhặt; tool chưa phát lệnh nhặt.</p>
+            <p id="farmPickupAvailability" class="hint" role="status">Nhặt theo tool đang khóa vì chưa tắt riêng được nhặt gần của game.</p>
+          </div>
+        </fieldset>
         <p id="farmFeedback" class="notice" role="alert"></p>
         <details class="diagnostic">
           <summary>Hỗ trợ khi gặp lỗi</summary>
@@ -501,7 +527,7 @@
             <option value="tool">Farm của tool</option>
             <option value="disabled" hidden disabled>Khóa Auto Farm cũ — chọn controller để mở khóa</option>
           </select>
-          <p class="hint" data-help-for='label[for="farmPolicyMode"]'>Chọn controller không bật Farm. Đổi lựa chọn luôn để Farm OFF. Farm của tool hỗ trợ di chuyển và đánh thường khi bạn bật riêng bằng nút/phím Farm trong game; không chạy Farm gốc dự phòng. Kỹ năng 1–6 và nhặt đồ chưa được thêm. Khóa cũ được giữ cho tới khi bạn chủ động chọn controller.</p>
+          <p class="hint" data-help-for='label[for="farmPolicyMode"]'>Chọn controller không bật Farm. Đổi lựa chọn luôn để Farm OFF. Farm của tool hỗ trợ di chuyển và đánh thường khi bạn bật riêng bằng nút/phím Farm trong game; không chạy Farm gốc dự phòng. Kỹ năng 1–6 dùng theo các ô đã bật và thứ tự đã lưu; nhặt theo tool đang khóa. Khóa cũ được giữ cho tới khi bạn chủ động chọn controller.</p>
           <p id="farmPolicySavedMode" class="feature-status" role="status" aria-live="polite">Đang đọc chế độ đã lưu…</p>
           <p id="farmPolicyDescription" class="hint" aria-live="polite">Đang đọc chế độ…</p>
           <label class="check-row" hidden><input id="farmCustomStats" type="checkbox"><span>Ghi thống kê so sánh Custom Farm trên tab này</span></label>

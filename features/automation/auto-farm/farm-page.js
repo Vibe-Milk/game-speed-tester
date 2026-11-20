@@ -165,7 +165,7 @@
       ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   }
 
-  const toolUnavailable = "Farm của tool: dùng nút/phím Farm để bắt đầu; hiện chỉ đi và đánh thường.";
+  const toolUnavailable = "Farm của tool: dùng nút/phím Farm để bắt đầu; di chuyển, đánh thường và kỹ năng theo thứ tự đã lưu.";
   function blockedFarmStart() {
     return !configurationReceived || identityBlocked || !["native", "tool"].includes(settings.policyMode)
       || settings.policyMode === "tool" && !globalThis.GSTToolFarm;
@@ -247,7 +247,7 @@
           const explicit = shortcutIntent?.generation === gestureGeneration && shortcutIntent.scene === scene
             && shortcutIntent.auto === this || validFarmGesture(window.event, scene, true);
           if (!explicit || blockedFarmStart() || !globalThis.GSTToolFarm?.prepare?.(scene, settings)) {
-            message = "Chưa bật Farm của tool: cần thao tác mới, đúng nick và game sẵn sàng."; return;
+            message = globalThis.GSTToolFarm?.status?.(scene) || "Chưa bật Farm của tool: cần thao tác mới, đúng nick và game sẵn sàng."; return;
           }
         }
         if (wasOn) globalThis.GSTToolFarm?.stop?.(scene);
@@ -256,7 +256,7 @@
         const thisAuto = this;
         const toggleArgs = tool ? [new Proxy(args[0], { get(host, property) {
           if (property === "note") return () => host.note(thisAuto.on
-            ? "Farm của tool: bật · di chuyển và đánh thường" : "Farm của tool: tắt");
+            ? "Farm của tool: bật · theo cấu hình đã lưu" : "Farm của tool: tắt");
           return Reflect.get(host, property);
         } })] : args;
         const result = owner.original.apply(this, toggleArgs);
@@ -1541,6 +1541,7 @@
       }
       identityBlocked = data.identityBlocked === true;
       settings = { policyMode: globalThis.GSTFarmPolicy?.normalize(data.policyMode) ?? "tool",
+        ...globalThis.GSTFarmPolicy?.actions?.(data),
         identityBlocked, identityVerified: data.identityVerified === true, customComparisonEnabled: data.customComparisonEnabled === true,
         accountProfileKey: typeof data.accountProfileKey === "string" ? data.accountProfileKey : "",
         accountId: typeof data.accountId === "string" ? data.accountId : "",

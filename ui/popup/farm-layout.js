@@ -36,6 +36,10 @@
   const targetColumn = archive.querySelector('.farm-target');
   targetColumn.querySelector('.farm-group-title')?.remove();
   move([targetColumn], targets);
+  move([byId('farmSkillOptions')], section('skills', 'Kỹ năng ưu tiên'));
+  move([byId('farmPickupOptions')], section('pickup', 'Nhặt đồ'));
+  // Keep the fieldset as the original lock source after moving its controls.
+  byId('farmActionControls').hidden = true;
   const controls = section('display', 'Phím bật/tắt Farm', false);
   const shortcut = byId('farmShortcutSummary').closest('details');
   move([shortcut], controls);

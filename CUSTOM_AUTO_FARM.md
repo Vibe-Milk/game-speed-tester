@@ -1,3 +1,5 @@
+> **Task 6 update:** The new Tool controller supports enabled slots 1–6 and priority scheduling through the game's native cast adapter. Pickup-by-game remains delegated; exclusive Tool pickup is blocked pending a supported native auto-pickup OFF API. See CODEGRAPH.md for the exact limitations.
+
 > **Task 5 update:** Farm của tool now has a new movement/basic-attack controller, enabled only by a fresh in-game Farm button/key after controller selection. The retired `custom` engine described below is still inactive. No skill-slot scheduling or tool pickup is implemented. See CODEGRAPH.md (Task 5) for current behavior and limitations.
 
 > **Historical controller:** legacy `custom`/`extended` values migrate to `tool`; the retired engine below remains inactive. The current Task 5 controller is described above and in CODEGRAPH.md.
