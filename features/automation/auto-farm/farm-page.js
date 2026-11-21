@@ -355,7 +355,7 @@
   }, true);
 
   function guardFarmKey(event) {
-    if (document.getElementById("gst-game-menu")?.dataset.open === "true") return;
+    const menuOpen = document.getElementById("gst-game-menu")?.dataset.open === "true";
     // Alt shortcuts (including configurable Harvest) belong to their own handlers.
     if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) return;
     let code = 86;
@@ -367,18 +367,25 @@
     } catch { /* The default V binding remains guarded while the scene loads. */ }
     // Let the game's focused key-binding capture validate and assign this key.
     // Background events still pass through the guard below.
-    if (scene?.keyCapture && !document.hidden && document.hasFocus()) return;
+    const captureActive = !!scene?.keyCapture && !document.hidden && document.hasFocus();
     const customKey = shortcut !== null && event.keyCode === shortcut;
     if (event.keyCode !== code && !customKey) return;
+    const trace = (stage, reason = "") => { try { globalThis.GSTFarmDiagnostics?.key?.(scene, stage, reason); } catch {} };
+    if (menuOpen) { trace("ignored", "menu"); return; }
+    if (captureActive) { trace("blocked", "key_capture"); return; }
     const editing = [document.activeElement, ...event.composedPath()].some((node) =>
       node instanceof HTMLElement && (node.isContentEditable
         || node.matches("input, textarea, select, [role='textbox']")));
+    if (!editing) trace("received");
     const ignored = document.hidden || !document.hasFocus() || editing || event.isComposing
       || event.repeat || event.ctrlKey || event.altKey || event.metaKey || !event.isTrusted
       || event.timeStamp < generationAt
       || (shortcut !== null && event.shiftKey);
     if (ignored) {
-      // Block background/editing events without cancelling normal text entry.
+      // Do not record typing in editable fields.
+      if (!editing) trace("ignored", document.hidden || !document.hasFocus() ? "background"
+        : event.isComposing ? "composing" : event.repeat ? "repeat" : !event.isTrusted ? "untrusted"
+          : event.timeStamp < generationAt ? "stale" : "modifier");
       event.stopImmediatePropagation();
       return;
     }
@@ -392,26 +399,32 @@
     const conflict = customKey && Object.entries(scene?.controls?.bindings ?? {})
       .some(([action, binding]) => action !== "V" && binding === shortcut);
     if (conflict) {
+      trace("blocked", "conflict");
       shortcutMessage = "Phím tùy chỉnh trùng thao tác khác trong game. Hãy chọn phím khác (ví dụ F6).";
       return;
     }
     if (!scene?.sys?.isActive?.() || typeof scene.toggleAutoFarm !== "function" || !scene.self) {
+      trace("blocked", "scene_unavailable");
       shortcutMessage = "Chưa truy cập được Auto Farm; cần tải game với tham số timer.";
       return;
     }
     if (blockedFarmStart() && scene.auto?.on === false) {
+      trace("blocked", "configuration");
       shortcutMessage = blockedFarmMessage();
       message = shortcutMessage;
       return;
     }
     if (scene.chat?.typing || scene.keyCapture || (!scene.auto?.on
         && (scene.self.dead || scene.uiBlocked || !connected(scene)))) {
+      trace("blocked", scene.chat?.typing ? "chat" : scene.keyCapture ? "key_capture"
+        : scene.self.dead ? "dead" : scene.uiBlocked ? "ui_blocked" : "disconnected");
       shortcutMessage = scene.chat?.typing ? "Đang nhập chat." : scene.keyCapture ? "Game đang chờ nhập phím tắt."
         : scene.self.dead ? "Nhân vật đã chết." : scene.uiBlocked ? "Game đang khóa thao tác do bảng/ô nhập/hộp thoại hoặc hướng màn hình."
           : "Kết nối game chưa sẵn sàng.";
       message = shortcutMessage; return;
     }
     if (settings.policyMode === "custom" && !scene.auto?.on && !ensureCustomReady(scene)) {
+      trace("blocked", "controller");
       shortcutMessage = "Custom Farm không khả dụng: không bảo vệ được controller.";
       return;
     }
@@ -427,6 +440,7 @@
       if (globalThis.GSTFarmDiagnostics) GSTFarmDiagnostics.toggleByUser(scene);
       else scene.toggleAutoFarm();
     } finally { if (shortcutIntent === attempt) shortcutIntent = null; }
+    trace("result", scene.auto?.on === wasOn ? "unchanged" : scene.auto?.on ? "enabled" : "disabled");
     if (settings.policyMode === "extended" && wasOn === false && scene.auto === previousAuto && scene.auto.on) {
       // An explicit new session must not inherit the old extension block or
       // native navigation failure counters left behind by native toggle().

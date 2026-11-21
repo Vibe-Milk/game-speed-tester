@@ -137,7 +137,8 @@
       if (!row || !accepted(row)) continue;
       const prev = output[output.length - 1];
       const signature = (r) => JSON.stringify([r.event, r.reason, r.skill, r.skillId, r.source, r.stage, r.fromId, r.toId, r.switchReason]);
-      if (prev && signature(prev) === signature(row)) {
+      const elapsed = prev && Date.parse(row.t) - Date.parse(prev.t);
+      if (prev && Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= 5000 && signature(prev) === signature(row)) {
         prev.repeatCount = Math.min(10000, (prev.repeatCount || 1) + (row.repeatCount || 1));
         prev.lastAt = row.t;
       } else output.push({ ...row });
@@ -151,6 +152,9 @@
       format: "gst-farm-agent-3",
       legend: "t=UTC; event=reason; also=other simultaneous events; flags lists true states (others false); missing fields=null; ownerScope=eligibility (not actual move)",
       farm: { tracking: data.tracking === true,
+        keyEvents: (Array.isArray(data.keyEvents) ? data.keyEvents : []).slice(-24).map((row) =>
+          pick(row, [["at", "t"], ["stage", "stage"], ["reason", "reason"], ["on", "on"],
+            ["focused", "focused"], ["hidden", "hidden"]])),
         current: pick(data.current, [["on", "on"], ["deaths", "deaths"]], farmFlags),
         events: problems((data.events || []).map((row) => pick(row, stopFields, farmFlags)), (row) => row.event === "off") },
       movement: { build: movement.build, tracking: movement.tracking === true,

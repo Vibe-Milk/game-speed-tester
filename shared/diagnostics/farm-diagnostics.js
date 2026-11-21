@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const key = "gst:farm-stop-log:v1";
-  let binding = null, cause = null, rows = [], at = -Infinity, onAt = performance.now();
+  let binding = null, cause = null, rows = [], keyEvents = [], at = -Infinity, onAt = performance.now();
   const codes = ["shortcut", "restore", "native_game", "death_limit", "click_to_move", "state_changed",
     "background_click_blocked", "blocking_dialog", "displaced", "navigation"];
   function flags(scene) {
@@ -35,7 +35,7 @@
   }
   function detach() {
     if (!binding) return;
-    const old = binding; binding = null;
+    const old = binding; binding = null; keyEvents = [];
     old.removeInput();
     old.scene.events.off("preupdate", frame);
     old.scene.events.off("shutdown", detach); old.scene.events.off("destroy", detach);
@@ -107,6 +107,17 @@
   }
   globalThis.GSTFarmDiagnostics = {
     observeToggle,
+    key(scene, stage, reason = "") {
+      try {
+        if (!binding || binding.scene !== scene || !["received", "ignored", "blocked", "result"].includes(stage)) return;
+        const allowed = ["menu", "background", "repeat", "modifier", "untrusted", "stale", "composing",
+          "scene_unavailable", "configuration", "chat", "key_capture", "dead", "ui_blocked", "disconnected",
+          "conflict", "controller", "enabled", "disabled", "unchanged"];
+        const row = { at: new Date().toISOString(), stage, reason: allowed.includes(reason) ? reason : "",
+          on: scene?.auto?.on === true, focused: document.hasFocus(), hidden: document.hidden };
+        keyEvents.push(row); keyEvents = keyEvents.slice(-24);
+      } catch { /* Diagnostics cannot block a shortcut. */ }
+    },
     attach: (scene) => { try { attach(scene); } catch { detach(); } },
     toggleByUser: (scene) => toggle(scene, "shortcut"),
     restore: (scene) => toggle(scene, "restore"),
@@ -116,6 +127,7 @@
       bossSafety: readSnapshot("GSTFarmBossSafety"),
       skill: readSnapshot("GSTFarmSkillDiagnostics"),
       flight: readSnapshot("GSTFlight"),
+      keyEvents: keyEvents.map((row) => ({ ...row })),
       current: flags(binding?.scene), lastStop: rows.findLast((row) => row.event === "off") ?? null, events: [...rows] })
   };
   window.addEventListener("message", (event) => {

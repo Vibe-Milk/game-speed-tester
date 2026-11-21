@@ -269,6 +269,15 @@
           .slice(-36).map(cleanMovement).filter(Boolean),
         incidents: (Array.isArray(data?.movement?.incidents) ? data.movement.incidents : [])
           .slice(-60).map(cleanMovement).filter(Boolean) },
+      keyEvents: (Array.isArray(data?.keyEvents) ? data.keyEvents : []).slice(-24).map((row) => {
+        const stages = ["received", "ignored", "blocked", "result"];
+        const reasons = ["menu", "background", "repeat", "modifier", "untrusted", "stale", "composing",
+          "scene_unavailable", "configuration", "chat", "key_capture", "dead", "ui_blocked", "disconnected",
+          "conflict", "controller", "enabled", "disabled", "unchanged"];
+        return stages.includes(row?.stage) ? { at: bgDate(row.at), stage: row.stage,
+          reason: reasons.includes(row.reason) ? row.reason : "", on: row.on === true,
+          focused: row.focused === true, hidden: row.hidden === true } : null;
+      }).filter(Boolean),
       current: flags(data?.current), lastStop: clean(data?.lastStop),
       events: (Array.isArray(data?.events) ? data.events : []).slice(-20).map(clean).filter(Boolean) };
     const context = globalThis.GSTAccountProfiles?.context?.()?.context;
