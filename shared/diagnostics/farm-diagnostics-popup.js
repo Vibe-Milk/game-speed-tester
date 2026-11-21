@@ -1,6 +1,7 @@
 (() => {
   "use strict";
   const button = document.getElementById("copyFarmDiagnostics");
+  const skillButton = document.getElementById("copyFarmSkillDiagnostics");
   const output = document.getElementById("farmDiagnosticsOutput"), feedback = document.getElementById("farmDiagnosticsFeedback");
   const skillEnabled = document.getElementById("farmSkillDiagnosticsEnabled");
   const clearSkill = document.getElementById("clearFarmSkillDiagnostics");
@@ -153,10 +154,10 @@
         events: (flight.events || []).map((row) =>
           pick(row, [["at", "t"], ["type", "event"]], ["auto", "flying", "always", "farm"])) },
       skill: { build: data.skill?.build || "unavailable", enabled: data.skill?.enabled === true,
-        tracking: data.skill?.tracking === true,
+        tracking: data.skill?.tracking === true, config: data.skill?.config || null,
         legend: "guard_blocked/q_blocked=extension block; native_rejected=host.cast returned false without scene.useSkill; skillWaitBeforeMs is the bounded client gate value at invocation; snapshot_cooldown is a newer client snapshot observation and attribution=not_specific means it is not linked to one attempt (priorEvidence is context only); repeats are coalesced; no stage proves server acceptance or damage",
         events: (Array.isArray(data.skill?.events) ? data.skill.events : []).slice(-80).map((row) => {
-          const result = pick(row, [["at", "t"], ["attemptId", "attempt"], ["skill", "skill"],
+          const result = pick(row, [["at", "t"], ["attemptId", "attempt"], ["skill", "skill"], ["skillId", "skillId"],
             ["source", "source"], ["stage", "stage"], ["reason", "reason"], ["method", "method"],
             ["returnKind", "return"], ["conditions", "conditions"], ["skillWaitMs", "skillWaitMs"],
             ["skillWaitBeforeMs", "skillWaitBeforeMs"], ["skillWaitMinMs", "skillWaitMinMs"],
@@ -181,7 +182,7 @@
       feedback.textContent = confirmedSkillEnabled ? "Đã bật thu thập log kỹ năng cho tab/tài khoản này." : "Đã tắt thu thập log kỹ năng.";
     } catch {
       skillEnabled.checked = confirmedSkillEnabled;
-      feedback.textContent = "Không đổi được chẩn đoán: tab chưa xác minh, Farm không ở chế độ mở rộng hoặc bridge chưa sẵn sàng.";
+      feedback.textContent = "Không đổi được chẩn đoán: tab chưa xác minh, Farm không ở chế độ tool hoặc bridge chưa sẵn sàng.";
     } finally { skillBusy = false; await refreshSkillStatus(); }
   });
   clearSkill.addEventListener("click", async () => {
@@ -274,8 +275,9 @@
     return { target: { tabId, documentToken: doc.documentToken, expected, freshContext }, error: null };
   }
 
-  button.addEventListener("click", async () => {
-    button.disabled = true;
+  async function exportDiagnostics(skillOnly) {
+    const clickedButton = skillOnly ? skillButton : button;
+    clickedButton.disabled = true;
     try {
       const { target, error } = await boundDiagnosticTarget();
       if (error === "no_bound_tab") {
@@ -338,7 +340,7 @@
         }
       }
 
-      const available = data.build === "farm-stop-1";
+      const available = ["farm-stop-1", "farm-stop-2"].includes(data.build);
       const report = compact(available ? data : {});
       report.diagnosticsAvailable = available;
       if (data.capture) {
@@ -357,7 +359,10 @@
         } : null,
         message: typeof status?.message === "string" ? status.message.slice(0, 240) : "Không nhận được trạng thái farm."
       };
-      output.value = JSON.stringify(report); output.hidden = false;
+      const exported = skillOnly ? { format: "gst-skill-1", capture: report.capture,
+        diagnosticsAvailable: available, farmStatus: { autoOn: report.farmStatus.autoOn, message: report.farmStatus.message },
+        skill: report.skill } : report;
+      output.value = JSON.stringify(exported); output.hidden = false;
       const notice = !available
         ? "Chưa nhận được log MAIN và không có bản lưu an toàn; bản xuất chỉ có trạng thái cầu nối. "
         : data.capture?.status === "stale"
@@ -368,11 +373,13 @@
       let copied = false;
       try { copied = await globalThis.GSTClipboard?.write(output.value) === true; } catch {}
       if (copied) {
-        feedback.textContent = notice + "Đã sao chép log một dòng. Dán vào chat để kiểm tra Auto Farm, di chuyển và chạy nền.";
+        feedback.textContent = notice + (skillOnly ? "Đã sao chép log kỹ năng. Dán vào chat để kiểm tra." : "Đã sao chép log một dòng. Dán vào chat để kiểm tra Auto Farm, di chuyển và chạy nền.");
       } else {
         output.focus(); output.select(); feedback.textContent = notice + "Đã chọn log một dòng; bấm Ctrl+C rồi dán vào chat.";
       }
     } catch { feedback.textContent = "Chưa đọc được chẩn đoán. Mở tab game, tải lại extension và game nếu vừa cập nhật."; }
-    finally { button.disabled = false; }
-  });
+    finally { clickedButton.disabled = false; }
+  }
+  button.addEventListener("click", () => { void exportDiagnostics(false); });
+  skillButton.addEventListener("click", () => { void exportDiagnostics(true); });
 })();

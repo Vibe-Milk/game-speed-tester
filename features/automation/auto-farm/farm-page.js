@@ -1547,8 +1547,9 @@
     if (data.type === "skill-diagnostics" && typeof data.requestId === "string") {
       let result = { accepted: false, enabled: false, reason: "policy_change" };
       if (settings.identityVerified && !identityBlocked && data.profileKey === settings.accountProfileKey
-          && settings.policyMode === "extended") {
+          && settings.policyMode === "tool") {
         try {
+          globalThis.GSTFarmSkillDiagnostics?.setContext?.(sceneNow(), settings);
           result = globalThis.GSTFarmSkillDiagnostics?.control?.(sceneNow(), data.action,
             data.enabled, data.profileKey) ?? result;
         } catch { result = { accepted: false, enabled: false, reason: "manual_tracking_unavailable" }; }

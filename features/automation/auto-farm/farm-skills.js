@@ -15,57 +15,66 @@
     if (!Array.isArray(available)) return null;
     const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
     for (const slot of options.skillPriority ?? []) {
-      if (!selected.includes(slot) || !available.includes(slot) || !/^[1-6]$/.test(slot)) continue;
+      if (!selected.includes(slot) || !/^[1-6]$/.test(slot)) continue;
+      const blocked = (reason) => { try { globalThis.GSTFarmSkillDiagnostics?.blocked?.(scene, slot, "farm_cast", reason); } catch {} };
+      if (!available.includes(slot)) { blocked("not_available"); continue; }
       const previous = ledger(scene).get(slot);
-      if (previous && performance.now() < previous.retryAt) continue;
+      if (previous && performance.now() < previous.retryAt) { blocked("retry_backoff"); continue; }
       const kit = host.kit(slot), full = scene.skills?.find((entry) => entry.key === slot)?.kit;
       if (!kit || !full || full.id !== kit.id || full.unlock !== undefined && !finite(full.unlock)
-          || scene.profile.level < full.unlock && !scene.gmSkills) continue;
+          || scene.profile.level < full.unlock && !scene.gmSkills) { blocked("kit_unavailable"); continue; }
       const cooldown = (self.cd?.[slot] ?? 0) - (time - scene.selfAt);
       // Native skillWait permits an 80ms early margin. Automation waits for
       // the observed global action lock as well, without changing native rules.
       if (!finite(cooldown) || cooldown > 0 || (self.cl ?? 0) - (time - scene.selfAt) > 0
           || scene.skillWait(slot) > 0
-          || !finite(kit.range) || kit.range < 0) continue;
+          || !finite(kit.range) || kit.range < 0) { blocked("action_lock"); continue; }
       const gauge = host.gauge?.();
       if (finite(kit.res) && gauge && (kit.res > 0 && gauge.v + kit.res >= gauge.max
-          || kit.res < 0 && gauge.v < -kit.res)) continue;
+          || kit.res < 0 && gauge.v < -kit.res)) { blocked("resource"); continue; }
       let x = decision ? decision.x : target.x, y = decision ? decision.y : target.y;
       if (!decision) {
         if (kit.heal && kit.dmg <= 0) {
-          if (host.hp() > 0.7 || !host.inCombat()) continue;
+          if (host.hp() > 0.7 || !host.inCombat()) { blocked("condition"); continue; }
           x = scene.px; y = scene.py;
         } else if (kit.dmg <= 0) {
-          if (!host.inCombat() || distance > 4 || kit.id === "huyet-te" && host.hp() < 0.5) continue;
+          if (!host.inCombat() || distance > 4 || kit.id === "huyet-te" && host.hp() < 0.5) { blocked("condition"); continue; }
           x = scene.px; y = scene.py;
         } else if (["self", "ally"].includes(kit.shape)) {
-          if (distance > kit.range + target.radius) continue;
+          if (distance > kit.range + target.radius) { blocked("out_of_range"); continue; }
           x = scene.px; y = scene.py;
         } else {
           const range = kit.castRange ?? kit.range;
-          if (!finite(range) || distance > range || !host.clear(scene.px, scene.py, x, y)) continue;
-          if (kit.shape === "cone" && distance > kit.range * 0.9 + target.radius) continue;
+          if (!finite(range) || distance > range) { blocked("out_of_range"); continue; }
+          if (!host.clear(scene.px, scene.py, x, y)) { blocked("unsafe_path"); continue; }
+          if (kit.shape === "cone" && distance > kit.range * 0.9 + target.radius) { blocked("out_of_range"); continue; }
         }
       }
       if (decision && (!finite(x) || !finite(y)
-          || Math.hypot(x - scene.px, y - scene.py) > 0.05 && !host.clear(scene.px, scene.py, x, y))) continue;
+          || Math.hypot(x - scene.px, y - scene.py) > 0.05 && !host.clear(scene.px, scene.py, x, y))) { blocked("unsafe_path"); continue; }
       if (kit.shape === "dash") {
         // Check the entire possible dash, including the longest native form.
-        if (distance < 0.8 || host.hp() < 0.35 || !finite(full.range)) continue;
+        if (distance < 0.8 || host.hp() < 0.35 || !finite(full.range)) { blocked("condition"); continue; }
         const length = Math.hypot(x - scene.px, y - scene.py);
-        if (length < 0.05) continue;
+        if (length < 0.05) { blocked("unsafe_path"); continue; }
         const end = { x: scene.px + (x - scene.px) / length * full.range,
           y: scene.py + (y - scene.py) / length * full.range };
-        if (!allowed(end) || !host.clear(scene.px, scene.py, end.x, end.y)) continue;
+        if (!allowed(end) || !host.clear(scene.px, scene.py, end.x, end.y)) { blocked("unsafe_path"); continue; }
       }
       // Anh Bo chooses a server-side nearest target and teleports behind it.
       // Its destination cannot be established from this selected actor alone.
-      if (kit.shape === "blink" && kit.id === "anh-bo") continue;
+      if (kit.shape === "blink" && kit.id === "anh-bo") { blocked("unsafe_blink"); continue; }
       if (!allowed({ x, y }) || !permitted()) return null;
       const current = host.kit(slot);
       if (current?.id !== kit.id) continue;
       const before = { cd: scene.cdLocal?.[slot], lock: scene.skillLockUntil, cast: scene.castAt };
-      if (host.cast(slot, x, y) !== true) continue; // Native mana/gauge/range checks.
+      const diagnostics = globalThis.GSTFarmSkillDiagnostics;
+      let called = false;
+      const cast = () => { called = true; return host.cast(slot, x, y); };
+      let castResult;
+      try { castResult = diagnostics?.isEnabled?.(scene) ? diagnostics.invoke(scene, slot, "farm_cast", "host.cast", cast) : cast(); }
+      catch (error) { if (called) throw error; castResult = cast(); }
+      if (castResult !== true) { blocked("cast_rejected"); continue; } // Native checks remain authoritative.
       const issued = (scene.cdLocal?.[slot] ?? -Infinity) > (before.cd ?? -Infinity)
         || (scene.skillLockUntil ?? -Infinity) > (before.lock ?? -Infinity)
         || (scene.castAt ?? -Infinity) > (before.cast ?? -Infinity);

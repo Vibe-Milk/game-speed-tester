@@ -62,6 +62,8 @@ flowchart LR
 - `shared/diagnostics/farm-diagnostics-popup.js` lấy cả `gst:farm-diagnostics` và `gst:farm-status` để xuất log kể cả khi tracker chưa gắn, MAIN chưa trả log hoặc tab game đang ngắt kết nối; tách đọc log khỏi kiểm tra kết nối nhưng giữ chặt tabId và ranh giới tài liệu (`documentToken`/`gst:farm-diagnostics-document`) cùng tài khoản; lỗi phân biệt không có tab gắn kết, tab đóng/chuyển trang, cầu nối timeout và ngữ cảnh đổi. Trả về cache cũ an toàn kèm `stale` nếu MAIN không phản hồi kịp. Bản xuất có `diagnosticsAvailable`, `capture` và `farmStatus`. Collector MAIN đọc snapshot từng helper độc lập để một helper lỗi không chặn toàn bộ phản hồi. `farm-page.js` báo bước áp cấu hình thất bại bằng tên bước cố định và loại lỗi chuẩn, không xuất raw message/stack.
 - `core/page.js` tạm ngừng ghi đè `self.ms` và hoàn nguyên tốc độ game khi `scene.auto.on` hoặc `GSTHarvest.isEnabled()`, `GSTChest.isEnabled()`, `GSTRealm.isEnabled()` trả về `true`, hoặc `GSTQuest.active(scene)` đang chạy. Khi tất cả tắt, tiếp tục áp tốc độ đi bộ/bay đã lưu nếu người dùng vẫn bật công tắc; `core/content.js` hiển thị trạng thái `TẠM TẮT`. Các hàm `isEnabled()` phản ánh cài đặt tính năng, không phải quyền điều khiển di chuyển (khác `controls()`).
 
+Log kỹ năng Tool Farm: `farm-skill-diagnostics.js` thu thập theo tab/hồ sơ đã xác minh khi người dùng bật; `farm-skills.js` ghi lý do bỏ qua và lần gọi tool, wrapper `scene.useSkill` quan sát thao tác tay. `farm-diagnostics-content.js` lọc trường trước bridge; popup có nút xuất log kỹ năng riêng và giữ log tổng. Hồi chiêu quan sát ở client không xác nhận sát thương/server.
+
 ## 4. Điều phối nhiều module cùng dùng Auto Farm
 
 ```mermaid

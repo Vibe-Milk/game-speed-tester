@@ -135,7 +135,7 @@
   }
   function cleanSkill(data) {
     const skills = ["1", "2", "3", "4", "5", "6", "Q"];
-    const sources = ["farm_cast", "auto_q"];
+    const sources = ["farm_cast", "auto_q", "manual"];
     const stages = ["guard_blocked", "q_blocked", "native_invoked", "native_skill_invoked",
       "native_return", "native_rejected", "local_state_changed", "snapshot_cooldown", "ambiguous", "unconfirmed"];
     const reasons = ["player_target", "player_lock", "player_aim", "requested_aim_overlap",
@@ -145,7 +145,8 @@
       "no_safe_direction", "hazard_window", "overlapping_attempt", "manual_input", "observation_timeout",
       "collection_disabled", "capacity", "scene_change", "manual_tracking_unavailable", "policy_change",
       "skill_unavailable", "self_unavailable", "dead", "silenced", "rooted_mobility_skill",
-      "cooldown_wait", "unknown"];
+      "cooldown_wait", "unknown", "not_available", "retry_backoff", "kit_unavailable",
+      "action_lock", "resource", "condition", "out_of_range", "unsafe_path", "unsafe_blink", "cast_rejected"];
     const conditions = ["skill_unavailable", "self_unavailable", "class_resource_guard_unknown",
       "class_guard_unknown", "dead", "dead_state_unknown", "silenced", "rooted_mobility_skill",
       "status_state_unknown", "cooldown_wait", "cooldown_state_unknown", "mana_cost_unknown",
@@ -159,6 +160,7 @@
           || !Number.isSafeInteger(row.attemptId) || row.attemptId < 0 || row.attemptId > 1e9) return null;
       const result = { at: bgDate(row.at), attemptId: row.attemptId, skill: row.skill,
         source: row.source, stage: row.stage };
+      if (typeof row.skillId === "string" && /^[a-z0-9_-]{1,64}$/i.test(row.skillId)) result.skillId = row.skillId;
       if (reasons.includes(row.reason)) result.reason = row.reason;
       if (["host.cast", "scene.useSkill"].includes(row.method)) result.method = row.method;
       if (["true", "false", "undefined", "other"].includes(row.returnKind)) result.returnKind = row.returnKind;
@@ -180,7 +182,10 @@
       return result;
     }).filter(Boolean);
     return { build: data?.build === "farm-skill-1" ? "farm-skill-1" : "unavailable",
-      enabled: data?.enabled === true, tracking: data?.tracking === true, events };
+      enabled: data?.enabled === true, tracking: data?.tracking === true,
+      config: data?.config ? { mode: data.config.mode === "custom" ? "custom" : "game",
+        selected: (Array.isArray(data.config.selected) ? data.config.selected : []).filter((key) => /^[1-6]$/.test(key)).slice(0, 6),
+        priority: (Array.isArray(data.config.priority) ? data.config.priority : []).filter((key) => /^[1-6]$/.test(key)).slice(0, 6) } : null, events };
   }
   // Isolated-world log collection must still work if the shared schema was not
   // initialized in this page; preserve its field allowlist on that fallback.
@@ -241,7 +246,7 @@
     if (!entry) return;
     pending.delete(event.data.requestId); clearTimeout(entry.timer);
     const data = event.data.diagnostics;
-    const result = { build: data?.build === "farm-stop-1" ? data.build : "unknown", tracking: data?.tracking === true,
+    const result = { build: ["farm-stop-1", "farm-stop-2"].includes(data?.build) ? data.build : "unknown", tracking: data?.tracking === true,
       background: { build: ["background-log-1", "background-log-2"].includes(data?.background?.build)
           ? data.background.build : "unavailable",
         generation: bgNumber(data?.background?.generation, 1e7),
@@ -268,7 +273,7 @@
       events: (Array.isArray(data?.events) ? data.events : []).slice(-20).map(clean).filter(Boolean) };
     const context = globalThis.GSTAccountProfiles?.context?.()?.context;
     const key = contextKey(context), capturedAt = new Date().toISOString();
-    if (result.build === "farm-stop-1" && key && context?.verified) {
+    if (["farm-stop-1", "farm-stop-2"].includes(result.build) && key && context?.verified) {
       cacheIdentity = {
         key,
         slot: context.slot ?? "",

@@ -62,16 +62,6 @@
   respawn.querySelector('span').textContent = 'Cho phép hồi sinh dùng chung với Thu hoạch';
   respawnHint.textContent = 'Thu hoạch còn kiểm tra lựa chọn hồi sinh riêng của nó. Farm của tool dừng khi chết; Farm của game giữ cơ chế hồi sinh gốc.';
   move([respawn, respawnHint], shared, false);
-  // Skill tracking cannot be enabled in inert tool/native policy. Keep the
-  // read-only movement export available, but hide its retired skill controls.
-  const skill = byId('farmSkillDiagnosticsEnabled').closest('label');
-  const skillHint = skill.nextElementSibling;
-  const retiredDiagnostics = document.createElement('div');
-  retiredDiagnostics.hidden = true; retiredDiagnostics.inert = true;
-  retiredDiagnostics.dataset.farmRetired = 'true';
-  skill.before(retiredDiagnostics);
-  retiredDiagnostics.append(skill, skillHint, byId('clearFarmSkillDiagnostics'));
-
   const prefix = 'farmSectionOpen:v1:', legacyKey = 'farmSectionOpen:v1';
   const touched = new Set();
   let ready = false;

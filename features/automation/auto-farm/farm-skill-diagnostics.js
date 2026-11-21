@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const skillKeys = new Set(["1", "2", "3", "4", "5", "6", "Q"]);
-  const sources = new Set(["farm_cast", "auto_q"]);
+  const sources = new Set(["farm_cast", "auto_q", "manual"]);
   const reasons = new Set(["player_target", "player_lock", "player_aim", "requested_aim_overlap",
     "stored_aim_overlap", "targeting_unavailable",
     "dodge_preference_off", "native_method_unavailable", "extension_throttle", "dash_active",
@@ -9,7 +9,8 @@
     "no_safe_direction", "hazard_window", "overlapping_attempt", "manual_input", "observation_timeout",
     "collection_disabled", "capacity", "scene_change", "manual_tracking_unavailable", "policy_change",
     "skill_unavailable", "self_unavailable", "dead", "silenced", "rooted_mobility_skill",
-    "cooldown_wait", "unknown"]);
+    "cooldown_wait", "unknown", "not_available", "retry_backoff", "kit_unavailable",
+    "action_lock", "resource", "condition", "out_of_range", "unsafe_path", "unsafe_blink", "cast_rejected"]);
   const rejectionConditions = new Set(["skill_unavailable", "self_unavailable", "class_resource_guard_unknown",
     "class_guard_unknown", "dead", "dead_state_unknown", "silenced", "rooted_mobility_skill",
     "status_state_unknown", "cooldown_wait", "cooldown_state_unknown", "mana_cost_unknown",
@@ -18,6 +19,7 @@
   const nativeCooldownToleranceSeconds = 0.08; // Matches the native skillWait snapshot margin.
   let scene = null, identityKey = "", profileKey = "", policyAllowed = false;
   let enabled = false, pending = [], events = [], nextAttemptId = 0, activeAttempt = null, hook = null;
+  let skillConfig = null;
   const lastBlocked = new Map(), lastRejected = new Map(), lastInvoked = new Map();
   const cooldownHistory = new Map(), recentSkillUses = new Map();
   let lastHistorySelf = null, lastHistorySelfAt = null;
@@ -65,6 +67,9 @@
     if (!attempt || !skillKeys.has(attempt.key) || !sources.has(attempt.source)) return;
     const row = { at: new Date().toISOString(), attemptId: attempt.id, skill: attempt.key,
       source: attempt.source, stage };
+    let id;
+    try { id = attempt.scene?.skills?.find?.((entry) => entry.key === attempt.key)?.kit?.id; } catch {}
+    if (typeof id === "string" && /^[a-z0-9_-]{1,64}$/i.test(id)) row.skillId = id;
     if (reasons.has(reason)) row.reason = reason;
     if (["host.cast", "scene.useSkill"].includes(extra.method)) row.method = extra.method;
     if (["true", "false", "undefined", "other"].includes(extra.returnKind)) row.returnKind = extra.returnKind;
@@ -229,6 +234,7 @@
     const ownerScene = scene;
     const wrapper = function (key, ...args) {
       const skill = cleanSkill(key), attempt = activeAttempt;
+      try {
       if (attempt && attempt === activeAttempt && attempt.key === skill
           && ["farm_cast", "auto_q"].includes(attempt.source)) {
         attempt.nativeSkillEntered = true;
@@ -239,6 +245,12 @@
         rememberSkillUse(skill);
         observeInterveningUse(ownerScene, skill,
           args[1] !== false ? "manual_input" : "overlapping_attempt");
+      }
+      } catch { /* Diagnostic observation must not block a native skill. */ }
+      if (!attempt && skill && args[1] !== false) {
+        const self = this;
+        return safeInvoke(ownerScene, skill, "manual", "scene.useSkill",
+          () => original.apply(self, [key, ...args]));
       }
       return original.apply(this, [key, ...args]);
     };
@@ -341,6 +353,20 @@
       if (!returned) stateAfter(attempt);
     }
   }
+  // Diagnostic failures cannot cancel or repeat the underlying game action.
+  function safeInvoke(sceneNow, key, source, method, action, evidence = null) {
+    let called = false, value, actionError, actionFailed = false;
+    const once = () => {
+      called = true;
+      try { value = action(); return value; }
+      catch (error) { actionFailed = true; actionError = error; throw error; }
+    };
+    try { return invoke(sceneNow, key, source, method, once, evidence); }
+    catch {
+      if (actionFailed) throw actionError;
+      return called ? value : once();
+    }
+  }
   function blocked(sceneNow, key, source, reason) {
     if (!enabled || sceneNow !== scene || !policyAllowed || !cleanSkill(key) || !sources.has(source)
         || !reasons.has(reason)) return;
@@ -351,7 +377,7 @@
       return;
     }
     nextAttemptId = nextAttemptId >= 1e9 ? 1 : nextAttemptId + 1;
-    append({ id: nextAttemptId, key, source }, source === "auto_q" ? "q_blocked" : "guard_blocked", reason,
+    append({ id: nextAttemptId, key, source, scene: sceneNow }, source === "auto_q" ? "q_blocked" : "guard_blocked", reason,
       { repeatCount: 1 });
     lastBlocked.set(throttleKey, { at: stamp, row: events.at(-1) });
     if (lastBlocked.size > 32) lastBlocked.delete(lastBlocked.keys().next().value);
@@ -363,6 +389,9 @@
     detachHooks();
   }
   function setContext(sceneNow, value = {}) {
+    skillConfig = { mode: value.skillMode === "custom" ? "custom" : "game",
+      selected: Array.isArray(value.skillEnabled) ? value.skillEnabled.filter((key) => /^[1-6]$/.test(key)).slice(0, 6) : [],
+      priority: Array.isArray(value.skillPriority) ? value.skillPriority.filter((key) => /^[1-6]$/.test(key)).slice(0, 6) : [] };
     const verified = value.identityVerified === true && value.identityBlocked !== true
       && typeof value.accountProfileKey === "string" && !!value.accountProfileKey;
     const nextIdentity = verified ? [value.accountProfileKey, value.accountId ?? "", value.slot ?? "",
@@ -379,7 +408,7 @@
       clearAttributionHistory();
       detachHooks(); scene = sceneNow?.events?.on && sceneNow?.events?.off ? sceneNow : null;
     }
-    policyAllowed = verified && value.policyMode === "extended" && !!scene;
+    policyAllowed = verified && value.policyMode === "tool" && !!scene;
     if (!policyAllowed && enabled) disable("policy_change");
     else if (enabled && !installHooks()) disable("manual_tracking_unavailable");
   }
@@ -412,9 +441,9 @@
   }
   function snapshot(sceneNow = scene) {
     return { build: "farm-skill-1", enabled: enabled && sceneNow === scene,
-      tracking: !!hook && sceneNow === scene, events: sceneNow === scene ? events.slice(-maxEvents).map((row) => ({ ...row })) : [] };
+      tracking: !!hook && sceneNow === scene, config: sceneNow === scene ? skillConfig : null, events: sceneNow === scene ? events.slice(-maxEvents).map((row) => ({ ...row })) : [] };
   }
   function isEnabled(sceneNow) { return enabled && policyAllowed && sceneNow === scene; }
-  globalThis.GSTFarmSkillDiagnostics = { setContext, control, invoke, blocked, snapshot, isEnabled };
+  globalThis.GSTFarmSkillDiagnostics = { setContext, control, invoke: safeInvoke, blocked, snapshot, isEnabled };
   window.addEventListener("pagehide", onPageHide);
 })();
