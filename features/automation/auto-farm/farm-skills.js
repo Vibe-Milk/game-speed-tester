@@ -60,9 +60,6 @@
           y: scene.py + (y - scene.py) / length * full.range };
         if (!allowed(end) || !host.clear(scene.px, scene.py, end.x, end.y)) { blocked("unsafe_path"); continue; }
       }
-      // Anh Bo chooses a server-side nearest target and teleports behind it.
-      // Its destination cannot be established from this selected actor alone.
-      if (kit.shape === "blink" && kit.id === "anh-bo") { blocked("unsafe_blink"); continue; }
       if (!allowed({ x, y }) || !permitted()) return null;
       const current = host.kit(slot);
       if (current?.id !== kit.id) continue;

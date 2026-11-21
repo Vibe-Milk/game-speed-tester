@@ -84,8 +84,6 @@
   }
   function pauseReason(s, starting = false, ignoreClick = false) {
     const scene = s.scene;
-    if (s.enabled && Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius)
-      return "Đã ra ngoài bán kính Farm; đang chờ bạn quay lại vùng Farm.";
     if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
     if (document.hidden) return "Tab game đang bị ẩn.";
     if (!document.hasFocus()) return "Tab game chưa có focus; quay lại tab game rồi thử lại.";
@@ -192,6 +190,27 @@
     if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) { release(s); return; }
     s.lastTime = time;
     if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
+    if (Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius) {
+      if (movementBlocked(scene)) { release(s); s.message = "Chờ game mở khóa di chuyển trước khi quay lại vùng Farm."; return; }
+      const step = GSTNavigation.customStep(scene, s.nav, host, time, s.origin.x, s.origin.y, Math.max(0.1, s.options.radius * 0.5));
+      const point = step?.point;
+      if (!point || !point.every(finite) || !host.clear(scene.px, scene.py, point[0], point[1])) {
+        release(s); s.state = "RETURN"; s.message = "Chưa tìm được đường về vùng Farm; đang thử lại."; return;
+      }
+      if (s.progressAt === null || Math.hypot(scene.px - s.progressX, scene.py - s.progressY) >= 0.2) {
+        s.progressAt = time; s.progressX = scene.px; s.progressY = scene.py;
+      } else if (time - s.progressAt >= 1.5) {
+        release(s); s.state = "RETURN"; s.message = "Đường về vùng Farm bị kẹt; đang thử lại."; return;
+      }
+      const dx = point[0] - scene.px, dy = point[1] - scene.py, length = Math.hypot(dx, dy);
+      if (length < 0.1 || context(s) || paused(s)) { release(s); return; }
+      host.steer(dx / length, dy / length); s.vector = [scene.autoX, scene.autoY];
+      s.fix = scene.self.fix; s.leg = [...point];
+      GSTNavigation.schedule(scene, s.nav, s.origin.x, s.origin.y, Math.max(0.1, s.options.radius * 0.5));
+      s.state = "RETURN"; s.message = "Farm đang quay lại vùng Farm."; return;
+    }
+    if (s.state === "RETURN") { release(s); GSTFarmPlanner.invalidateRoute(scene); s.state = "SEARCH"; }
+
     s.skillAction = null;
     if (s.pendingOptions) {
       const next = s.pendingOptions; s.pendingOptions = null;
