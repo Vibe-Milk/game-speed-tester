@@ -4,9 +4,9 @@
   const currentScene = () => window.game?.scene?.getScene?.("world")
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   const key = (o) => JSON.stringify([o.policyMode, o.identityVerified, o.identityBlocked, o.accountProfileKey,
-    o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.searchScope, o.targetMode,
-    o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter,
-    o.pickupMode]);
+    o.accountId, o.slot, o.character, o.characterId, o.classId, o.pickupMode]);
+  const searchKey = (o) => JSON.stringify([o.radius, o.searchScope, o.targetMode, o.targetLevel,
+    o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter]);
   function otherOwner(scene, allowHarvest = false) {
     return [globalThis.GSTHarvest, globalThis.GSTQuest, globalThis.GSTMapTravel,
       globalThis.GSTFarmSeals, globalThis.GSTFarmBossSafety, globalThis.GSTFarmDefense]
@@ -47,16 +47,27 @@
     if (s && (s.auto !== scene.auto || s.key !== key(options))) {
       halt(s, "Đã đổi cấu hình hoặc nhân vật; bật Farm lại để bắt đầu phiên mới."); dispose(scene);
     } else if (s) {
-      // Skill-only changes keep the current lifecycle, origin and issued action.
-      if (s.enabled) s.pendingOptions = { ...options };
-      else s.options = { ...options };
+      if (s.enabled) {
+        // Validate the existing session before accepting live search changes.
+        const error = context(s, false, true);
+        if (error || !s.auto.on) { halt(s, error || "Farm đã tắt."); return; }
+        if (searchKey(s.options) !== searchKey(options)) {
+          release(s);
+          for (const name of ["radius", "searchScope", "targetMode", "targetLevel", "targetMinLevel",
+            "targetMaxLevel", "excludeBoss", "bossFilter"]) s.options[name] = options[name];
+          s.targetId = null; s.retries = 0; s.state = "SEARCH";
+          s.message = "Đang áp dụng cấu hình tìm quái mới.";
+        }
+        // Skill changes still wait for the current skill action to finish.
+        s.pendingOptions = { ...options };
+      } else s.options = { ...options };
     }
   }
-  function context(s, starting = false) {
+  function context(s, starting = false, configuring = false) {
     const scene = s.scene, o = s.options, time = scene.now?.();
     if (currentScene() !== scene || scene.auto !== s.auto || !scene.sys?.isActive?.() || scene.leaving
         || !scene.self || scene.self.dead || !globalThis.GSTFarmPolicy?.isTool?.()
-        || globalThis.GSTFarmConfigurationReady !== true || !o.identityVerified || o.identityBlocked
+        || (!configuring && globalThis.GSTFarmConfigurationReady !== true) || !o.identityVerified || o.identityBlocked
         || !o.accountProfileKey || String(scene.you) !== o.characterId || scene.profile?.classId !== o.classId
         || scene.profile?.name?.normalize?.("NFC") !== o.character
         || (new URLSearchParams(location.search).get("slot") ?? "") !== (o.slot ?? "")) return "Ngữ cảnh Farm đã thay đổi.";

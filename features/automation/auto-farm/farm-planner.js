@@ -20,7 +20,18 @@
     const key = JSON.stringify([options.accountProfileKey, options.accountId, options.slot,
       options.character, options.characterId, options.classId, options.radius, options.searchScope, options.targetMode,
       options.targetLevel, options.targetMinLevel, options.targetMaxLevel, options.excludeBoss, options.bossFilter]);
-    if (sessions.get(scene)?.key === key) return;
+    const existing = sessions.get(scene);
+    if (existing?.key === key) return;
+    // Preserve a live, identity-matched Farm origin while replacing its search plan.
+    const identity = (o) => JSON.stringify([o.accountProfileKey, o.accountId, o.slot,
+      o.character, o.characterId, o.classId]);
+    if (existing?.originLocked && existing.auto === scene.auto && globalThis.GSTToolFarm?.active?.(scene)
+        && identity(existing.options) === identity(options)) {
+      existing.key = key; existing.options = { ...options };
+      existing.rejected.clear(); existing.lastTarget = null; existing.routeFailures = 0;
+      yieldPlan(existing, "configuration_changed");
+      return;
+    }
     reset(scene);
     const state = { key, options: { ...options }, auto: scene.auto, map: null, collision: null,
       origin: null, originLocked: false, targetId: null, lastTarget: null, routeFailures: 0, rejected: new Map(), at: -Infinity, result: null };
