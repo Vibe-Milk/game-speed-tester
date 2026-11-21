@@ -99,7 +99,7 @@
       [globalThis.GSTMapTravel, "Đi tới bản đồ"], [globalThis.GSTFarmSeals, "Phong ấn"],
       [globalThis.GSTFarmBossSafety, "Né boss"], [globalThis.GSTFarmDefense, "Tự vệ"]];
     for (const [owner, name] of owners) {
-      if (starting && owner === globalThis.GSTHarvest && owner?.needsFarmCoordination?.() === true) continue;
+      if (starting && owner === globalThis.GSTHarvest) continue;
       if (owner?.controls?.(scene) === true) return name + " đang giữ quyền điều khiển.";
     }
     if (globalThis.GSTFarmInput?.movement?.(scene, { ignoreClick }))
@@ -166,7 +166,7 @@
   }
   function start(scene, intent) {
     const s = sessions.get(scene);
-    if (!s || context(s, true) || paused(s) || !scene.auto.on
+    if (!s || context(s, true) || paused(s, true) || !scene.auto.on
         || !globalThis.GSTIntentAuthority?.validate?.(intent, "farm", true, s.options.accountProfileKey)) return false;
     GSTFarmPlanner.configure(scene, s.options);
     const origin = { x: scene.px, y: scene.py };

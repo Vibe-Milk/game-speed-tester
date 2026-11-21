@@ -269,13 +269,29 @@
           ? globalThis.GSTIntentAuthority?.farmChanged?.(scene, this.on === true) : null;
         if (wasOn && !this.on) invalidateFarmGestures();
         if (!wasOn && this.on) {
-          if (tool && globalThis.GSTIntentAuthority?.validate?.(token, "farm", true, settings.accountProfileKey))
-            globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, token);
-          if (tool && !globalThis.GSTToolFarm?.start?.(scene, token)) {
-            owner.original.apply(this, args);
-            globalThis.GSTIntentAuthority?.farmChanged?.(scene, false);
-            invalidateFarmGestures();
-            message = "Không xác nhận được quyền chạy Farm của tool; đã để Farm OFF."; return;
+          if (tool) {
+            // Harvest configuration synchronously rechecks activation while
+            // Farm is ON but has not yet finished starting. Protect only this
+            // same-scene transition; identity and current intent still apply.
+            let started = false;
+            owner.starting = true;
+            try {
+              if (globalThis.GSTIntentAuthority?.validate?.(token, "farm", true, settings.accountProfileKey)) {
+                globalThis.GSTHarvest?.coordinateFarmEnable?.(scene, token);
+                if (activationLock === owner && sceneNow() === scene && scene.auto === owner.auto
+                    && this.on && !globalThis.GSTHarvest?.needsFarmCoordination?.())
+                  started = globalThis.GSTToolFarm?.start?.(scene, token) === true;
+              }
+            } catch { /* Roll back the native ON below. */ }
+            finally { owner.starting = false; }
+            if (!started) {
+              if (activationLock === owner && sceneNow() === scene && scene.auto === owner.auto && this.on)
+                owner.original.apply(this, args);
+              if (globalThis.GSTIntentAuthority?.validate?.(token, "farm", true, settings.accountProfileKey))
+                globalThis.GSTIntentAuthority?.farmChanged?.(scene, false);
+              invalidateFarmGestures();
+              message = "Chưa bật Farm: chưa bàn giao xong Thu hoạch hoặc không xác nhận được Farm."; return;
+            }
           }
           globalThis.GSTMeditation?.farmStarted?.(scene);
           if (!tool && performance.now() - lastTrustedInputAt < 700)
@@ -312,7 +328,7 @@
       } catch (error) { clearActivationLock(); throw error; }
     }
     if (scene.auto.on && (blockedFarmStart() || settings.policyMode === "tool"
-        && !globalThis.GSTToolFarm?.active?.(scene))) stopFarmOwner(scene);
+        && !activationLock?.starting && !globalThis.GSTToolFarm?.active?.(scene))) stopFarmOwner(scene);
   }
   function syncActivationTracking() {
     if (needsActivationTracking()) {
