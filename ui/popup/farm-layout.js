@@ -62,6 +62,14 @@
   respawn.querySelector('span').textContent = 'Cho phép hồi sinh dùng chung với Thu hoạch';
   respawnHint.textContent = 'Thu hoạch còn kiểm tra lựa chọn hồi sinh riêng của nó. Farm của tool dừng khi chết; Farm của game giữ cơ chế hồi sinh gốc.';
   move([respawn, respawnHint], shared, false);
+  const visual = section('visual', 'Hiển thị mục tiêu và phạm vi', true);
+  independentBody.append(visual.parentElement);
+  const rangeDisplay = byId('farmShowRange').closest('label');
+  const rangeHint = rangeDisplay.nextElementSibling;
+  rangeHint.textContent = 'Vòng thể hiện bán kính Farm của tool tính từ điểm bắt đầu.';
+  const targetDisplay = byId('farmShowTargetLine').closest('label');
+  targetDisplay.querySelector('span').textContent = 'Hiện đường tới quái Farm đang chọn';
+  move([rangeDisplay, rangeHint, targetDisplay], visual, false);
   const prefix = 'farmSectionOpen:v1:', legacyKey = 'farmSectionOpen:v1';
   const touched = new Set();
   let ready = false;

@@ -179,6 +179,7 @@
     s.lifecycle = intent.lifecycle; s.lastTime = scene.now(); s.enabled = true;
     GSTFarmSkills.reset(scene); s.pendingOptions = null; s.skillRotation = { nextSlot: 0 }; s.skillAction = null; s.targetId = null; s.retries = 0; s.nextAttack = -Infinity; s.progressAt = null;
     messages.delete(scene); s.state = "SEARCH"; s.message = "Farm của tool: tìm quái trong bán kính đã lưu.";
+    globalThis.GSTFarmVisual?.attach?.(scene);
     return true;
   }
   function update(s, host, time) {
@@ -272,6 +273,18 @@
   }
   globalThis.GSTToolFarm = Object.freeze({ configure, prepare, start, stop, dispose, movementOwned,
     active: (scene) => sessions.get(scene)?.enabled === true,
+    visualSnapshot(scene) {
+      const s = sessions.get(scene);
+      if (!s?.enabled || !scene.auto?.on || scene.self?.dead || scene.leaving || context(s)) return null;
+      let target = null;
+      if (["COMBAT", "APPROACH"].includes(s.state) && !pauseReason(s) && s.targetId !== null) {
+        const enemy = scene.autoHost?.()?.enemies?.()?.find((e) => e.id === s.targetId && !e.dead);
+        const plan = globalThis.GSTFarmPlanner?.snapshot?.(scene);
+        if (enemy && plan?.targetId === s.targetId && [enemy.x, enemy.y].every(finite))
+          target = { x: enemy.x, y: enemy.y };
+      }
+      return { origin: { ...s.origin }, radius: s.options.radius, target };
+    },
     state: (scene) => sessions.get(scene)?.state ?? "OFF",
     status: (scene) => (sessions.get(scene)?.message ?? messages.get(scene) ?? "Farm của tool: dùng nút/phím Farm để bắt đầu.")
       + (GSTFarmSkills.status(scene) ? " · " + GSTFarmSkills.status(scene) : ""),

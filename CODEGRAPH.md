@@ -64,6 +64,8 @@ flowchart LR
 
 Log kỹ năng Tool Farm: `farm-skill-diagnostics.js` thu thập theo tab/hồ sơ đã xác minh khi người dùng bật; `farm-skills.js` ghi lý do bỏ qua và lần gọi tool, wrapper `scene.useSkill` quan sát thao tác tay. `farm-diagnostics-content.js` lọc trường trước bridge; popup có nút xuất log kỹ năng riêng và giữ log tổng. Hồi chiêu quan sát ở client không xác nhận sát thương/server.
 
+Tool Farm cung cấp snapshot chỉ đọc về tâm, bán kính phiên và quái đang chọn qua `GSTToolFarm.visualSnapshot`; `farm-visual.js` dùng snapshot này để vẽ vòng và đường mục tiêu khi bật các tùy chọn trong Tiện ích độc lập. Thu hoạch giữ hiển thị riêng.
+
 ## 4. Điều phối nhiều module cùng dùng Auto Farm
 
 ```mermaid

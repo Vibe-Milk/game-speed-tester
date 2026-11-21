@@ -77,6 +77,23 @@
     owner.nextAt = performance.now() + 100;
     graphics.clear();
     try {
+      if (globalThis.GSTFarmPolicy?.isTool?.()) {
+        const snapshot = globalThis.GSTToolFarm?.visualSnapshot?.(scene);
+        if (!snapshot) return;
+        const zoom = scene.cameras?.main?.zoom || 1;
+        const center = scene.toPx(snapshot.origin.x, snapshot.origin.y);
+        if (preferences.showRange) {
+          const edge = scene.toPx(snapshot.origin.x + snapshot.radius, snapshot.origin.y);
+          const radius = Math.abs(edge[0] - center[0]);
+          if (Number.isFinite(radius) && radius > 0) graphics.lineStyle(1.5 / zoom, 0x64baff, 0.7).strokeCircle(center[0], center[1], radius);
+        }
+        if (preferences.showTargetLine && snapshot.target) {
+          const start = scene.toPx(scene.px, scene.py), end = scene.toPx(snapshot.target.x, snapshot.target.y);
+          graphics.lineStyle(2 / zoom, 0x5ce6bd, 0.9).lineBetween(...start, ...end);
+          graphics.strokeCircle(end[0], end[1], 6 / zoom);
+        }
+        return;
+      }
       drawRange(scene, graphics);
       if (!preferences.showTargetLine) return;
       const snapshot = navigationSnapshot(scene);
@@ -102,7 +119,8 @@
     } catch { detach(); }
   }
   function attach(scene) {
-    if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !enabled || suspended) { detach(); return; }
+    if ((!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() && !globalThis.GSTFarmPolicy?.isTool?.())
+        || !enabled || suspended || preferences.identityBlocked || !preferences.identityVerified) { detach(); return; }
     if (binding?.scene === scene) return;
     detach();
     if (!scene?.sys?.isActive?.() || typeof scene.add?.graphics !== "function" || typeof scene.toPx !== "function"

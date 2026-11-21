@@ -699,6 +699,7 @@ function syncFarmPolicyUI(raw = {}) {
   farmRightControls.disabled = true; // Retired Farm behaviors; preferences remain stored.
   // This flag is also used by independent Harvest recovery.
   farmAutoRespawn.disabled = !farmSyncReady || !accountAllowed;
+  farmShowRange.disabled = farmShowTargetLine.disabled = !farmSyncReady || !accountAllowed;
   farmCustomStats.disabled = !farmSyncReady || tabMode !== "custom" || !accountAllowed;
   syncBossTargetControls();
   breakSeals.disabled = true;
