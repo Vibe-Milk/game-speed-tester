@@ -85,13 +85,10 @@
   function pauseReason(s, starting = false, ignoreClick = false) {
     const scene = s.scene;
     if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
-    if (document.hidden) return "Tab game đang bị ẩn.";
-    if (!document.hasFocus()) return "Tab game chưa có focus; quay lại tab game rồi thử lại.";
     if (scene.chat?.typing) return "Đang nhập chat.";
     if (scene.keyCapture) return "Game đang chờ nhập phím tắt.";
     if (scene.inputFieldActive?.()) return "Ô nhập của game đang nhận bàn phím.";
     if (scene.overlay?.dialogOpen) return "Game đang mở hộp thoại.";
-    if (scene.panels?.open) return "Game đang mở bảng thông tin; đóng bảng trước khi bật Farm.";
     if (scene.uiBlocked) return "Game đang khóa thao tác; kiểm tra hướng màn hình hoặc bảng đang mở.";
     if (scene.heldAttack) return "Đang giữ đánh thường bằng tay.";
     if (scene.pendingSkill) return "Đang có kỹ năng chờ xử lý.";

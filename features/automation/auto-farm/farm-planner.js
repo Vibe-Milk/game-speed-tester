@@ -110,7 +110,7 @@
         state.map = map; state.collision = scene.collision; state.origin = null;
         state.rejected.clear(); yieldPlan(state, "map_changed");
       }
-      if ((!execution && scene.auto.on === true) || document.hidden || !document.hasFocus() || scene.uiBlocked || scene.keyCapture
+      if ((!execution && (scene.auto.on === true || document.hidden || !document.hasFocus())) || scene.uiBlocked || scene.keyCapture
           || scene.chat?.typing || scene.heldAttack || scene.pendingSkill || scene.aiming || scene.dashT > 0
           || scene.self.med || scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time
           || globalThis.GSTFarmInput?.movement?.(scene)

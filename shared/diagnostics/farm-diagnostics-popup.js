@@ -129,6 +129,21 @@
     if (result && row.before) result.before = pick(row.before, vitalFields, vitalFlags);
     return result;
   }
+  // Keep only actionable incidents in exported histories. Collection remains
+  // unchanged so existing diagnostics can still correlate observations.
+  function problems(rows, accepted, max = 30) {
+    const output = [];
+    for (const row of rows || []) {
+      if (!row || !accepted(row)) continue;
+      const prev = output[output.length - 1];
+      const signature = (r) => JSON.stringify([r.event, r.reason, r.skill, r.skillId, r.source, r.stage, r.fromId, r.toId, r.switchReason]);
+      if (prev && signature(prev) === signature(row)) {
+        prev.repeatCount = Math.min(10000, (prev.repeatCount || 1) + (row.repeatCount || 1));
+        prev.lastAt = row.t;
+      } else output.push({ ...row });
+    }
+    return output.slice(-max);
+  }
   function compact(data) {
     const movement = data.movement || {}, bg = data.background || {};
     const boss = data.bossSafety || {}, flight = data.flight || {};
@@ -137,26 +152,30 @@
       legend: "t=UTC; event=reason; also=other simultaneous events; flags lists true states (others false); missing fields=null; ownerScope=eligibility (not actual move)",
       farm: { tracking: data.tracking === true,
         current: pick(data.current, [["on", "on"], ["deaths", "deaths"]], farmFlags),
-        events: (data.events || []).map((row) => pick(row, stopFields, farmFlags)) },
+        events: problems((data.events || []).map((row) => pick(row, stopFields, farmFlags)), (row) => row.event === "off") },
       movement: { build: movement.build, tracking: movement.tracking === true,
         current: move(movement.current),
-        events: merged([movement.events, movement.incidents, movement.uiIncidents], move, true) },
+        events: problems(merged([movement.events, movement.incidents, movement.uiIncidents], move, true),
+          (row) => ["movement_stall", "routing_stuck", "routing_replan", "routing_correction", "map_stuck", "map_replan", "map_correction", "frame_gap", "short_frame_gap", "panel_gap", "correction", "target_decision", "farm_boundary_denied"].includes(row.event)) },
       background: { build: bg.build, generation: bg.generation,
         current: background(bg.current),
         recovery: background(bg.recovery),
         lastAlive: pick(bg.lastAlive, vitalFields, vitalFlags),
         lastObserved: pick(bg.lastObserved, vitalFields, vitalFlags),
-        events: merged([bg.events, bg.incidents], background) },
+        events: problems(merged([bg.events, bg.incidents], background),
+          (row) => ["frame_gap", "freeze", "position_jump", "death", "native_revive_attempt"].includes(row.event)) },
       boss: { build: boss.build, active: boss.active === true, retreating: boss.retreating === true,
-        events: (boss.events || []).map((row) => pick(row, bossFields, ["flying"])) },
+        events: problems((boss.events || []).map((row) => pick(row, bossFields, ["flying"])),
+          (row) => ["unsupported", "no_destination", "no_route", "return_deferred", "flight_drop"].includes(row.event)) },
       flight: { build: flight.build,
         state: pick(flight, flightFields, flightFlags),
-        events: (flight.events || []).map((row) =>
-          pick(row, [["at", "t"], ["type", "event"]], ["auto", "flying", "always", "farm"])) },
+        events: problems((flight.events || []).map((row) =>
+          pick(row, [["at", "t"], ["type", "event"]], ["auto", "flying", "always", "farm"])),
+          (row) => ["no_snapshot", "unconfirmed", "disconnected", "blocked"].includes(row.event)) },
       skill: { build: data.skill?.build || "unavailable", enabled: data.skill?.enabled === true,
         tracking: data.skill?.tracking === true, config: data.skill?.config || null,
         legend: "guard_blocked/q_blocked=extension block; native_rejected=host.cast returned false without scene.useSkill; skillWaitBeforeMs is the bounded client gate value at invocation; snapshot_cooldown is a newer client snapshot observation and attribution=not_specific means it is not linked to one attempt (priorEvidence is context only); repeats are coalesced; no stage proves server acceptance or damage",
-        events: (Array.isArray(data.skill?.events) ? data.skill.events : []).slice(-80).map((row) => {
+        events: problems((Array.isArray(data.skill?.events) ? data.skill.events : []).slice(-80).map((row) => {
           const result = pick(row, [["at", "t"], ["attemptId", "attempt"], ["skill", "skill"], ["skillId", "skillId"],
             ["source", "source"], ["stage", "stage"], ["reason", "reason"], ["method", "method"],
             ["returnKind", "return"], ["conditions", "conditions"], ["skillWaitMs", "skillWaitMs"],
@@ -169,7 +188,8 @@
             ["cooldownAfterMs", "cooldownAfterMs"], ["dashStarted", "dashStarted"],
             ["pendingSkillChanged", "pendingSkillChanged"]]);
           return result;
-        }) }
+        }), (row) => ["native_rejected", "unconfirmed", "ambiguous", "q_blocked"].includes(row.stage)
+          || row.stage === "guard_blocked" && !["action_lock", "cooldown_wait", "retry_backoff"].includes(row.reason), 40) }
     };
   }
   skillEnabled.addEventListener("change", async () => {
