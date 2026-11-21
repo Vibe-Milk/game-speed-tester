@@ -23,7 +23,7 @@
     if (sessions.get(scene)?.key === key) return;
     reset(scene);
     const state = { key, options: { ...options }, auto: scene.auto, map: null, collision: null,
-      origin: null, originLocked: false, targetId: null, rejected: new Map(), at: -Infinity, result: null };
+      origin: null, originLocked: false, targetId: null, lastTarget: null, routeFailures: 0, rejected: new Map(), at: -Infinity, result: null };
     state.dispose = () => reset(scene);
     sessions.set(scene, state); liveScenes.add(scene);
     scene.events.on("shutdown", state.dispose); scene.events.on("destroy", state.dispose);
@@ -66,7 +66,8 @@
     if (!state || !origin || ![origin.x, origin.y].every(finite)) return false;
     state.origin = { ...origin }; state.originLocked = true;
     state.map = scene.autoHost().mapKey(); state.collision = scene.collision;
-    state.rejected.clear(); yieldPlan(state, "new_start"); return true;
+    state.rejected.clear(); state.lastTarget = null; state.routeFailures = 0;
+    yieldPlan(state, "new_start"); return true;
   }
   function invalidateRoute(scene, rejectedId = null) {
     const state = sessions.get(scene); if (!state) return;
@@ -143,12 +144,24 @@
         if (valid) {
           state.result.path = cached;
           state.result.target = { x: retained.x, y: retained.y, radius: retained.radius };
+          state.lastTarget = { id: retained.id, x: retained.x, y: retained.y, at: time };
+          state.routeFailures = 0;
           return copy(state.result);
         }
       }
       if (time >= state.at && time - state.at < 0.5) return waiting("planning_throttled");
       state.at = time;
-      const ordered = candidates.sort((a, b) => rank(a, b, pos, options.targetMode));
+      const previousTarget = state.lastTarget;
+      const previousId = state.targetId ?? previousTarget?.id;
+      const anchor = !retained && previousTarget && time >= previousTarget.at && time - previousTarget.at <= 8
+        ? previousTarget : null;
+      const ordered = candidates.sort((a, b) => {
+        if (anchor && !["bossLevel", "highLevel", "lowLevel"].includes(options.targetMode)) {
+          const aNear = distance(a, anchor) <= 8, bNear = distance(b, anchor) <= 8;
+          if (aNear !== bNear) return aNear ? -1 : 1;
+        }
+        return rank(a, b, pos, options.targetMode);
+      });
       if (retained) { ordered.splice(ordered.indexOf(retained), 1); ordered.unshift(retained); }
       state.targetId = null; state.result = null;
       let probes = 0;
@@ -175,11 +188,24 @@
         }
         if (!path && !complete) break;
         if (!path) {
+          if (retained && enemy.id === retained.id && state.routeFailures < 2) {
+            state.routeFailures++; state.targetId = retained.id;
+            try { globalThis.GSTMovementDiagnostics?.event?.(scene, "target_decision",
+              { fromId: retained.id, toId: retained.id, switchSource: options.searchScope === "map" ? "map" : "radius", switchReason: "route_unavailable" }); } catch {}
+            return waiting("route_retry");
+          }
+          state.routeFailures = 0;
           state.rejected.set(enemy.id, { x: enemy.x, y: enemy.y, at: time, until: time + 5 });
           if (state.rejected.size > 128) state.rejected.delete(state.rejected.keys().next().value);
           continue;
         }
-        state.targetId = enemy.id;
+        state.targetId = enemy.id; state.routeFailures = 0;
+        if (previousId && previousId !== enemy.id) {
+          try { globalThis.GSTMovementDiagnostics?.event?.(scene, "target_decision",
+            { fromId: previousId, toId: enemy.id, switchSource: options.searchScope === "map" ? "map" : "radius",
+              switchReason: retained ? "route_unavailable" : "target_unavailable" }); } catch {}
+        }
+        state.lastTarget = { id: enemy.id, x: enemy.x, y: enemy.y, at: time };
         state.result = { state: "PLANNED", reason: "proposal_only", executable: false,
           targetId: enemy.id, target: { x: enemy.x, y: enemy.y, radius: enemy.radius },
           goal: { x: goal.x, y: goal.y }, reach, origin: { ...state.origin },
