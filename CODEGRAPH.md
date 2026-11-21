@@ -64,7 +64,7 @@ flowchart LR
 
 Log kỹ năng Tool Farm: `farm-skill-diagnostics.js` thu thập theo tab/hồ sơ đã xác minh khi người dùng bật; `farm-skills.js` ghi lý do bỏ qua và lần gọi tool, wrapper `scene.useSkill` quan sát thao tác tay. `farm-diagnostics-content.js` lọc trường trước bridge; popup có nút xuất log kỹ năng riêng và giữ log tổng. Hồi chiêu quan sát ở client không xác nhận sát thương/server.
 
-Tool Farm không tự dừng chỉ vì tab nền, mất focus hoặc mở bảng; các điều kiện nhập liệu, thao tác tay và khóa game vẫn giữ. Bản xuất diagnostics chỉ giữ các sự kiện lỗi chính và gộp lặp. Tool Farm hỗ trợ phạm vi bán kính hoặc toàn map theo dữ liệu quái game cung cấp; đổi phạm vi kết thúc phiên Farm hiện tại. Tool Farm cung cấp snapshot chỉ đọc về tâm, bán kính phiên và quái đang chọn qua `GSTToolFarm.visualSnapshot`; `farm-visual.js` dùng snapshot này để vẽ vòng và đường mục tiêu khi bật các tùy chọn trong Tiện ích độc lập. Thu hoạch giữ hiển thị riêng.
+Tool Farm không tự dừng chỉ vì tab nền, mất focus, mở bảng hoặc nhập chat; vẫn nhường thao tác di chuyển, ngắm skill, hộp thoại và khóa phím tắt. Planner thử các điểm đứng quanh mục tiêu và yêu cầu đường đánh thông thoáng khi lập đường tránh vật cản. Bản xuất diagnostics chỉ giữ các sự kiện lỗi chính và gộp lặp. Tool Farm hỗ trợ phạm vi bán kính hoặc toàn map theo dữ liệu quái game cung cấp; đổi phạm vi kết thúc phiên Farm hiện tại. Tool Farm cung cấp snapshot chỉ đọc về tâm, bán kính phiên và quái đang chọn qua `GSTToolFarm.visualSnapshot`; `farm-visual.js` dùng snapshot này để vẽ vòng và đường mục tiêu khi bật các tùy chọn trong Tiện ích độc lập. Thu hoạch giữ hiển thị riêng.
 
 ## 4. Điều phối nhiều module cùng dùng Auto Farm
 

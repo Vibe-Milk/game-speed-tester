@@ -110,8 +110,8 @@
         state.map = map; state.collision = scene.collision; state.origin = null;
         state.rejected.clear(); yieldPlan(state, "map_changed");
       }
-      if ((!execution && (scene.auto.on === true || document.hidden || !document.hasFocus())) || scene.uiBlocked || scene.keyCapture
-          || scene.chat?.typing || scene.heldAttack || scene.pendingSkill || scene.aiming || scene.dashT > 0
+      if ((!execution && (scene.auto.on === true || document.hidden || !document.hasFocus())) || scene.keyCapture || scene.overlay?.dialogOpen
+          || (document.body.classList.contains("mobile") && innerHeight > innerWidth) || scene.heldAttack || scene.pendingSkill || scene.aiming || scene.dashT > 0
           || scene.self.med || scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time
           || globalThis.GSTFarmInput?.movement?.(scene)
           || [globalThis.GSTHarvest, globalThis.GSTQuest, globalThis.GSTMapTravel,
@@ -168,20 +168,20 @@
       for (const enemy of ordered) {
         const skip = state.rejected.get(enemy.id);
         if (skip && distance(skip, enemy) < 1) continue;
-        if (probes >= 6) break;
+        if (probes >= 12) break;
         let path = null, goal = enemy;
         const baseReach = ["kiem-tien", "ma-tong", "the-tu", "untrained"].includes(options.classId) ? 1.3 : 1.6;
         if (execution && (!finite(enemy.radius) || enemy.radius < 0)) continue;
         const reach = baseReach + (execution ? enemy.radius : 0);
         const angle = Math.atan2(pos.y - enemy.y, pos.x - enemy.x);
         const goals = !execution ? [enemy] : distance(pos, enemy) <= reach && host.clear(pos.x, pos.y, enemy.x, enemy.y)
-          ? [pos] : [0, 0.75, -0.75].map((offset) => ({
+          ? [pos] : [0, 0.75, -0.75, 1.5, -1.5, 2.25, -2.25, Math.PI].map((offset) => ({
             x: enemy.x + Math.cos(angle + offset) * reach * 0.8,
             y: enemy.y + Math.sin(angle + offset) * reach * 0.8 }));
         let complete = true;
         for (const point of goals) {
-          if (!allowed(point)) continue;
-          if (probes >= 6) { complete = false; break; }
+          if (!allowed(point) || (execution && host.clear(point.x, point.y, enemy.x, enemy.y) !== true)) continue;
+          if (probes >= 12) { complete = false; break; }
           probes++;
           path = globalThis.GSTNavigation?.planRoute?.(host, pos, point, allowed);
           if (path) { goal = point; break; }
@@ -195,6 +195,8 @@
             return waiting("route_retry");
           }
           state.routeFailures = 0;
+          if (execution) try { globalThis.GSTMovementDiagnostics?.event?.(scene, "target_decision",
+            { fromId: enemy.id, switchSource: options.searchScope === "map" ? "map" : "radius", switchReason: "route_unavailable" }); } catch {}
           state.rejected.set(enemy.id, { x: enemy.x, y: enemy.y, at: time, until: time + 5 });
           if (state.rejected.size > 128) state.rejected.delete(state.rejected.keys().next().value);
           continue;

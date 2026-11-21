@@ -85,11 +85,10 @@
   function pauseReason(s, starting = false, ignoreClick = false) {
     const scene = s.scene;
     if (performance.now() < s.manualUntil) return "Đang chờ sau thao tác tay.";
-    if (scene.chat?.typing) return "Đang nhập chat.";
     if (scene.keyCapture) return "Game đang chờ nhập phím tắt.";
-    if (scene.inputFieldActive?.()) return "Ô nhập của game đang nhận bàn phím.";
     if (scene.overlay?.dialogOpen) return "Game đang mở hộp thoại.";
-    if (scene.uiBlocked) return "Game đang khóa thao tác; kiểm tra hướng màn hình hoặc bảng đang mở.";
+    if (document.body.classList.contains("mobile") && innerHeight > innerWidth)
+      return "Game đang khóa thao tác do hướng màn hình.";
     if (scene.heldAttack) return "Đang giữ đánh thường bằng tay.";
     if (scene.pendingSkill) return "Đang có kỹ năng chờ xử lý.";
     if (scene.aiming) return "Đang ngắm kỹ năng bằng tay.";
