@@ -4,7 +4,7 @@
   const currentScene = () => window.game?.scene?.getScene?.("world")
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   const key = (o) => JSON.stringify([o.policyMode, o.identityVerified, o.identityBlocked, o.accountProfileKey,
-    o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.targetMode,
+    o.accountId, o.slot, o.character, o.characterId, o.classId, o.radius, o.searchScope, o.targetMode,
     o.targetLevel, o.targetMinLevel, o.targetMaxLevel, o.excludeBoss, o.bossFilter,
     o.pickupMode]);
   function otherOwner(scene, allowHarvest = false) {
@@ -191,7 +191,7 @@
     if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) { release(s); return; }
     s.lastTime = time;
     if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
-    if (Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius) {
+    if (s.options.searchScope !== "map" && Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius) {
       if (movementBlocked(scene)) { release(s); s.message = "Chờ game mở khóa di chuyển trước khi quay lại vùng Farm."; return; }
       const step = GSTNavigation.customStep(scene, s.nav, host, time, s.origin.x, s.origin.y, Math.max(0.1, s.options.radius * 0.5));
       const point = step?.point;
@@ -230,7 +230,7 @@
     const distance = Math.hypot(target.x - scene.px, target.y - scene.py);
     const allowed = (point) => point && [point.x, point.y].every(finite) && point.x >= 0 && point.y >= 0
       && point.x < scene.map.w && point.y < scene.map.h
-      && Math.hypot(point.x - s.origin.x, point.y - s.origin.y) <= s.options.radius;
+      && (s.options.searchScope === "map" || Math.hypot(point.x - s.origin.x, point.y - s.origin.y) <= s.options.radius);
     // Custom restarts at priority[0]; game mode retains its private rotation.
     if (s.options.skillMode === "game" || s.options.skillEnabled?.length) {
       const permitted = () => !context(s) && !paused(s);
@@ -283,7 +283,7 @@
         if (enemy && plan?.targetId === s.targetId && [enemy.x, enemy.y].every(finite))
           target = { x: enemy.x, y: enemy.y };
       }
-      return { origin: { ...s.origin }, radius: s.options.radius, target };
+      return { origin: { ...s.origin }, radius: s.options.radius, scope: s.options.searchScope, target };
     },
     state: (scene) => sessions.get(scene)?.state ?? "OFF",
     status: (scene) => (sessions.get(scene)?.message ?? messages.get(scene) ?? "Farm của tool: dùng nút/phím Farm để bắt đầu.")

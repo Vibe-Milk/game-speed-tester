@@ -905,8 +905,7 @@ function farmMessage(message) {
     : farmHpThresholdDraft().error ? ` · ${farmHpThresholdDraft().error}` : farmHasDraft() ? " · Có bản nháp chưa lưu." : "");
 }
 function syncFarmScope() {
-  // The retired whole-map preference must not hide the retained radius editor.
-  farmRadius.closest(".input-action").hidden = false;
+  farmRadius.closest(".input-action").hidden = farmSearchScope.value === "map";
 }
 function syncBossTargetControls() {
   const mode = farmTargetMode.value || farmConfirmed.targetMode || "all";
@@ -1041,7 +1040,7 @@ farmBossFilter.addEventListener("change", async () => {
 for (const [input, key] of [[farmSearchScope, "searchScope"], [farmIdleMode, "idleMode"]]) {
   input.addEventListener("change", async () => {
     const value = input.value;
-    const patch = key === "searchScope" ? { enabled: true, searchScope: value, ...(farmConfirmed.enabled ? {} : { radius: 11 }) } : { [key]: value };
+    const patch = key === "searchScope" ? { enabled: true, searchScope: value } : { [key]: value };
     input.disabled = true;
     syncFarmScope();
     await saveFarmPatch(patch, () => { input.value = String(farmConfirmed[key]); syncFarmScope(); });

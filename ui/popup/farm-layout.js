@@ -37,9 +37,10 @@
     wrapper.append(...nodes); destination.append(wrapper); mirrors.push({ wrapper, sources });
   }
   const range = section('range', 'Bán kính Farm');
-  move([byId('farmRadius').closest('.input-action')], range);
+  const scope = byId('farmSearchScope');
+  move([scope.previousElementSibling, scope, scope.nextElementSibling, byId('farmRadius').closest('.input-action')], range);
   const hint = document.createElement('p'); hint.className = 'hint'; hint.setAttribute('role', 'note');
-  hint.textContent = 'Bán kính và bộ lọc áp dụng cho Farm của tool sau khi bật riêng trong game. Farm của game dùng cài đặt game gốc.';
+  hint.textContent = 'Phạm vi và bộ lọc áp dụng cho Farm của tool. Toàn map chỉ tìm trong dữ liệu game cung cấp.';
   range.prepend(hint);
   const targets = section('targets', 'Bộ lọc quái');
   const targetColumn = archive.querySelector('.farm-target');

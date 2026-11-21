@@ -18,7 +18,7 @@
     }
     if (!scene.events?.on || !scene.events.off) { reset(scene); return; }
     const key = JSON.stringify([options.accountProfileKey, options.accountId, options.slot,
-      options.character, options.characterId, options.classId, options.radius, options.targetMode,
+      options.character, options.characterId, options.classId, options.radius, options.searchScope, options.targetMode,
       options.targetLevel, options.targetMinLevel, options.targetMaxLevel, options.excludeBoss, options.bossFilter]);
     if (sessions.get(scene)?.key === key) return;
     reset(scene);
@@ -121,7 +121,7 @@
           || options.radius < 1 || options.radius > 1000) return yieldPlan(state, "invalid_boundary");
       state.origin ??= { ...pos };
       const allowed = (point) => point && [point.x, point.y].every(finite) && point.x >= 0 && point.y >= 0
-        && point.x < width && point.y < height && distance(point, state.origin) <= options.radius;
+        && point.x < width && point.y < height && (options.searchScope === "map" || distance(point, state.origin) <= options.radius);
       if (!allowed(pos)) return yieldPlan(state, "outside_radius");
       const enemies = host.enemies?.();
       if (!Array.isArray(enemies)) return yieldPlan(state, "targets_unavailable");

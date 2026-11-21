@@ -92,7 +92,7 @@
       eliteDodge: value?.eliteDodge === true,
       bossRetreat: value?.bossRetreat !== false,
       ...hpThresholds,
-      searchScope: value?.searchScope === "map" ? "map" : "radius",
+      searchScope: value?.enabled === true && value?.searchScope === "map" ? "map" : "radius",
       breakSeals: value?.breakSeals === true,
       idleMode: ["home", "seek"].includes(value?.idleMode) ? value.idleMode : "hold",
       preferLoot: value?.preferLoot !== false,

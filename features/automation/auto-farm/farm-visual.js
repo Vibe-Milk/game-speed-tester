@@ -82,7 +82,7 @@
         if (!snapshot) return;
         const zoom = scene.cameras?.main?.zoom || 1;
         const center = scene.toPx(snapshot.origin.x, snapshot.origin.y);
-        if (preferences.showRange) {
+        if (preferences.showRange && snapshot.scope !== "map") {
           const edge = scene.toPx(snapshot.origin.x + snapshot.radius, snapshot.origin.y);
           const radius = Math.abs(edge[0] - center[0]);
           if (Number.isFinite(radius) && radius > 0) graphics.lineStyle(1.5 / zoom, 0x64baff, 0.7).strokeCircle(center[0], center[1], radius);
