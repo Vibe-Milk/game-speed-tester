@@ -189,7 +189,9 @@
         let path = null, goal = enemy;
         const baseReach = ["kiem-tien", "ma-tong", "the-tu", "untrained"].includes(options.classId) ? 1.3 : 1.6;
         if (execution && (!finite(enemy.radius) || enemy.radius < 0)) continue;
-        const reach = baseReach + (execution ? enemy.radius : 0);
+        // Approach inside the native selector's threshold to leave room for
+        // target movement before the game's delayed attack impact.
+        const reach = Math.max(0.5, baseReach + (execution ? enemy.radius : 0) - 0.3);
         const angle = Math.atan2(pos.y - enemy.y, pos.x - enemy.x);
         const goals = !execution ? [enemy] : distance(pos, enemy) <= reach && host.clear(pos.x, pos.y, enemy.x, enemy.y)
           ? [pos] : [0, 0.75, -0.75, 1.5, -1.5, 2.25, -2.25, Math.PI].map((offset) => ({

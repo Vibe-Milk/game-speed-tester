@@ -250,6 +250,9 @@
     if (distance <= plan.reach && host.clear(scene.px, scene.py, target.x, target.y) === true) {
       release(s); s.state = "COMBAT"; s.message = "Farm của tool: đánh thường mục tiêu đã chọn.";
       if (time < s.nextAttack || scene.skillWait?.("Space") > 0) return;
+      // Never clear another owner's movement; wait until the game is stationary.
+      // Native action locks at the top of update govern completion of the swing.
+      if (![scene.autoX, scene.autoY].every(finite) || Math.hypot(scene.autoX, scene.autoY) > 0.01) return;
       // Final synchronous ownership check before the only combat action.
       if (context(s) || paused(s)) return;
       host.face(target.x, target.y, target.id); s.lockId = scene.lockId;
