@@ -158,6 +158,10 @@
         return false;
       }
     }
+    // Only restore focus when this menu still owns it in the foreground.
+    // The iframe lives in a closed shadow root, so document.activeElement is
+    // the host for both the iframe and the menu's own close button.
+    const returnFocus = opened && !document.hidden && document.hasFocus() && document.activeElement === root;
     opened = false;
     if (root) root.dataset.open = "false";
     if (panel) panel.hidden = true;
@@ -165,6 +169,15 @@
     // Remove the iframe so its popup refresh interval stops while closed.
     clearTimeout(frameLoadTimer); frameLoadTimer = null;
     frame?.remove(); frame = null; frameLoaded = false;
+    if (returnFocus && !document.hidden && document.hasFocus()) {
+      const canvas = document.querySelector("canvas");
+      if (canvas?.isConnected) {
+        const hadTabIndex = canvas.hasAttribute("tabindex");
+        if (!hadTabIndex) canvas.setAttribute("tabindex", "-1");
+        try { canvas.focus({ preventScroll: true }); } catch { /* Menu closure must still succeed. */ }
+        if (!hadTabIndex) canvas.removeAttribute("tabindex");
+      }
+    }
     return true;
   }
   function open() {
