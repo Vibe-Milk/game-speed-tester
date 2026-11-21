@@ -189,6 +189,16 @@
     if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
     const pursuit = GSTFarmPlanner.chase(scene);
     if (s.options.searchScope !== "map" && Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius && !pursuit) {
+      if (s.state !== "RETURN" && s.targetId !== null) {
+        try {
+          const enemy = host.enemies?.()?.find((e) => e.id === s.targetId);
+          const reason = enemy && [enemy.x, enemy.y].every(finite)
+            && Math.hypot(enemy.x - s.origin.x, enemy.y - s.origin.y) > s.options.radius + 10
+            ? "outside_circle" : "target_unavailable";
+          globalThis.GSTMovementDiagnostics?.event?.(scene, "target_decision",
+            { fromId: s.targetId, switchSource: "radius", switchReason: reason });
+        } catch {}
+      }
       if (movementBlocked(scene)) { release(s); s.message = "Chờ game mở khóa di chuyển trước khi quay lại vùng Farm."; return; }
       const step = GSTNavigation.customStep(scene, s.nav, host, time, s.origin.x, s.origin.y, Math.max(0.1, s.options.radius * 0.5));
       const point = step?.point;

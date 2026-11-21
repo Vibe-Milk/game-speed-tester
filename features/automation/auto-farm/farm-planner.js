@@ -29,7 +29,7 @@
     scene.events.on("shutdown", state.dispose); scene.events.on("destroy", state.dispose);
   }
   function yieldPlan(state, reason) {
-    if (reason !== "yielding") state.targetId = null;
+    if (!["yielding", "stale_data", "targets_unavailable", "data_unavailable"].includes(reason)) state.targetId = null;
     state.result = null; state.at = -Infinity;
     return waiting(reason);
   }
@@ -203,7 +203,12 @@
           path = globalThis.GSTNavigation?.planRoute?.(host, pos, point, allowed);
           if (path) { goal = point; break; }
         }
-        if (!path && !complete) break;
+        if (!path && !complete) {
+          // Probe budget exhaustion is not evidence that the retained target
+          // is unreachable. Keep its identity for the next planning pass.
+          if (retained && enemy.id === retained.id) state.targetId = retained.id;
+          return waiting("planning_throttled");
+        }
         if (!path) {
           if (retained && enemy.id === retained.id && state.routeFailures < 2) {
             state.routeFailures++; state.targetId = retained.id;
