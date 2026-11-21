@@ -29,9 +29,8 @@
       if (!finite(cooldown) || cooldown > 0 || (self.cl ?? 0) - (time - scene.selfAt) > 0
           || scene.skillWait(slot) > 0
           || !finite(kit.range) || kit.range < 0) { blocked("action_lock"); continue; }
-      const gauge = host.gauge?.();
-      if (finite(kit.res) && gauge && (kit.res > 0 && gauge.v + kit.res >= gauge.max
-          || kit.res < 0 && gauge.v < -kit.res)) { blocked("resource"); continue; }
+      // Resource effects are not a universal minimum cost. Let the native
+      // cast path apply class-specific requirements and observe its outcome.
       let x = decision ? decision.x : target.x, y = decision ? decision.y : target.y;
       if (!decision) {
         if (kit.heal && kit.dmg <= 0) {
@@ -100,7 +99,10 @@
     // idle and the native controller's own nextSlot are never invoked or changed.
     const adapter = Object.freeze({
       hp: () => host.hp(), gauge: () => host.gauge?.(), inCombat: () => host.inCombat(),
-      skills: () => host.skills().filter((slot) => /^[1-6]$/.test(slot)), kit: (slot) => host.kit(slot),
+      skills: () => host.skills().filter((slot) => /^[1-6]$/.test(slot)),
+      // The native selector treats resource gain as a reason to skip a skill.
+      // Keep its targeting and rotation, but defer resource eligibility to cast.
+      kit: (slot) => { const kit = host.kit(slot); return kit ? { ...kit, res: 0 } : kit; },
       cast(slot, x, y) {
         if (action || !permitted()) return false;
         action = tryPriority(scene, host, { skillEnabled: [slot], skillPriority: [slot] },
