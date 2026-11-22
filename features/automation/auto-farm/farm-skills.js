@@ -140,7 +140,17 @@
         if (action.rotation) action.rotation.nextSlot = action.nextSlot;
         results.set(scene, `Ô ${action.slot}: đã quan sát hồi chiêu từ game; không xác nhận sát thương.`);
       }
-      if (!action.confirmed && performance.now() < action.deadline) return true;
+      // A fresh snapshot with a ready skill may mean an immediate reset, not
+      // proof of a successful cast. Wait for native locks before retrying.
+      const readyAgain = scene.selfAt > action.snapshotAt && finite(cd) && cd <= 0
+        && time >= action.until && typeof scene.skillWait === "function" && scene.skillWait(action.slot) <= 0;
+      if (!action.confirmed && !readyAgain && performance.now() < action.deadline) return true;
+      if (!action.confirmed && readyAgain && entry && entry.retryAt === Infinity) {
+        entry.failures = Math.min(4, entry.failures + 1);
+        entry.retryAt = performance.now() + Math.min(4000, 300 * 2 ** (entry.failures - 1));
+        results.set(scene, `Ô ${action.slot}: skill sẵn sàng lại; chưa xác nhận lần dùng trước.`);
+        return false;
+      }
       if (!action.confirmed) {
         if (entry && entry.retryAt === Infinity) {
           entry.failures = Math.min(3, entry.failures + 1);
