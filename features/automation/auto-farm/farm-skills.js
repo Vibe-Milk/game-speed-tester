@@ -5,6 +5,11 @@
     if (!attempts.has(scene)) attempts.set(scene, new Map());
     return attempts.get(scene);
   }
+  function deferRetry(scene, slot, id, previous) {
+    const failures = Math.min(3, (previous?.id === id ? previous.failures : 0) + 1);
+    ledger(scene).set(slot, { id, failures, retryAt: performance.now() + Math.min(4000, 500 * 2 ** failures) });
+    results.set(scene, `Ô ${slot}: game chưa nhận yêu cầu; giãn lần thử lại.`);
+  }
   // True means a client-side skill issue was observed, not a server hit/receipt.
   function tryPriority(scene, host, options, target, allowed, permitted, decision = null) {
     const time = scene.now(), self = scene.self;
@@ -70,11 +75,13 @@
       let castResult;
       try { castResult = diagnostics?.isEnabled?.(scene) ? diagnostics.invoke(scene, slot, "farm_cast", "host.cast", cast) : cast(); }
       catch (error) { if (called) throw error; castResult = cast(); }
-      if (castResult !== true) { blocked("cast_rejected"); continue; } // Native checks remain authoritative.
+      if (castResult !== true) {
+        blocked("cast_rejected"); deferRetry(scene, slot, kit.id, previous); continue;
+      } // Native checks remain authoritative.
       const issued = (scene.cdLocal?.[slot] ?? -Infinity) > (before.cd ?? -Infinity)
         || (scene.skillLockUntil ?? -Infinity) > (before.lock ?? -Infinity)
         || (scene.castAt ?? -Infinity) > (before.cast ?? -Infinity);
-      if (!issued) continue;
+      if (!issued) { blocked("cast_unobserved"); deferRetry(scene, slot, kit.id, previous); continue; }
       const completion = (finite(full.contact) ? full.contact : 0)
         + Math.max(0, (full.hits || 1) - 1) * (finite(full.interval) ? full.interval : 0.25);
       const action = { slot, id: kit.id, snapshotAt: scene.selfAt,
