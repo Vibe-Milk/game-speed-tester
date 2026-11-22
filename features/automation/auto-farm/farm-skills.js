@@ -146,8 +146,10 @@
         && time >= action.until && typeof scene.skillWait === "function" && scene.skillWait(action.slot) <= 0;
       if (!action.confirmed && !readyAgain && performance.now() < action.deadline) return true;
       if (!action.confirmed && readyAgain && entry && entry.retryAt === Infinity) {
-        entry.failures = Math.min(4, entry.failures + 1);
-        entry.retryAt = performance.now() + Math.min(4000, 300 * 2 ** (entry.failures - 1));
+        // A fresh ready snapshot is ambiguous: it can be an instant reset.
+        // Keep a short fixed interval; only explicit rejections back off.
+        entry.failures = 0;
+        entry.retryAt = performance.now() + 150;
         results.set(scene, `Ô ${action.slot}: skill sẵn sàng lại; chưa xác nhận lần dùng trước.`);
         return false;
       }
