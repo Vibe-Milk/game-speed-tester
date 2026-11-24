@@ -10,6 +10,7 @@
   <script src="shared/accounts/account-profiles.js" defer></script>
   <script src="features/automation/auto-farm/farm-compatibility.js" defer></script>
   <script src="features/automation/auto-farm/farm-policy.js" defer></script>
+  <script src="ui/popup/popup-help.js" defer></script>
   <script src="ui/popup/popup.js" defer></script>
   <script src="ui/popup/popup-layout.js" defer></script>
   <script src="ui/popup/popup-search.js" defer></script>
@@ -28,7 +29,6 @@
   <script src="ui/popup/farm-layout.js" defer></script>
   <script src="ui/popup/harvest-layout.js" defer></script>
   <script src="ui/popup/feature-sections.js" defer></script>
-  <script src="ui/popup/popup-help.js" defer></script>
   <script src="ui/game-menu/menu-popup.js" defer></script>
   <script src="features/movement/map/area-map-popup.js" defer></script>
   <script src="ui/game-menu/menu-monitor.js" defer></script>
@@ -93,13 +93,14 @@
           <div class="feature-group-grid feature-flat-grid">
           <section class="feature-flat-section"><h3>Kết nối lại (Auto Reconnect)</h3><div class="feature-group-body">
           <label class="switch-row" for="connectionAutoReconnect"><span>Bật hỗ trợ kết nối lại của extension</span><input id="connectionAutoReconnect" class="switch" type="checkbox" checked></label>
-          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]'>Khi mất kết nối, tool hỗ trợ kết nối lại với máy chủ bằng cơ chế gốc của game, không tải lại trang. Ưu tiên giữ phiên đăng nhập hiện tại. Tool thử bổ sung tối đa 3 lần khi đủ điều kiện an toàn.</p>
-          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]'>Mặc định bật. Tắt chỉ dừng các lượt thử bổ sung của tool; game vẫn có thể tự kết nối lại. Nếu không khôi phục được phiên, cần kiểm tra thủ công hoặc dùng Auto Reload khi đã bật và đủ điều kiện.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]' data-help-title="Auto Reconnect — Tự kết nối lại" data-help-heading="Công dụng">Khi mất kết nối, tool hỗ trợ kết nối lại với máy chủ bằng cơ chế gốc của game, không tải lại trang. Ưu tiên giữ phiên đăng nhập hiện tại. Tool thử bổ sung tối đa 3 lần khi đủ điều kiện an toàn.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]' data-help-heading="Mặc định và lưu ý">Mặc định bật. Tắt chỉ dừng các lượt thử bổ sung của tool; game vẫn có thể tự kết nối lại. Nếu không khôi phục được phiên, cần kiểm tra thủ công hoặc dùng Auto Reload khi đã bật và đủ điều kiện.</p>
           </div></section>
           <section class="feature-flat-section"><h3>Tự tải lại khi lỗi kéo dài (Auto Reload)</h3><div class="feature-group-body">
           <label class="switch-row" for="connectionAutoReload"><span>Tự tải lại sau khi kết nối lỗi kéo dài</span><input id="connectionAutoReload" class="switch" type="checkbox"></label>
-          <p class="hint" data-help-for='label[for="connectionAutoReload"]'>Phương án dự phòng: tải lại toàn bộ trang game giống nhấn F5, gián đoạn hơn Auto Reconnect và có thể cần đăng nhập lại. Khi bật cả hai, game thử kết nối lại trước, tool thử bổ sung nếu có thể, sau đó mới xét tự tải lại nếu lỗi mạng kéo dài và đủ điều kiện an toàn.</p>
-          <p class="hint" data-help-for='label[for="connectionAutoReload"]'>Mặc định tắt. Chờ 90 giây, đếm ngược 10 giây, tối đa 3 lần tải lại trong 15 phút (có thể chỉnh bên dưới). Có thể hủy đếm ngược. Không tự tải lại khi đang kết nối lại, đang xác minh phiên, offline hoặc có lỗi tài khoản; không tự xử lý màn đăng nhập hay thử thách xác minh.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReload"]' data-help-title="Auto Reload — Tự tải lại" data-help-heading="Công dụng">Phương án dự phòng: tải lại toàn bộ trang game giống nhấn F5, gián đoạn hơn Auto Reconnect và có thể cần đăng nhập lại.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReload"]' data-help-heading="Cách hoạt động">Khi bật cả hai, game thử kết nối lại trước, tool thử bổ sung nếu có thể, sau đó mới xét tự tải lại nếu lỗi mạng kéo dài và đủ điều kiện an toàn.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReload"]' data-help-heading="Mặc định và lưu ý">Mặc định tắt. Chờ 90 giây, đếm ngược 10 giây, tối đa 3 lần tải lại trong 15 phút (có thể chỉnh bên dưới). Có thể hủy đếm ngược. Không tự tải lại khi đang kết nối lại, đang xác minh phiên, offline hoặc có lỗi tài khoản; không tự xử lý màn đăng nhập hay thử thách xác minh.</p>
           <div class="two-columns separated">
             <div><label for="connectionReloadDelay">Chờ trước khi đếm ngược (30–600 giây)</label><input id="connectionReloadDelay" type="number" min="30" max="600" step="1" value="90"></div>
             <div><label for="connectionReloadCountdown">Thời gian đếm ngược (3–60 giây)</label><input id="connectionReloadCountdown" type="number" min="3" max="60" step="1" value="10"></div>

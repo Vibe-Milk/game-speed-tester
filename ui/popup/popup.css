@@ -79,8 +79,6 @@ button.panel-handle:active { cursor: grabbing; }
 .account-autologin { display: grid; gap: 7px; }
 .help-label { display: flex; align-items: center; gap: 5px; }
 .field-help { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; color: var(--muted); font-size: 10px; font-weight: 600; cursor: help; }
-.help-tooltip { display: none; position: absolute; left: 14px; right: 14px; z-index: 5; padding: 10px 12px; margin-top: 8px; transform: translateY(50%); border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 4px 12px #0003; font-size: 11px; line-height: 1.6; font-weight: 400; cursor: default; }
-.field-help:hover .help-tooltip, .field-help:focus .help-tooltip { display: block; }
 fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 fieldset:disabled { opacity: .6; }
 label, .field-title { display: block; font-size: 12px; font-weight: 550; margin: 0 0 5px; }
@@ -139,11 +137,6 @@ body.embedded { width: 100%; max-height: none; min-width: 0; }
 .compact-help-row > :first-child { flex: 1; min-width: 0; margin-block: 0; }
 .compact-help { display: inline-flex; flex-shrink: 0; }
 .compact-help-button { display: inline-flex; align-items: center; justify-content: center; width: 19px; height: 19px; min-height: 0; padding: 0; border-radius: 50%; color: var(--muted); font-size: 11px; }
-.compact-tooltip { position: fixed; z-index: 1000; display: block; box-sizing: border-box; max-height: min(50vh, 280px); overflow: auto; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; line-height: 1.6; box-shadow: 0 4px 14px #0005; }
-.compact-tooltip[hidden] { display: none; }
-.compact-help-paragraph { display: block; }
-.compact-help-paragraph + .compact-help-paragraph { margin-top: 8px; }
-.field-help[data-open="true"] .help-tooltip { display: block; }
 
 /* Compact navigation shared by toolbar popup and embedded game menu. */
 body { padding: 12px; }
@@ -165,7 +158,6 @@ h1 { font-size: 18px; }
 .feature-status, .card-body > p[role="status"] { padding: 8px 10px; margin: 0 0 10px; border-left: 3px solid var(--accent); background: var(--subtle); border-radius: 5px; font-size: 11px; }
 .compact-help-row { align-items: center; }
 .compact-help-button, .field-help { width: 24px; height: 24px; font-size: 12px; border-radius: 50%; }
-.help-tooltip { position: fixed; right: auto; margin: 0; transform: none; z-index: 1000; max-height: min(50vh, 280px); overflow: auto; }
 
 .advanced > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 .advanced-body { padding-top: 12px; }
@@ -180,7 +172,7 @@ label, .field-title, .check-row, .hint, .notice, .diagnostic,
 summary strong, summary small, .save-mode, .layout-hint,
 .harvest-toolbar, .harvest-list small, .feature-status,
 .card-body > p[role="status"], .advanced > summary, .key-label,
-.compact-tooltip, .help-tooltip, .range, dt, dd { font-size: 18px; }
+.range, dt, dd { font-size: 18px; }
 button { font-size: 18px; min-height: 42px; }
 input[type="number"], input[type="search"], select { font-size: 18px; min-height: 44px; }
 .check-row { min-height: 40px; }
@@ -496,3 +488,47 @@ html[data-embedded="true"] body, body.embedded {
 
 /* Retired Farm controls remain mounted only for preference compatibility. */
 [data-farm-retired] { display:none !important; }
+
+/* Global help — one preview and one native dialog for all feature pages. */
+.global-help-preview {
+  position: fixed; z-index: 1000; width: min(340px, calc(100vw - 16px));
+  padding: 10px 13px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); box-shadow: 0 6px 20px #0003;
+  font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; pointer-events: none;
+}
+.global-help-preview-text, .global-help-preview-action { display: block; }
+.global-help-preview-action { margin-top: 5px; color: var(--accent); font-size: 12px; }
+.global-help-dialog {
+  position: fixed; inset: 0; margin: auto; width: min(620px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px); max-height: calc(100vh - 32px);
+  padding: 0; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 60px #0005;
+  overflow: hidden;
+}
+.global-help-dialog[open] { display: flex; flex-direction: column; }
+.global-help-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.global-help-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  flex-shrink: 0; padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+}
+.global-help-heading { min-width: 0; overflow-wrap: anywhere; }
+.global-help-kicker { display: block; margin-bottom: 5px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .9px; }
+.global-help-title { margin: 0; font-size: 20px; line-height: 1.35; }
+.global-help-close {
+  flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px;
+  min-height: 36px; padding: 0; font-size: 24px; line-height: 1; border-radius: 50%;
+}
+.global-help-content {
+  min-height: 0; overflow: auto; overscroll-behavior: contain;
+  padding: 18px 24px 24px; font-size: 16px; line-height: 1.65; overflow-wrap: anywhere;
+}
+.global-help-section + .global-help-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.global-help-section-title { margin: 0 0 6px; font-size: 15px; color: var(--accent); }
+.global-help-paragraph { margin: 0; }
+.global-help-content:focus-visible, .global-help-close:focus-visible, .compact-help-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 420px), (max-height: 360px) {
+  .global-help-header { padding: 12px 14px; gap: 10px; }
+  .global-help-title { font-size: 17px; }
+  .global-help-content { padding: 12px 14px 16px; font-size: 14px; }
+  .global-help-section + .global-help-section { margin-top: 10px; padding-top: 10px; }
+}

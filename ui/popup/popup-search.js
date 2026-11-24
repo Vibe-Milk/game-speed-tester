@@ -60,7 +60,7 @@
       for (const scope of scopes.filter(Boolean)) {
         const panelName = scope.querySelector(":scope > summary strong, .page-heading h2")?.textContent?.trim() ?? "Tính năng";
         for (const node of scope.querySelectorAll(searchable)) {
-          if (node.closest(".feature-search, [data-farm-retired]") || node.hidden || !node.textContent.trim()) continue;
+          if (node.closest(".feature-search, .compact-help, .field-help, [data-farm-retired]") || node.hidden || !node.textContent.trim()) continue;
           let target = node;
           if (node.tagName === "LABEL") target = node.control ?? node;
           if (node.tagName === "SUMMARY") target = node;

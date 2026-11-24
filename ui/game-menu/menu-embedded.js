@@ -30,6 +30,7 @@
   // Later popup handlers can consume Escape for shortcut recording. If they
   // failed to initialize, retain an escape route from the focused iframe.
   window.addEventListener("keydown", (event) => {
+    if (document.querySelector("#gstGlobalHelpDialog[open]")) return;
     const escape = event.key === "Escape";
     const matches = !event.repeat && event.code === shortcut.code && event.ctrlKey === shortcut.ctrl
       && event.altKey === shortcut.alt && event.shiftKey === shortcut.shift && event.metaKey === shortcut.meta;

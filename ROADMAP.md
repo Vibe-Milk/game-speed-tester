@@ -32,6 +32,8 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 
 - UI Connection Recovery: IMPLEMENTED trong commit UI này — nút `?` giải thích Reconnect và Reload bằng tooltip dùng chung; không đổi logic, runtime UI chưa kiểm tra. Bước kiểm tra Task 1–3 vẫn PENDING.
 
+- Global Help UI Standardization: IMPLEMENTED trong commit UI này — hover ngắn, click mở dialog giữa viewport, dùng chung cho các nút giải thích, đồng bộ theme; không đổi automation. Runtime UI UNVERIFIED; kiểm tra thủ công cả popup và menu nhúng. Connection Recovery vẫn là mục tiêu tiếp theo.
+
 ## Giới hạn và việc còn mở
 
 - Chưa xác minh handler của nút “Kết nối lại” trong game live; chưa triển khai tự bấm nút. Chỉ xem xét sau khi có source phù hợp.
