@@ -3,9 +3,9 @@
   const origin = "https://nghichthienky.online", channel = "gst:potion:v1";
   const finite = Number.isFinite;
   let settings = { hpEnabled: false, mpEnabled: false, hpPercent: 40, mpPercent: 25 };
-  let binding = null, watcher = null, suspended = false;
+  let binding = null, watcher = null, suspended = false, disableGamePills = false, toolDrinking = false;
 
-  const enabled = () => settings.hpEnabled || settings.mpEnabled;
+  const enabled = () => settings.hpEnabled || settings.mpEnabled || disableGamePills;
   const sceneNow = () => window.game?.scene?.getScene?.("world")
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
   function connected(scene) {
@@ -42,7 +42,8 @@
         const wait = auto.wait(host, kind, time);
         if (!(time > auto.pillAt) || !finite(wait) || wait > 0) continue;
         owner.lastActionAt = time;
-        auto.drink(host, kind, pills, value, time);
+        try { toolDrinking = true; auto.drink(host, kind, pills, value, time); }
+        finally { toolDrinking = false; }
         break; // HP first; MP on a later eligible tick.
       }
     } catch { /* A potion helper must not interrupt the game frame. */ }
@@ -75,6 +76,7 @@
           || typeof scene.auto.drink !== "function" || typeof scene.auto.wait !== "function") return;
       const auto = scene.auto, original = auto.drink, descriptor = Object.getOwnPropertyDescriptor(auto, "drink");
       const wrapper = function (host, kind, pills, value, time) {
+        if (this === auto && disableGamePills && !toolDrinking && (kind === "hp" || kind === "mp")) return;
         if (this === auto && (kind === "hp" || kind === "mp") && settings[kind + "Enabled"]) {
           // Suppress the native Auto Farm threshold if it differs from the chosen one.
           const actual = ratio(scene, kind);
@@ -103,6 +105,13 @@
     discover();
     if (watcher === null && !suspended) watcher = setInterval(discover, 1000);
   }
+  window.addEventListener("message", (event) => {
+    if (event.source === window && event.origin === origin && event.data?.channel === "gst:farm:v1"
+        && event.data.type === "configure") {
+      disableGamePills = event.data.disableGamePills === true;
+      configure(settings);
+    }
+  });
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== origin
         || event.data?.channel !== channel || event.data.type !== "configure") return;

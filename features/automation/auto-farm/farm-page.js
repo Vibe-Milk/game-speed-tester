@@ -1635,6 +1635,7 @@
         allowPlayerTargets: data.allowPlayerTargets === true,
         enabled: data.enabled, radius: data.radius, autoRespawn: data.autoRespawn !== false,
         noRetreat: data.noRetreat !== false,
+        disableGamePills: data.disableGamePills === true,
         toolRecoveryEnabled: data.toolRecoveryEnabled === true,
         toolRetreatHp: Number.isSafeInteger(data.toolRetreatHp) && Number.isSafeInteger(data.toolResumeHp)
           && data.toolRetreatHp >= 1 && data.toolRetreatHp < data.toolResumeHp && data.toolResumeHp <= 100 ? data.toolRetreatHp : 40,

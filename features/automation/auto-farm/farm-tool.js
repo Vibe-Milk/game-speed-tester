@@ -59,7 +59,7 @@
           s.message = "Đang áp dụng cấu hình tìm quái mới.";
         }
         // Recovery preferences are independent of skill rotation and apply immediately.
-        for (const name of ["toolRecoveryEnabled", "toolRetreatHp", "toolResumeHp"]) s.options[name] = options[name];
+        for (const name of ["disableGamePills", "toolRecoveryEnabled", "toolRetreatHp", "toolResumeHp"]) s.options[name] = options[name];
         // Skill changes still wait for the current skill action to finish.
         s.pendingOptions = { ...options };
       } else s.options = { ...options };
@@ -239,7 +239,7 @@
       if (!s.options.toolRecoveryEnabled || hp >= s.options.toolRetreatHp / 100
           || typeof host.pills !== "function") return false;
       const pills = host.pills("hp");
-      if (!Array.isArray(pills) || pills.length < 2 || pills[0] !== 0 || pills[1] !== 0) return false;
+      if (!s.options.disableGamePills && (!Array.isArray(pills) || pills.length < 2 || pills[0] !== 0 || pills[1] !== 0)) return false;
       release(s); s.recovery = { started: time, stableAt: null, point: null, pending: null, owned: false, retryAt: 0, attempts: 0, stopAttempts: 0 };
     }
     const r = s.recovery;
@@ -413,7 +413,7 @@
       try {
         const hp = scene.self?.hp / scene.self?.mh, pills = scene.autoHost()?.pills?.("hp");
         return finite(hp) && scene.self.mh > 0 && hp < s.options.toolRetreatHp / 100
-          && Array.isArray(pills) && pills.length >= 2 && pills[0] === 0 && pills[1] === 0;
+          && (s.options.disableGamePills || Array.isArray(pills) && pills.length >= 2 && pills[0] === 0 && pills[1] === 0);
       } catch { return false; }
     },
     visualSnapshot(scene) {

@@ -38,6 +38,7 @@ const farmPolicyFeedback = document.getElementById("farmPolicyFeedback");
 const farmAssistanceAvailability = document.getElementById("farmAssistanceAvailability");
 const farmNoRetreat = document.getElementById("farmNoRetreat");
 const toolRecoveryControls = document.getElementById("toolRecoveryControls");
+const disableGamePills = document.getElementById("disableGamePills");
 const toolRecoveryEnabled = document.getElementById("toolRecoveryEnabled");
 const toolRetreatHp = document.getElementById("toolRetreatHp");
 const toolResumeHp = document.getElementById("toolResumeHp");
@@ -660,6 +661,7 @@ function normalizedFarmPreferences(raw = {}) {
   const radius = Number.isSafeInteger(raw.radius)
     ? Math.max(1, Math.min(1000, raw.radius)) : 22;
   return {
+    disableGamePills: raw.disableGamePills === true,
     toolRecoveryEnabled: raw.toolRecoveryEnabled === true,
     toolRetreatHp: validFarmHpThresholds(raw.toolRetreatHp, raw.toolResumeHp) ? raw.toolRetreatHp : 40,
     toolResumeHp: validFarmHpThresholds(raw.toolRetreatHp, raw.toolResumeHp) ? raw.toolResumeHp : 100,
@@ -735,6 +737,7 @@ function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {})
   const draftMaxValue = oldMode === "range" ? farmSelectionValue(farmTargetRows.max, "max") : null;
   const next = normalizedFarmPreferences(raw);
   farmConfirmed = next;
+  disableGamePills.checked = next.disableGamePills;
   toolRecoveryEnabled.checked = next.toolRecoveryEnabled;
   if (document.activeElement !== toolRetreatHp && document.activeElement !== toolResumeHp) {
     toolRetreatHp.value = String(next.toolRetreatHp); toolResumeHp.value = String(next.toolResumeHp);
@@ -975,6 +978,9 @@ async function saveFarmPatch(patch, rollback, { draftWrite = false, preserveDraf
     syncBossTargetControls();
   }
 }
+disableGamePills.addEventListener("change", () => {
+  void saveFarmPatch({ disableGamePills: disableGamePills.checked }, () => { disableGamePills.checked = farmConfirmed.disableGamePills; });
+});
 toolRecoveryEnabled.addEventListener("change", () => {
   void saveFarmPatch({ toolRecoveryEnabled: toolRecoveryEnabled.checked }, () => { toolRecoveryEnabled.checked = farmConfirmed.toolRecoveryEnabled; });
 });

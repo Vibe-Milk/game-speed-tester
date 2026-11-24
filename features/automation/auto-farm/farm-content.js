@@ -88,6 +88,7 @@
         ? Math.max(1, Math.min(6, value.nearbyRadius)) : 2,
       autoRespawn: value?.autoRespawn !== false,
       noRetreat: value?.noRetreat !== false,
+      disableGamePills: value?.disableGamePills === true,
       toolRecoveryEnabled: value?.toolRecoveryEnabled === true,
       toolRetreatHp: Number.isSafeInteger(value?.toolRetreatHp) && Number.isSafeInteger(value?.toolResumeHp)
         && value.toolRetreatHp >= 1 && value.toolRetreatHp < value.toolResumeHp && value.toolResumeHp <= 100 ? value.toolRetreatHp : 40,
