@@ -447,3 +447,8 @@ Theo snapshot `index-ymL7Xfvg.js` trong Wiki, driver tự thử resume và phát
 Đổi nhãn tài khoản không thu hồi quyền khôi phục. Khi cấu hình tài khoản liên quan thay đổi, quyền được thu hồi và chỉ có thể cấp lại sau kiểm tra danh tính mới trên cùng scene/driver đang kết nối; lệnh chuyển tài khoản giữ khóa cho owner đó. Tín hiệu khôi phục của game tạm dừng đếm ngược tải lại trong lúc xác minh. Sau 30 giây chưa xác minh được, trạng thái mơ hồ yêu cầu kiểm tra thủ công, không coi timeout là lỗi mạng.
 
 Tự tải lại tiếp tục chỉ áp dụng cho thông báo mạng gốc được nhận diện và tài khoản/scene an toàn; nó kiểm tra lại giới hạn, hủy thủ công và trạng thái kết nối trước khi tải. Không tự bấm nút game. Trường hợp mất phiên, lỗi không được nhận diện, yêu cầu đăng nhập hoặc phiên bị từ chối có thể cần thao tác thủ công. Mô tả này dựa trên code extension và snapshot game lưu trữ, chưa xác nhận runtime game live.
+
+
+### Đánh giá reconnect và xác minh quá hạn (Task 3.1)
+
+Khi game không cung cấp hàm reconnect tương thích, extension không tạo lượt thử giả; tự tải lại vẫn cần tín hiệu reconnect gốc đã xảy ra, thông báo lỗi mạng gốc được nhận diện và mọi kiểm tra an toàn. Nếu thiếu bằng chứng thì cần kiểm tra thủ công. Khi tín hiệu thành công chờ xác minh quá hạn, extension quan sát heartbeat gốc ngay cả khi lớp báo lỗi cũ còn hiện: phản hồi mới hỗ trợ kiểm tra lại tài khoản, còn heartbeat mới không được trả lời có thể đưa cơ chế về đường xử lý lỗi có giới hạn. Kết nối hoặc danh tính chưa rõ vẫn không được tự tải lại. Hành vi dựa trên code và source game lưu trữ; chưa kiểm chứng game live.

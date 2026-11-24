@@ -254,6 +254,8 @@
         owner.successCheck = 0;
         owner.checkRequestedAt = 0;
         owner.verificationStartedAt = performance.now();
+        owner.waitingSince = null;
+        owner.minimumPingAt = owner.verificationStartedAt;
         owner.verificationTimedOut = false;
         recoveryEvent(owner, "verification_pending");
       }
@@ -371,6 +373,11 @@
       }).finally(() => { if (state === owner) owner.pending = false; });
     } catch { owner.pending = false; }
   }
+  function reconnectPathComplete(owner, record) {
+    if (!owner.nativeReconnectStarted) return false;
+    if (!preferences.autoReconnect || typeof owner.driver.reconnect !== "function") return true;
+    return owner.attempts >= retryDelays.length && record.extensionAttempts >= retryDelays.length;
+  }
   function manageReload(owner, now) {
     const { driver } = owner;
     const scopeKey = reloadScope(owner.scene);
@@ -428,9 +435,7 @@
       hideReloadBanner();
       return;
     }
-    if (!owner.nativeReconnectStarted
-        || preferences.autoReconnect && (typeof driver.reconnect !== "function"
-          || owner.attempts < retryDelays.length || record.extensionAttempts < retryDelays.length)) {
+    if (!reconnectPathComplete(owner, record)) {
       reloadTransition(owner, "reload_blocked");
       return;
     }
@@ -469,10 +474,8 @@
         || (owner.lastPong !== null && owner.downSince !== null && owner.lastPong > owner.downSince
           && performance.now() - owner.lastPong < replyTimeout)
         || driver.noticed || driver.closing || driver.displaced || new URLSearchParams(location.search).has("gstAttempt")
-        || !owner.nativeReconnectStarted || preferences.autoReconnect
-          && (typeof driver.reconnect !== "function" || owner.attempts < retryDelays.length
-            || (latest?.extensionAttempts ?? 0) < retryDelays.length)
-        || !latest || latest.scopeKey !== scopeKey || latest.canceled || memoryCanceled.has(scopeKey)
+        || !latest || !reconnectPathComplete(owner, latest)
+        || latest.scopeKey !== scopeKey || latest.canceled || memoryCanceled.has(scopeKey)
         || latest.countdownStartedAt !== record.countdownStartedAt
         || !Array.isArray(latest.reloads)
         || latest.reloads.filter((at) => Number.isFinite(at) && wallNow - at < reloadWindowMs).length >= preferences.reloadLimit) return;
@@ -489,12 +492,20 @@
   function observedFailureStatus(owner) {
     if (!owner) return "";
     const { driver } = owner;
-    if (owner.confirmed && !owner.successVerified && profileContext?.managed)
-      return owner.verificationTimedOut
-        ? "Mạng: chưa xác minh được kết nối đã khôi phục; cần kiểm tra thủ công."
-        : "Mạng: game báo đã kết nối lại; đang xác minh tài khoản.";
+    if (owner.confirmed && !owner.successVerified && profileContext?.managed) {
+      if (!owner.verificationTimedOut) return "Mạng: game báo đã kết nối lại; đang xác minh tài khoản.";
+      const healthy = owner.lastPong !== null && owner.lastPong >= owner.verificationStartedAt
+        && performance.now() - owner.lastPong < replyTimeout;
+      return healthy
+        ? "Mạng: có phản hồi từ game nhưng chưa xác minh được tài khoản; có thể cần kiểm tra thủ công."
+        : "Mạng: chưa đủ thông tin xác nhận kết nối và tài khoản; cần kiểm tra thủ công.";
+    }
     if (owner.recoveryRevoked)
       return "Mạng: quyền khôi phục đang bị khóa; cần xác minh lại tài khoản khi kết nối an toàn.";
+    if (!driver.displaced && !driver.noticed && !driver.closing
+        && preferencesReady && preferences.autoReconnect && typeof driver.reconnect !== "function"
+        && (!owner.nativeReconnectStarted || !recoverableNetworkNotice()))
+      return "Mạng: game không cung cấp reconnect tương thích và chưa đủ bằng chứng lỗi mạng; cần kiểm tra thủ công.";
     if (recoverableNetworkNotice()) {
       if (driver.displaced)
         return "Mạng: trạng thái phiên đang mơ hồ; extension tạm dừng hành động tự động để tránh tải lại nhầm.";
@@ -513,13 +524,14 @@
           return `Mạng: đã đạt giới hạn ${preferences.reloadLimit} lần trong ${preferences.reloadWindowMinutes} phút; cần kiểm tra thủ công.`;
         if (!owner.nativeReconnectStarted)
           return "Mạng: đang chờ xác nhận kết quả lần thử reconnect gốc của game.";
-        if (preferences.autoReconnect && (record?.extensionAttempts ?? 0) < retryDelays.length)
+        if (preferences.autoReconnect && typeof driver.reconnect === "function"
+            && (record?.extensionAttempts ?? 0) < retryDelays.length)
           return "Mạng: game báo mất kết nối; đang chờ các lần thử bổ sung kết thúc.";
         if (preferences.autoReload)
           return `Mạng: chờ ${preferences.reloadDelaySeconds} giây, sau đó đếm ngược ${preferences.reloadCountdownSeconds} giây.`;
       }
-      if (!preferences.autoReconnect && !preferences.autoReload)
-        return "Mạng: hỗ trợ reconnect của extension đang tắt; dùng nút Kết nối lại của game nếu cần.";
+      if ((!preferences.autoReconnect || typeof driver.reconnect !== "function") && !preferences.autoReload)
+        return "Mạng: không thể tự reconnect; hãy dùng nút Kết nối lại của game hoặc kiểm tra thủ công.";
       return "Mạng: game báo mất kết nối; đang chờ hoặc thử kết nối lại.";
     }
     if (driver.noticed)
@@ -535,10 +547,10 @@
     if (driver.displaced || driver.noticed || driver.closing) return "blocked_session";
     if (navigator.onLine === false) return "blocked_offline";
     if (!recoveryAuthorized(owner)) return "blocked_identity";
-    if (typeof driver.reconnect !== "function") return "blocked";
     if (owner.pending) return "attempt_started";
     if (owner.confirmed && profileContext?.managed && !owner.successVerified) return "waiting";
     if (driver.reconnecting || driver.handingOver) return "native_in_progress";
+    if (typeof driver.reconnect !== "function") return "unavailable";
     if (owner.confirmed === true && (!profileContext?.managed || owner.successVerified) && driver.link?.open?.() === true
         && !driver.reconnecting && !driver.handingOver && !driver.displaced)
       return "completed";
@@ -620,8 +632,13 @@
       owner.verificationTimedOut = true;
       recoveryEvent(owner, "verification_timeout");
     }
+    // After the deadline, only a fresh pong from the resumed connection
+    // justifies another identity check; a timeout alone proves nothing.
+    const recentRecoveryPong = owner.lastPong !== null
+      && owner.lastPong >= owner.verificationStartedAt && now - owner.lastPong < replyTimeout;
     if (owner.confirmed && profileContext?.managed && !owner.successVerified
-        && !owner.verificationTimedOut && now - owner.checkRequestedAt >= 5000 && recoveryAuthorized(owner)) {
+        && (!owner.verificationTimedOut || recentRecoveryPong)
+        && now - owner.checkRequestedAt >= (owner.verificationTimedOut ? 15000 : 5000) && recoveryAuthorized(owner)) {
       owner.successCheck = ++recoveryCheckId;
       owner.checkRequestedAt = now;
       window.postMessage({ channel: "gst:account-profile:v1", type: "recovery-check",
@@ -641,8 +658,13 @@
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;
 
-    if (owner.confirmed && (!stable || !recoveryAuthorized(owner))) owner.confirmed = false;
+    if (owner.confirmed && (!stable || !recoveryAuthorized(owner))) {
+      owner.confirmed = false;
+      owner.successVerified = false;
+      owner.successCheck = 0;
+    }
     if (stable && navigator.onLine !== false && owner.confirmed && recoveryAuthorized(owner)
+        && (!owner.verificationTimedOut || recentRecoveryPong)
         && (!profileContext?.managed || (profileContext.verified && owner.successVerified))) {
       owner.confirmed = false;
       recoveryEvent(owner, "recovery_confirmed");
@@ -671,10 +693,50 @@
       return;
     }
 
-    // Native retries can fail while the old transport still reports open.
-    // The exact native network notice plus the observed native retry permits
-    // the existing bounded retry path; other notices remain manual-only.
-    if (owner.nativeReconnectStarted && recoverableNetworkNotice()
+    // The game may stop updating when idle, even if neither automation is ON.
+    // Advance only the original network tick, never movement or gameplay.
+    if (navigator.onLine !== false && !driver.displaced && !driver.noticed && !driver.closing
+        && !driver.reconnecting && !driver.handingOver && !owner.pending
+        && (!recoverableNetworkNotice() || (owner.confirmed && recoveryAuthorized(owner)))
+        && typeof driver.update === "function") {
+      const lastTick = Number.isFinite(driver.tickAt) ? driver.tickAt : 0;
+      if (now - lastTick >= 1700) {
+        try { driver.update(); } catch { /* Leave gameplay in control. */ }
+      }
+    }
+
+    // Native update may itself start a reconnect; never race it.
+    if (driver.reconnecting || driver.handingOver || driver.closing || driver.displaced || driver.noticed) {
+      manageReload(owner, now);
+      return;
+    }
+
+    // Native update resets waitingSince after >2s between ticks. Track the
+    // first unanswered ping ourselves, using actual inbound server messages.
+    if (Number.isFinite(driver.pingAt) && driver.pingAt > Math.max(owner.lastPongRequest, owner.minimumPingAt)
+        && owner.waitingSince === null) owner.waitingSince = driver.pingAt;
+    if (owner.waitingSince !== null && now - owner.waitingSince >= replyTimeout) {
+      // A new unanswered heartbeat after the native success is evidence of a
+      // subsequent failure. Invalidate the old success, never the account guard.
+      if (owner.confirmed && owner.verificationTimedOut && navigator.onLine !== false
+          && owner.waitingSince > owner.verificationStartedAt && recoveryAuthorized(owner)) {
+        owner.confirmed = false;
+        owner.successVerified = false;
+        owner.successCheck = 0;
+        recoveryEvent(owner, "recovery_failed_again");
+      }
+      if (owner.downSince === null) {
+        owner.downSince = owner.waitingSince;
+        owner.downSinceWall = Date.now() - Math.max(0, now - owner.waitingSince);
+      }
+      owner.healthySince = null;
+      retry(owner, now, true);
+      manageReload(owner, now);
+      return;
+    }
+    // A stale overlay does not prevent observing native heartbeat above.
+    // Only the existing exact notice and native failure permit this retry.
+    if (owner.nativeReconnectStarted && !owner.confirmed && recoverableNetworkNotice()
         && !driver.noticed && !driver.displaced) {
       if (owner.downSince === null) {
         owner.downSince = now;
@@ -685,30 +747,6 @@
       return;
     }
 
-    // The game may stop updating when idle, even if neither automation is ON.
-    // Advance only the original network tick, never movement or gameplay.
-    if (navigator.onLine !== false && !driver.displaced && !driver.closing && !owner.pending
-        && typeof driver.update === "function") {
-      const lastTick = Number.isFinite(driver.tickAt) ? driver.tickAt : 0;
-      if (now - lastTick >= 1700) {
-        try { driver.update(); } catch { /* Leave gameplay in control. */ }
-      }
-    }
-
-    // Native update resets waitingSince after >2s between ticks. Track the
-    // first unanswered ping ourselves, using actual inbound server messages.
-    if (Number.isFinite(driver.pingAt) && driver.pingAt > Math.max(owner.lastPongRequest, owner.minimumPingAt)
-        && owner.waitingSince === null) owner.waitingSince = driver.pingAt;
-    if (owner.waitingSince !== null && now - owner.waitingSince >= replyTimeout) {
-      if (owner.downSince === null) {
-        owner.downSince = owner.waitingSince;
-        owner.downSinceWall = Date.now() - Math.max(0, now - owner.waitingSince);
-      }
-      owner.healthySince = null;
-      retry(owner, now, true);
-      manageReload(owner, now);
-      return;
-    }
     // A newly attached, already joined driver plus sustained native pong
     // responses confirms an operational session after a prior page reload.
     if (owner.freshEpisode && !owner.nativeReconnectStarted && owner.scopeKey
