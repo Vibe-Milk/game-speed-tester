@@ -433,3 +433,10 @@ This section supersedes skill-change OFF and 700ms manual-pause descriptions abo
 `farm-skills.js` now also respects the strict observed server global action lock (`self.cl` minus snapshot age), beyond native skillWait's 80ms early margin. A local cdLocal/animation-lock change only records a request. A newer self snapshot with a positive slot cooldown and increased cooldown expiry marks observed cooldown evidence, not proof of hit/damage. Requests wait up to 1.8 wall seconds for evidence plus existing completion locks; unconfirmed slots get bounded 1–4 second retry backoff while other slots can proceed. The six-slot scene-local ledger is reset at explicit start; native default rotation commits only on cooldown evidence. Status text exposes requested/observed/unconfirmed states through the existing status path. No native cooldown, packet, authentication or server rule is modified.
 
 No class-specific cause is claimed without the affected skill names/runtime evidence. Tests/lint/typecheck/QA/gameplay were not run.
+
+
+### Điều phối reconnect (Task 2)
+
+`reconnect-page.js` tiếp tục dùng driver của game và tối đa ba lượt thử bổ sung. Lượt thử bị chặn khi scene/driver hoặc phạm vi nhân vật không còn khớp, tài khoản quản lý chưa được xác nhận, trình duyệt offline, game đang reconnect/handover, hoặc driver báo phiên bị thay thế/thông báo lỗi. Bộ đếm được khôi phục từ record của tab khi còn episode và chỉ được xóa sau tín hiệu reconnect thành công của game, hoặc sau khi driver mới gắn đã vào phiên và nhận pong ổn định, kèm kết nối và danh tính hợp lệ. Nhịp nền và Auto Reload giữ cơ chế riêng hiện có. Nút reconnect không được tự bấm vì chưa xác minh được handler của nút ở bản game hiện tại.
+
+Theo snapshot `index-ymL7Xfvg.js` trong Wiki, driver tự thử resume và phát trạng thái thành công sau khi nhận phản hồi resume; khi thất bại nó báo lỗi mạng chung. Lỗi chung này không cho biết chắc server đã reset hay phiên hết hiệu lực. Snapshot không chứng minh hành vi của bản game live; chưa kiểm chứng runtime.

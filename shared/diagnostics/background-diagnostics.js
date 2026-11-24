@@ -56,7 +56,7 @@
     result.redirectReason = row.redirectReason === "extension_timer" ? "extension_timer" : null;
     result.persisted = typeof row.persisted === "boolean" ? row.persisted : null;
     const retryReasons = new Set(["idle", "waiting", "attempt_started", "native_in_progress",
-      "blocked", "exhausted", "completed", "failed", "disabled", "pending"]);
+      "blocked", "blocked_session", "blocked_offline", "blocked_identity", "exhausted", "completed", "failed", "disabled", "pending"]);
     result.retryReason = retryReasons.has(row?.retryReason) ? row.retryReason : null;
     result.attempts = finite(row?.attempts) ? Math.max(0, Math.min(20, Math.floor(row.attempts))) : null;
     for (const k of ["checkGapMs", "tickAgeMs", "inboundAgeMs", "waitingMs", "downMs"]) result[k] = number(row[k]);
@@ -152,7 +152,7 @@
     owner.checkAt = now;
     const lost = document.getElementById("lost");
     const retryReasons = new Set(["idle", "waiting", "attempt_started", "native_in_progress",
-      "blocked", "exhausted", "completed", "failed", "disabled", "pending"]);
+      "blocked", "blocked_session", "blocked_offline", "blocked_identity", "exhausted", "completed", "failed", "disabled", "pending"]);
     const retryReason = typeof data.retryReason === "string" && retryReasons.has(data.retryReason)
       ? data.retryReason : null;
     const attempts = finite(data.attempts) ? Math.max(0, Math.min(20, Math.floor(data.attempts))) : null;

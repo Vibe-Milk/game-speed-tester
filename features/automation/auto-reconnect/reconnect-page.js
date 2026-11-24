@@ -198,20 +198,26 @@
     const owner = {
       scene, driver, lastInbound: now, diagnosticLastInbound: null, waitingSince: null, downSince: null, downSinceWall: null,
       healthySince: null, attempts: 0, lastAttempt: -Infinity, pending: false,
-      nativeReconnectStarted: false,
+      nativeReconnectStarted: false, scopeKey: null, lastWatch: now, minimumPingAt: 0, lastPong: null, freshEpisode: false,
       confirmed: false, receiveDescriptor: Object.getOwnPropertyDescriptor(driver, "receive"),
       originalReceive: driver.receive, originalStatus: driver.onStatus
     };
     owner.receiveHook = function (...args) {
       const result = owner.originalReceive.apply(this, args);
       // The original decoder handles all packets. Only observe arrival time.
-      if (state === owner && this === driver && typeof args[0] === "string") {
+      if (state === owner && this === driver && eligible(scene)
+          && typeof args[0] === "string") {
         owner.lastInbound = performance.now();
         owner.diagnosticLastInbound = owner.lastInbound;
-        owner.waitingSince = null;
-        if (!driver.reconnecting && !driver.handingOver) {
+        // Only a native pong confirms a response to the outstanding heartbeat.
+        let pong = false;
+        try { pong = JSON.parse(args[0])?.t === "pong"; } catch {}
+        if (pong && !driver.reconnecting && !driver.handingOver
+            && !driver.displaced && !driver.noticed) {
+          owner.waitingSince = null;
+          owner.lastPong = owner.lastInbound;
           owner.healthySince ??= owner.lastInbound;
-          if (owner.downSince !== null) {
+          if (!owner.nativeReconnectStarted && owner.attempts === 0) {
             owner.downSince = null;
             owner.downSinceWall = null;
           }
@@ -221,10 +227,17 @@
     };
     owner.statusHook = function (...args) {
       const result = owner.originalStatus.apply(this, args);
-      if (state === owner && this === driver && args[0] === "Mất kết nối · đang kết nối lại…")
+      if (state === owner && this === driver && eligible(scene)
+          && args[0] === "Mất kết nối · đang kết nối lại…") {
         owner.nativeReconnectStarted = true;
+        owner.freshEpisode = false;
+        owner.confirmed = false;
+      }
       // The game emits this only after the server accepted resume.
-      if (state === owner && this === driver && args[0] === "Đã kết nối lại") {
+      if (state === owner && this === driver && eligible(scene)
+          && owner.scopeKey && reloadScope(scene) === owner.scopeKey
+          && (!profileContext?.managed || profileContext.verified)
+          && !driver.displaced && !driver.noticed && args[0] === "Đã kết nối lại") {
         owner.confirmed = true;
       }
       return result;
@@ -284,11 +297,14 @@
   }
   function retry(owner, now, staleOpen) {
     const { driver } = owner;
-    if (!preferencesReady || !preferences.autoReconnect || owner.pending || owner.attempts >= retryDelays.length
-        || driver.displaced
-        || (driver.noticed && !recoverableNetworkNotice())
+    if (state !== owner || !eligible(owner.scene) || owner.scene.driver !== driver
+        || !owner.scopeKey || reloadScope(owner.scene) !== owner.scopeKey
+        || (profileContext?.managed && !profileContext.verified)
+        || !preferencesReady || !preferences.autoReconnect || owner.pending || owner.attempts >= retryDelays.length
+        || driver.displaced || driver.noticed
         || driver.reconnecting || driver.handingOver || navigator.onLine === false
         || typeof driver.reconnect !== "function") return;
+    // Do not compete with a native reconnect that has not yet had time to start.
     const since = owner.attempts === 0
       ? (staleOpen ? owner.waitingSince : owner.downSince) : owner.lastAttempt;
     const delay = owner.attempts === 0 && staleOpen ? replyTimeout : retryDelays[owner.attempts];
@@ -430,10 +446,11 @@
   function retryReasonFor(owner, now) {
     if (!preferencesReady || !preferences.autoReconnect) return "disabled";
     const driver = owner.driver;
-    if (driver.displaced || driver.closing || navigator.onLine === false
-        || typeof driver.reconnect !== "function"
-        || (driver.noticed && !recoverableNetworkNotice()))
-      return "blocked";
+    if (driver.displaced || driver.noticed || driver.closing) return "blocked_session";
+    if (navigator.onLine === false) return "blocked_offline";
+    if (!owner.scopeKey || reloadScope(owner.scene) !== owner.scopeKey
+        || (profileContext?.managed && !profileContext.verified)) return "blocked_identity";
+    if (typeof driver.reconnect !== "function") return "blocked";
     if (owner.pending) return "attempt_started";
     if (driver.reconnecting || driver.handingOver) return "native_in_progress";
     if (owner.confirmed === true && driver.link?.open?.() === true
@@ -467,11 +484,29 @@
     const owner = attach(scene);
     if (!owner) return;
     const { driver } = owner, now = performance.now();
+    const scopeKey = reloadScope(scene);
+    if (!owner.scopeKey && scopeKey) {
+      owner.scopeKey = scopeKey;
+      const record = readRecords()[scopeKey];
+      if (record?.startedAt > 0 && Number.isSafeInteger(record.extensionAttempts)) {
+        owner.freshEpisode = true;
+        owner.attempts = Math.max(0, Math.min(retryDelays.length, record.extensionAttempts));
+        if (owner.attempts) owner.lastAttempt = now;
+      }
+    }
+    // A long scheduler gap can be browser suspension, not a network failure.
+    if (now - owner.lastWatch > 5000 && !driver.reconnecting && !driver.handingOver) {
+      owner.waitingSince = null;
+      owner.minimumPingAt = now;
+      if (owner.downSince !== null) owner.downSince = now;
+    }
+    owner.lastWatch = now;
     const retryReason = retryReasonFor(owner, now);
     try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver, eligible: true,
       lastInbound: owner.diagnosticLastInbound,
       recoveryComplete: owner.confirmed === true && driver.link.open() === true
-        && !driver.reconnecting && !driver.handingOver && !driver.displaced,
+        && !driver.reconnecting && !driver.handingOver && !driver.displaced && !driver.noticed
+        && !!owner.scopeKey && scopeKey === owner.scopeKey,
       retryReason,
       attempts: Number.isSafeInteger(owner.attempts) ? owner.attempts : 0,
       waitingMs: owner.waitingSince !== null ? Math.max(0, now - owner.waitingSince) : null,
@@ -480,8 +515,13 @@
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;
 
-    if (stable && owner.confirmed) {
+    if (stable && owner.confirmed && !driver.displaced && !driver.noticed
+        && owner.scopeKey && scopeKey === owner.scopeKey
+        && (!profileContext?.managed || profileContext.verified)) {
       owner.confirmed = false;
+      owner.attempts = 0;
+      owner.freshEpisode = false;
+      owner.lastAttempt = -Infinity;
       owner.nativeReconnectStarted = false;
       owner.waitingSince = null;
       owner.downSince = null;
@@ -503,6 +543,20 @@
       return;
     }
 
+    // Native retries can fail while the old transport still reports open.
+    // The exact native network notice plus the observed native retry permits
+    // the existing bounded retry path; other notices remain manual-only.
+    if (owner.nativeReconnectStarted && recoverableNetworkNotice()
+        && !driver.noticed && !driver.displaced) {
+      if (owner.downSince === null) {
+        owner.downSince = now;
+        owner.downSinceWall = Date.now();
+      }
+      retry(owner, now, false);
+      manageReload(owner, now);
+      return;
+    }
+
     // The game may stop updating when idle, even if neither automation is ON.
     // Advance only the original network tick, never movement or gameplay.
     if (navigator.onLine !== false && !driver.displaced && !driver.closing && !owner.pending
@@ -515,7 +569,7 @@
 
     // Native update resets waitingSince after >2s between ticks. Track the
     // first unanswered ping ourselves, using actual inbound server messages.
-    if (Number.isFinite(driver.pingAt) && driver.pingAt > owner.lastInbound
+    if (Number.isFinite(driver.pingAt) && driver.pingAt > Math.max(owner.lastInbound, owner.minimumPingAt)
         && owner.waitingSince === null) owner.waitingSince = driver.pingAt;
     if (owner.waitingSince !== null && now - owner.waitingSince >= replyTimeout) {
       if (owner.downSince === null) {
@@ -527,18 +581,17 @@
       manageReload(owner, now);
       return;
     }
-    const persistedEpisode = readRecords()[reloadScope(scene) ?? ""];
-    if ((owner.attempts > 0 || owner.nativeReconnectStarted || persistedEpisode?.startedAt > 0)
+    // A newly attached, already joined driver plus sustained native pong
+    // responses confirms an operational session after a prior page reload.
+    if (owner.freshEpisode && !owner.nativeReconnectStarted && owner.scopeKey
+        && scopeKey === owner.scopeKey && (!profileContext?.managed || profileContext.verified)
         && owner.healthySince !== null
-        && now - owner.healthySince >= 10000 && now - owner.lastInbound < 3000
-        && !recoverableNetworkNotice() && !driver.noticed && !driver.displaced) {
-      owner.downSince = null;
-      owner.downSinceWall = null;
+        && now - owner.healthySince >= 10000 && owner.lastPong !== null && now - owner.lastPong < 3000
+        && !driver.noticed && !driver.displaced && !recoverableNetworkNotice()) {
       owner.attempts = 0;
       owner.lastAttempt = -Infinity;
-      owner.healthySince = null;
-      owner.nativeReconnectStarted = false;
-      clearRecord(reloadScope(scene));
+      owner.freshEpisode = false;
+      clearRecord(scopeKey);
       stopReloadCountdown();
       hideReloadBanner();
     }
@@ -621,6 +674,7 @@
     applyProfileMessage(event.data);
   });
   window.postMessage({ channel: "gst:account-profile:v1", type: "ready" }, location.origin);
+  window.addEventListener("online", () => { if (!suspended) watch(); });
   document.addEventListener("visibilitychange", () => { syncScheduler(); });
   window.addEventListener("pagehide", () => {
     suspended = true;
