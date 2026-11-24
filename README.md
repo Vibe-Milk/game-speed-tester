@@ -1,553 +1,75 @@
 # Game Speed Tester
 
-Source chính: [ThagMilky/game-speed-tester](https://github.com/ThagMilky/game-speed-tester), nhánh `main`. Cài extension trực tiếp từ thư mục chứa `manifest.json` bằng **Load unpacked** tại `chrome://extensions`; không cần build hoặc Node.js. Để chia sẻ với bạn bè, repository đã có GitHub Actions **Release extension** đóng gói ZIP theo phiên bản `manifest.json`; xem [RELEASE.md](RELEASE.md).
+Chrome Extension Manifest V3 dành cho kiểm thử có sự cho phép trên `https://nghichthienky.online/*`. Repository: [Vibe-Milk/game-speed-tester](https://github.com/Vibe-Milk/game-speed-tester), nhánh `main`.
 
-Nếu chuyển thư mục Load unpacked sang đường dẫn khác, Chrome có thể tạo ID extension khác và không tự chuyển cài đặt cũ. Cập nhật source local theo quy trình Git hiện có, nhấn **Reload** cho extension rồi tải lại tab game. Gói ZIP Release không chứa Git history hoặc thư mục tài liệu và source tham chiếu `GAME_ASSET_WIKI_v2.0/`.
+Tài liệu được đối chiếu với giao diện và source liên quan tại commit [`e8efee2`](https://github.com/Vibe-Milk/game-speed-tester/commit/e8efee261066fc55d9839d9e5746f79dca814e48). Đây là hướng dẫn theo code, không phải kết quả kiểm thử gameplay.
 
-Chrome Extension Manifest V3 phục vụ kiểm thử anti-cheat có sự cho phép, chỉ trên `https://nghichthienky.online/*`. Mặc định **tắt**; tốc độ **đi bộ 3.5**, **bay 2**; mỗi giá trị điều chỉnh trong **1.0–6.0**.
-
-**Mốc đối chiếu lịch sử:** source extension được đối chiếu tại commit `c82bdc5` (2026-11-08), trước các cập nhật tài liệu và Custom Auto Farm. Các mục ghi ngày cũ bên dưới lưu lịch sử, có thể mô tả giao diện hoặc giới hạn đã được thay thế. Khi nội dung khác nhau, ưu tiên phần tóm tắt này, [CODEGRAPH.md](CODEGRAPH.md), [RELEASE.md](RELEASE.md) và source thật. Đây là đối chiếu tĩnh; **tests/lint/browser/gameplay: NOT RUN; runtime: UNVERIFIED; CI: NOT CHECKED**. Kết quả QA lịch sử không xác minh HEAD hiện tại ([QA-report.md tại commit cũ](https://github.com/ThagMilky/game-speed-tester/blob/036ddbafd3891320039317f7f18dda38db208867/QA-report.md)).
-
-## Tra cứu source game
-
-[GAME_ASSET_WIKI_v2.0](GAME_ASSET_WIKI_v2.0/README.md) là bản đồ điều hướng cho snapshot JavaScript của game. Developer và AI agent bắt đầu từ [Feature Index](GAME_ASSET_WIKI_v2.0/FEATURE_INDEX.md), rồi dùng [Asset Index](GAME_ASSET_WIKI_v2.0/ASSET_INDEX.json), [Function Map](GAME_ASSET_WIKI_v2.0/FUNCTION_MAP.md) và [Dependency Map](GAME_ASSET_WIKI_v2.0/DEPENDENCY_MAP.md) để mở đúng module và đoạn source. Cách này giảm việc đọc lặp lại toàn bộ bundle.
-
-Trước khi triển khai, cần xác minh đoạn source liên quan và danh tính file theo [Source Manifest](GAME_ASSET_WIKI_v2.0/SOURCE_MANIFEST.json); Wiki định hướng chứ không chứng minh hành vi runtime. Wiki ghi chép source game, còn [CODEGRAPH.md](CODEGRAPH.md) mô tả kiến trúc và luồng của extension.
-## Tính năng chính theo source hiện tại
-
-- **Popup:** điều hướng theo từng trang ở thanh bên: Tổng quan, Auto Farm, Thu hoạch, Bí cảnh, Auto Quest, Tốc độ & bay, Hình ảnh & FPS, Giao diện và Chẩn đoán. Ghi nhớ trang bằng `popupActivePage`; không còn kéo thả thứ tự panel.
-- **Auto Farm:** sử dụng Auto Farm của game để chiến đấu, hỗ trợ lọc quái theo level/boss, phạm vi bán kính 11–1.000 ô hoặc tìm mục tiêu trên toàn map hiện tại. Khi di chuyển xa, `features/automation/auto-farm/farm-map.js` dùng đường đi gốc rồi nhường Auto Farm gốc đánh ở gần. Khi game gửi sự kiện sát thương có ID quái gây đòn (`event.by`), bộ tìm quái có thể ưu tiên quái đó ở gần; không suy đoán kẻ đánh chỉ từ cờ `aggro`. `features/automation/auto-farm/farm-behavior.js` và `features/automation/auto-farm/farm-map.js` dùng chung `GSTFarmEvents` để theo dõi sự kiện. Chế độ **Thử nghiệm · Custom Farm** là lựa chọn riêng, mặc định không bật; dùng một controller quyết định mục tiêu, đường tới mục tiêu, kỹ năng, vật phẩm và hồi phục. Các chế độ Tool hỗ trợ, Theo game gốc và Khóa Auto Farm vẫn giữ nguyên. Xem [CUSTOM_AUTO_FARM.md](CUSTOM_AUTO_FARM.md) để bật và so sánh thủ công.
-- **Map toàn khu vực:** mở bằng dấu `.` mặc định (có thể đổi phím trong Giao diện); có marker và **Click để di chuyển**. Tọa độ click tính theo lần vẽ canvas cuối cùng, kể cả ngay sau khi zoom. WASD/joystick chủ động hủy hành trình. Tùy chọn quay lại nơi chết lưu điểm trong cùng tab tối đa 2 phút, **không áp dụng trong bí cảnh**. Khả năng đến đích phụ thuộc dữ liệu map/va chạm game.
-- **Phát hành:** GitHub Actions tạo ZIP trong Releases theo `manifest.json`; người nhận giải nén và **Load unpacked**, không tự cập nhật qua Chrome Web Store. Xem [RELEASE.md](RELEASE.md).
-
-## Cấu trúc
-
-Mã nguồn được tổ chức theo `core/`, `features/`, `shared/` và `ui/`. Các thành phần chưa rõ trách nhiệm sẽ được đưa vào `uncategorized/` sau khi kiểm tra. Những hướng dẫn lịch sử bên dưới có thể còn nhắc đường dẫn cũ; xem `CODEGRAPH.md` và `manifest.json` để biết đường dẫn đang nạp.
-
-```text
-game-speed-tester/
-  manifest.json   Quyền storage và hai content script giới hạn đúng website
-  core/content.js     Đọc cài đặt, thêm timer, cầu nối popup và bảng trạng thái trên game
-  ui/interface/font-options.js Danh sách 10 font và quy tắc tùy chọn dùng chung
-  ui/interface/font.js        Bật/tắt và áp dụng font giao diện web sau 1 giây
-  features/visual/fps/fps-options.js Tùy chọn FPS dùng chung giữa popup và ISOLATED
-  features/visual/fps/fps-popup.js   Lưu lựa chọn giảm hình ảnh, khôi phục và đọc FPS
-  features/visual/fps/fps-content.js Storage và cầu nối FPS theo danh sách trường boolean
-  features/visual/fps/fps-page.js    Bộ lọc camera và hook tạo hiệu ứng trong MAIN world
-  features/automation/auto-farm/farm-page.js   Mở rộng tâm tìm kiếm của Auto Farm có sẵn, chạy trong MAIN world
-  features/automation/auto-farm/farm-content.js Storage và cầu nối riêng cho tùy chọn/trạng thái Auto Farm
-  features/automation/auto-farm/farm-session.js Giữ ý định Auto Farm theo tab qua tải lại/đổi map
-  shared/coordination/farm-update.js Một wrapper update chung để bàn giao phong ấn/Tự hái/game gốc
-  shared/navigation/farm-input.js  Một wrapper click-to-move chung, kiểm tra focus lúc thực thi
-  features/automation/auto-farm/farm-behavior.js Hành vi đứng chờ/né, cung cấp GSTFarmEvents cho scene.onEvent
-  features/automation/auto-farm/farm-map.js    Tiếp cận quái toàn map, dùng GSTFarmEvents để nhận sát thương
-  features/automation/auto-farm/farm-boss-safety.js Né cảnh báo boss và phối hợp rút lui HP thấp
-  features/movement/map/map-travel-page.js Điều hướng điểm click và quay về nơi chết ngoài bí cảnh
-  features/movement/map/area-map-page.js Vẽ bản đồ toàn khu vực và nhận click theo khung đã vẽ
-  shared/diagnostics/farm-diagnostics.js Theo dõi các lần bật/tắt và nguyên nhân, không điều khiển farm
-  shared/diagnostics/farm-diagnostics-content.js Cầu nối chỉ đọc chẩn đoán, lọc trường xuất
-  shared/diagnostics/farm-diagnostics-popup.js Sao chép chẩn đoán theo yêu cầu, không polling riêng
-  features/automation/auto-farm/farm-seals.js  Hỗ trợ di chuyển và đánh phong ấn bí cảnh bằng hàm gốc
-  features/automation/auto-harvest/harvest-options.js Tùy chọn Tự hái dùng chung; cầu nối điều phối trong MAIN world
-  features/automation/auto-harvest/harvest-main-options.js Bản sinh từ features/automation/auto-harvest/harvest-options.js, đường dẫn riêng cho MAIN
-  features/automation/auto-harvest/harvest-page.js Chọn cây, tìm đường, tương tác gốc và bàn giao với Auto Farm
-  features/automation/auto-harvest/harvest-content.js Storage/cầu nối trạng thái và danh mục cây từ game
-  features/automation/auto-harvest/harvest-popup.js Tìm tên không dấu, tick chọn, lưu tùy chọn Tự hái
-  core/page.js        Truy cập Phaser, tách snapshot dùng cho scene rồi chỉnh ms
-  popup.html     Giao diện
-  ui/popup/popup.css      Định dạng giao diện
-  ui/popup/popup.js       Lưu tùy chọn và đọc trạng thái tab đang mở
-  ui/popup/popup-layout.js Điều hướng trang popup, lưu popupActivePage, không kéo thả panel
-  README.md
-```
-
-## Cài đặt
+## Cài đặt và cập nhật
 
 1. Dùng Chrome 111 trở lên. Mở `chrome://extensions`.
-2. Bật **Developer mode**.
-3. Chọn **Load unpacked**, rồi chọn thư mục `game-speed-tester` chứa `manifest.json` này.
-4. Mở trang game. Nếu trang đã mở trước khi cài hoặc cập nhật extension, tải lại trang một lần.
-5. Mở extension từ biểu tượng Extensions; có thể ghim để truy cập nhanh.
-
-Không cần build, npm, backend hoặc dependency.
-
-## Bố cục popup
-
-Bố cục hiện hành (đối chiếu `popup.html` và `popup-layout.js`): thanh điều hướng có trang **Tổng quan** và từng trang tính năng; mỗi lần chỉ mở một trang. Nút trên Tổng quan cho phép mở nhanh. `popupActivePage` trong `chrome.storage.local` ghi nhớ trang đã chọn. Trang Auto Farm có thanh Lưu riêng, nút chẩn đoán chuyển sang trang Chẩn đoán nhưng vẫn dùng handler cũ. Không còn kéo thả sắp xếp nhóm bằng `popupPanelOrder`. Giao diện thực tế trong Chrome chưa được kiểm thử ở HEAD này.
-
-### Lịch sử bố cục popup (không còn áp dụng)
-
-Đầu popup có bốn chỉ số: Auto Farm thật của game, trạng thái di chuyển, tốc độ hiện tại và Fix. Bên dưới là sáu nhóm: **Auto Farm**, **Tự hái**, **Tự vào bí cảnh**, **Tốc độ di chuyển**, **Bảng trạng thái**, **Font chữ**. Mỗi lần mở popup, cả sáu nhóm đều thu gọn; bấm tiêu đề để mở. Kéo tay nắm **⠿** ở đầu nhóm lên/xuống và thả khi thấy vạch màu để đổi thứ tự. Ví dụ kéo Tự hái xuống dưới Tốc độ di chuyển để Auto Farm và Tốc độ nằm cạnh nhau. Thứ tự tự lưu riêng ở `popupPanelOrder` trong `chrome.storage.local`, dùng lại khi mở popup; không đổi cài đặt tính năng hoặc tác động game. Có thể dùng bàn phím: đặt focus vào tay nắm rồi bấm Alt + mũi tên lên/xuống.
-
-Các thông báo kỹ thuật nằm trong mục chi tiết; lỗi lưu cài đặt vẫn có thông báo riêng. Checkbox hiển thị/font/bí cảnh và phím tắt vẫn tự lưu; nhập bán kính/tốc độ vẫn dùng nút Lưu hoặc Enter như trước. Popup hỗ trợ giao diện sáng/tối theo hệ thống. Thay đổi bố cục/kéo thả: tests/lint/typecheck/browser **NOT RUN**, hành vi giao diện **UNVERIFIED**, CI **NOT CHECKED**.
-
-## Phong ấn boss bí cảnh
-
-Trong Auto Farm, tick **Tự phá phong ấn khi đánh boss bí cảnh** (`farmPreferences.breakSeals`, mặc định tắt). Bật Auto Farm của game bằng phím đã chọn. Không cần bật mở rộng bán kính hoặc Tự hái; URL vẫn cần `timer`, cầu nối tự bổ sung như các tính năng hiện có. Chỉ áp dụng khi `scene.self.realm.inside` có boss còn HP và danh sách `seals` có x/y/hits hợp lệ. Không giả định có đúng 3 phong ấn, không tạo mục tiêu quái/ID giả.
-
-Module chọn phong ấn còn hits gần nhất; dùng `auto.walk` gốc với trạng thái đường đi riêng thừa kế từ Auto Farm, giữ nguyên native target/path/ax/ay. Đến trong 1 ô và có đường thông thì hướng mặt về phong ấn và gọi `host.basic()` gốc: `useSkill("Space", true, false)`. Nhịp quyết định tối đa 5 lần/giây bằng nhịp update game (như native Auto Farm), hàm game vẫn kiểm tra cooldown và server quyết định đòn hợp lệ; không sửa damage, attack speed, cooldown hoặc tự dựng packet. Khi nhường lại, làm mới mốc chaseSince/think cho mục tiêu vẫn còn đúng, để thời gian phá phong ấn không bị tính thành đuổi boss thất bại. Không thay target/path/center của boss hoặc tự bật V.
-
-Theo dõi hits mới từ game, không tự trừ hits. Không giảm trong 8 giây ở vị trí đánh hoặc không tới trong 15 giây thì bỏ mục tiêu đó và báo trạng thái; không tự thử mãi cùng phong ấn với cùng số hits. Có thể thử phong ấn khác. Khi hits/vị trí đổi, hết đợt phong ấn hoặc người dùng tắt/bật Auto Farm thì cho phép thử lại. Hết phong ấn trả về native Auto Farm. Chưa xác minh server nhận đánh thường của mọi class với cơ chế này; nếu server không tính đòn, module sẽ dừng thử và báo, không tuyên bố đã phá thành công.
-
-Ưu tiên nhường hồi HP/MP theo ngưỡng game, chết/hồi sinh, UI/hộp kiểm tra người chơi và thao tác tay; không đi qua cổng/NPC. Tự hái đang được game xác nhận thì để hoàn tất; khi xử lý phong ấn, Tự hái và hỗ trợ tiếp cận tốc độ tạm nhường di chuyển. `farm-update.js` giữ một wrapper native update, phong ấn và Tự hái đăng ký/gỡ handler riêng; gỡ handler cuối khôi phục descriptor gốc nếu còn sở hữu. Khi tắt hỗ trợ/rời scene/mất kết nối, dọn điều khiển và handler; chỉ giữ một watcher 1 giây lúc chờ scene, không timer theo từng phong ấn. Kiểm tra modal cache 200 ms, ngưỡng hồi phục cache 1 giây. Tests/lint/typecheck/browser/gameplay **NOT RUN**; hành vi phá phong ấn/server **UNVERIFIED**, CI **NOT CHECKED**.
-
-## Tự vào bí cảnh và giữ Auto Farm
-
-Nhóm **Tự vào bí cảnh** có ba công tắc tự lưu trong `chrome.storage.local.realmPreferences`: bật tính năng (mặc định tắt), cho phép vào khi Auto Farm bật (mặc định tắt), giữ Auto Farm qua đổi map (mặc định bật). Hai công tắc đầu phải bật nếu muốn đang farm mà tự tới cổng xuất hiện. Tính năng cũng đi tìm cổng khi farm tắt; tắt V chỉ tắt farm, muốn ngừng tìm cổng cần tắt riêng công tắc bí cảnh. Không có bán kính: đọc toàn bộ `self.realm.events` trong map hiện tại, chỉ cổng chưa đóng/chưa hết hạn và đủ level; không đi qua map khác để tìm.
-
-Tận dụng `realmUI.interact()` gốc để tính điều kiện level/combat/cooldown: chặn riêng lời gọi `panels.show` trong lần gọi đồng bộ đó để lấy callback native của nút Vào bí cảnh, khôi phục descriptor bằng finally, không tự dựng bảng level hoặc hiện/đóng bảng người dùng. Đi bằng `auto.walk` gốc trên state riêng. Khi đến trong 2.5 ô, xác nhận cả pickTarget mới và scene.target là đúng realm-enter/ID cổng; gọi callback native một lần khi nó không disabled, không ép target hoặc gọi travel cổng thường. Thời hạn chờ xác nhận 8 giây, chặn gửi lặp cùng cổng trong khoảng này; cổng không tới/không hợp lệ bỏ qua 30 giây. Lượt đi tối đa 120 giây, không tiến bộ 5 giây thì bỏ. Server vẫn quyết định có vào được hay không.
-
-Trong lúc farm, cho native đánh xong mục tiêu đang có; sau đó tạm ngừng chọn mục tiêu mới để đợi hết combat trước khi đi/vào. Giao tranh kéo dài vẫn có thể lỡ cổng. Tự hái đã bắt đầu được chờ kết thúc; di chuyển/chiến đấu tay tạm nhường, chờ ít nhất 3 giây sau thao tác rồi tiếp tục. Hộp kiểm tra người chơi, UI, hồi phục, chết và mất kết nối vẫn chặn. Dùng chung dispatcher Auto Farm với ưu tiên cổng → phong ấn → Tự hái → game; không đổi bộ lọc quái/boss của người dùng. Không tự mở rương, bỏ bảo vệ hoặc thoát; tự chờ hết bảo vệ ban đầu. Đồ bí cảnh có thể mất khi chết.
-
-Ý định Auto Farm lưu ở `sessionStorage["gst:farm-intent:v1"]` **riêng từng tab và tên nhân vật**, còn tùy chọn giữ trạng thái lưu ở chrome.storage.local. Sau tải lại/đổi map, chờ cầu nối xác nhận đã đọc cài đặt farm/bộ lọc, kết nối/nhân vật ổn định 2 giây, hết bảo vệ và không thao tác tay rồi gọi toggleAutoFarm gốc tối đa một lần cho phiên mới nếu ý định đã lưu là ON. Không ghi OFF từ trạng thái khởi tạo của map mới; V/nút game OFF chủ động được lưu OFF. Native click-to-move có thể tự tắt farm: giữ ý định ON trong trường hợp đó, đợi lệnh đi kết thúc và khoảng nghỉ rồi bật lại nếu chọn giữ farm. Auto Farm tiếp tục sau mọi lần hồi sinh; bản cập nhật chuyển trạng thái blocked do giới hạn chết ở bản cũ về ý định ON nếu đang bật giữ farm. OFF chủ động vẫn giữ OFF; không tiếp tục nếu tài khoản bị displaced. Nếu storage bị chặn, không đảm bảo giữ ý định qua reload. Không khẳng định duy trì được khi Windows/Chrome đình chỉ tab.
-
-**Tự hồi sinh luôn ON khi đang có chế độ tự động:** Auto Farm, Tự hái hoặc Tự vào bí cảnh đang chạy đều dùng chung kiểm tra nút deathBtn sẵn sàng/once-per-death; các cờ autoRespawn cũ được đọc thành true và bỏ checkbox OFF. Không tự hồi sinh nếu cả ba đều tắt. Không sửa thời gian chờ, HP, cooldown hoặc yêu cầu đang chờ của native. Riêng Auto Farm bỏ cờ dừng phía client do chết nhiều lần, không xóa lịch sử chết. Khi chưa có timer, trang game có thể tải lại một lần để hỗ trợ theo dõi Auto Farm/hồi sinh; vẫn giữ query/hash khác. Tự hái và tự vào cổng tiếp tục theo cài đặt sau hồi sinh, không tự chuyển sang Chỉ boss.
-
-Chỉ thêm script cục bộ trong đúng MAIN/ISOLATED, không quyền mới hoặc request mạng riêng. Module cổng dùng một watcher 1 giây lúc chưa có scene, quét khi rảnh tối đa mỗi giây, theo đường bằng update game; module giữ farm dùng preupdate giới hạn 200 ms khi có scene, thêm một timer 1 giây chỉ khi đang chờ khôi phục OFF→ON (dừng ngay khi đã bật/thử xong), và dọn wrapper/listener lúc rời scene/trang. Không timer theo cổng; popup dùng nhịp đọc hiện có. Cầu nối có xác nhận configKey, không coi đã lưu là đã chạy. Tests/lint/typecheck/browser/gameplay **NOT RUN**, vào cổng/khôi phục farm/hồi sinh **UNVERIFIED**, CI **NOT CHECKED**.
-
-## Bật lại Auto Farm sau thao tác trang bị
-
-Khi phím V/phím tùy chỉnh do extension xử lý thực sự chuyển native Auto Farm từ OFF sang ON, kết thúc phiên hỗ trợ cũ còn sót **trước** native toggle (để không ghi đè tâm mới), bỏ khóa phiên mở rộng cũ và làm mới lastX/Y, stillSince, chaseSince, sideUntil/sideX/Y, stuckCount, moved cùng cache reachable của game. Source native toggle đã xóa target/path/think/pauseUntil nhưng giữ các trạng thái chống kẹt này; bước di chuyển của game lại làm mới một số trạng thái đó. Đây là sửa khởi tạo cho trường hợp có thể giữ trạng thái cũ, chưa chứng minh là nguyên nhân duy nhất của báo cáo đứng yên sau đổi trang bị. Chỉ thực hiện một lần khi người dùng chủ động bật phiên mới, không tự giả di chuyển hoặc bật/tắt V liên tục; không sửa HP/MP, kỹ năng, trang bị, cooldown hoặc tọa độ.
-
-Chi tiết Auto Farm ưu tiên thông báo tiếng Việt khi game còn bế quan, nghỉ hồi máu, ngắm/chờ chiêu, UI/ô nhập, mất kết nối hoặc tạm dừng sau đi tay. Cờ Auto Farm BẬT chỉ cho biết đã bật chế độ, không đảm bảo đang chọn/đánh quái. Bản sửa khởi tạo hiện áp dụng cho V/phím tùy chỉnh đi qua extension, chưa thêm hook riêng cho nút cảm ứng bật Auto Farm. Tests/lint/typecheck/browser/gameplay **NOT RUN**, chuỗi tắt farm → di chuyển → trang bị → bật lại **UNVERIFIED**, CI **NOT CHECKED**.
-
-## Chẩn đoán Auto Farm tự tắt ở tab nền
-
-QA cục bộ ngày 2026-11-04: **32/32 ca PASS** bằng `node work/qa-auto-stop.cjs` từ workspace cha; kết quả ở `work/qa-auto-stop-results.json`, ngoài gói extension. Harness dùng native Auto Farm/toggleAutoFarm/startClickOrder trích từ code.txt, DOM/timer giả, không game client đầy đủ, đăng nhập hoặc network. Hai ca thiếu guard đã tái hiện: gọi native startClickOrder khi hidden hoặc mất focus sẽ tắt auto; sau sửa bị chặn. Mô phỏng 30 phút chỉ kiểm tra logic đồng hồ, không phải treo trình duyệt thật 30 phút. Bổ sung mô phỏng 10 lần chết liên tiếp, giữ lịch sử chết, chính sách khi tắt giữ farm, di trú blocked cũ và OFF chủ động trong lượt chết thứ ba. Không có bằng chứng xác nhận đây là nguyên nhân của mọi lần người dùng báo.
-
-V/F10 đã có guard ở keydown, nhưng nguồn game còn gọi toggleAutoFarm từ click-to-move, câu cá và quy tắc chết nhiều lần. Thêm guard ở **lúc startClickOrder thực sự chạy** để chặn click xử lý trễ khi document.hidden hoặc !document.hasFocus; không giả định đổi phím là đủ. Tự hái dùng chung lease input, chỉ nhường khi click được chấp nhận. Các đường đi tự động dùng auto.walk nên vẫn chạy ở nền theo nhịp game. Click tay hợp lệ trong tab game vẫn chạy nguyên bản. Module chẩn đoán chỉ ghi nhận; chính sách hồi sinh riêng chỉ bỏ điều kiện dừng vì số lần chết.
-
-Khi gặp lại lỗi: mở tab game → popup → Auto Farm → **Chi tiết Auto Farm → Sao chép chẩn đoán lần tự tắt**, rồi dán vào chat, tốt nhất trước khi tự bật lại. Giữ tối đa 20 mốc ON/OFF/bối cảnh trong sessionStorage riêng tab qua reload/map. Ghi thời gian UTC, khoảng thời gian từ lúc quan sát ON/attach, hidden/focused, số lần chết native, clickOrder/reconnect/displaced và tối đa bốn tên file:line:column đã lọc. Không ghi nội dung phím, tên tài khoản/nhân vật, tọa độ, packet, token, URL đầy đủ hoặc raw stack. Quan sát trạng thái direct-write có thể trễ đến lúc game cập nhật/đọc chẩn đoán; timestamp trường hợp đó là lúc quan sát, không cam kết thời điểm thay đổi chính xác.
-
-Mã lý do: shortcut (đã qua guard phím), death_limit (native stopOnRevive trước toggle), click_to_move, native_game (caller game khác/chưa phân loại), state_changed (cờ đổi không đi qua toggle đã theo dõi), background_click_blocked (đã chặn lệnh, không phải OFF). blocking_dialog/displaced/navigation là bối cảnh, không tự chứng minh nguyên nhân. death_limit có thể xuất hiện trong log bản cũ; bản hiện tại bỏ cờ này trước native update khi đang có lượt chết/hồi sinh và Auto Farm còn ON. Hộp kiểm tra người chơi chỉ được ghi nhận xuất hiện; không tự bấm/ẩn hoặc xác nhận hộ. Có lệnh đi tay hợp lệ còn chưa xong thì giữ farm tạm dừng; không tự hủy lệnh đó để ép farm.
-
-Không thêm quyền, telemetry, network request hoặc timer chẩn đoán riêng; gắn scene từ watcher farm hiện có, đọc fallback tối đa mỗi 500 ms bằng preupdate, ghi storage chỉ khi có sự kiện, dọn hook/listener lúc rời scene/trang. Kiểm tra cục bộ gồm phím nền, click nền, OFF chủ động ngay cả khi đang chết lần thứ ba, 10 lần chết liên tiếp, giữ trạng thái qua reload, cleanup, bật/tắt Tự hái, cầu nối chẩn đoán và bindings/permissions. Browser UI/live gameplay/nguồn sự kiện thực tế trên máy người dùng **NOT RUN / UNVERIFIED**; lint/typecheck/full historical suite **NOT RUN**, CI **NOT CHECKED**.
-
-## Tự hái cây
-
-**Kết quả thu hoạch:** trạng thái popup và bảng trong game (khi tick hiện Tự hái) hiện **“Thành công: nhận thêm …”** trong 5 giây khi đã quan sát game bắt đầu hái đúng cây, sau đó kết thúc, cây không còn ready và số lượng đúng tên vật phẩm trong `scene.inv` tăng so với ngay trước yêu cầu hái. Khi cờ đang hái kết thúc, chờ cập nhật túi/cây tối đa 1,5 giây bằng nhịp đang có; không thêm timer hay gọi mạng. Thiếu bằng chứng thì báo chưa xác nhận, không coi ready=false hoặc hết thanh tiến trình là thành công. Đây là đối chiếu dữ liệu client; nếu đồng thời nhận cùng vật phẩm từ nguồn khác, không thể tách nguồn chỉ bằng số lượng túi. Dùng/tiêu thụ vật phẩm cùng lúc hoặc snapshot quá chậm có thể không hiện thành công dù hái được. Chưa có bằng chứng server riêng cho từng lượt; behavior mới **UNVERIFIED**, tests/browser **NOT RUN**.
-
-**Dấu ? bên cạnh khoảng cách:** trỏ chuột hoặc dùng Tab tới dấu hỏi để xem giải thích. Vùng tìm cây là bán kính quanh tâm cố định lúc bắt đầu (ví dụ 6 ô); vùng sạch quái kiểm tra quanh cả người và cây (ví dụ 4 ô, không tự dọn quái, không áp dụng khi bỏ qua quái gần); khoảng cách hái là lúc dừng đi và thử tương tác cây (gợi ý 1.2 ô), không nới tầm tương tác game. Thay đổi các số vẫn cần nút Lưu khoảng cách.
-
-**Hồi sinh và tiếp tục hái:** bật Tự hái; tự hồi sinh luôn ON kèm theo, `harvestPreferences.autoRespawn` được chuẩn hóa thành true. Hoạt động cả khi Auto Farm tắt. Khi chết, dọn lượt đi/hái và wrapper như trước, dùng watcher 1 giây sẵn có để chờ nút hồi sinh của game hết khóa rồi bấm một lần. Dùng chung trạng thái yêu cầu với tùy chọn hồi sinh Auto Farm; không bấm thêm nếu extension đã yêu cầu hoặc native Auto Farm có yêu cầu đang chờ. Không sửa thời gian chết/cooldown; chính sách Auto Farm mới giữ farm qua nhiều lần chết khi farm đang ON, không tự bật farm chỉ vì đang Tự hái.
-
-Sau khi thấy sống lại, chờ native Auto Farm xử lý hồi sinh (nếu đang bật), rồi ổn định 2 giây trước khi gắn lại Tự hái. Cùng scene thì giữ tâm vùng hái trước chết, tìm cây theo bộ lọc và tìm đường gốc; không giữ mục tiêu/path cũ. Scene khác hoặc tải lại trang thì dùng tâm mới theo quy tắc hiện có, không tự đi qua cổng để quay về map cũ. Đường quá xa/bị chặn và nguy hiểm vẫn chịu giới hạn đi/hái cũ, nên không bảo đảm luôn quay tới cây từ mọi điểm hồi sinh. Tắt Tự hái sẽ dừng phần hồi sinh của nó; Auto Farm/Tự vào bí cảnh vẫn tự hồi sinh nếu các chế độ đó đang bật. Không vượt hộp kiểm tra người chơi. Tests/lint/typecheck/browser/gameplay **NOT RUN**, hồi sinh và quay lại vùng hái **UNVERIFIED**, CI **NOT CHECKED**.
-
-**Thao tác giao diện trong lúc hái (MAIN `harvest-main-log-3-ui`):** mở kho/bảng thông tin, gõ chat hoặc dùng ô nhập không tự hủy lượt đi/hái. Phím menu không còn bị coi chung là lệnh tay. Phím di chuyển/đánh/chiêu, tương tác F tay và click di chuyển/đánh trên canvas nhường điều khiển trong 3 giây; giữ phím/ngắm chiêu/lệnh đi chưa xong tiếp tục chờ. Phím gõ trong ô nhập/chat không được coi là di chuyển. Click nút chiêu được nhận qua lời gọi `useSkill` thủ công; lời gọi Auto Farm với tham số thứ ba `false` giữ nguyên. Hộp thoại tương tác, đổi phím, màn hình mobile dọc và hộp kiểm tra người chơi vẫn chặn. Các điều kiện chết/kết nối/quái/phối hợp Auto Farm giữ nguyên.
-
-Theo source game được cung cấp, `move()` chặn khi `uiBlocked && !auto.on`; module bọc riêng lời gọi này và tạm cho `uiBlocked=false` **chỉ trong lần gọi đồng bộ**, khi đang sở hữu lượt hái, mở UI thông thường và không có điều kiện chặn khác. Khôi phục descriptor bằng `finally`; không thay getter cho các phần game còn lại hoặc bật Auto Farm để lách điều kiện. Vẫn dùng movement/va chạm/khóa di chuyển gốc. `interact()` đóng kho rồi thoát, nên khi kho mở module dùng đúng nhánh node của nó: `sendMove()`, đặt `harvestNode`, gọi `act("harvest", String(index))` một lần sau kiểm tra cả mục tiêu mới/cache. Không tự đóng kho, ép target, giả F vào ô nhập, tự dựng packet hay sửa cooldown. Lệnh click đi/đánh được nhận qua `startClickOrder`, không qua mọi click canvas. Wrapper `move`/`useSkill`/`startClickOrder` được khôi phục khi tắt/rời scene nếu còn sở hữu. Tests/lint/typecheck/browser/gameplay **NOT RUN**; hỗ trợ UI và chấp nhận phía server **UNVERIFIED**, CI **NOT CHECKED**.
-
-**Theo dõi lượt hái bị bỏ qua:** mục thu gọn **Hỗ trợ khi gặp lỗi** chỉ ghi exception cầu nối, timeout đọc MAIN và lượt đường đi/tương tác bị bỏ qua hoặc chưa xác nhận. Không còn thêm lịch sử khởi tạo/configure/status, chọn cây/bắt đầu hái, thành công hay nhường lệnh tay bình thường. Chỉ ghi khi bật; buffer tối đa 60 dòng, không thêm timer. Giữ dữ liệu số lượt/index cây, phase/thời gian/khoảng cách tương đối/ready/fixChanged cho lỗi, không ghi tên cây hoặc tọa độ tuyệt đối. lastFailure=null chỉ là không ghi exception cầu nối, không chứng minh mọi lượt hái thành công. Các log cũ harvest_ended như file người dùng gửi chỉ cho thấy lượt hái kết thúc, không xác nhận nhận vật phẩm.
-
-Nếu pickTarget mới khớp cây nhưng scene.target còn từ khung trước, module dừng tại chỗ và chờ tối đa 500 ms để cache khớp trước khi tương tác. Mục tiêu mới là cổng/NPC hoặc sai cây vẫn bị bỏ qua ngay; không ép scene.target và không nới khoảng cách. Đây là sửa nhánh có thể bỏ qua sớm qua đọc source, **chưa xác nhận là nguyên nhân của các lượt fail người dùng báo**. Tests/lint/typecheck/browser/gameplay: **NOT RUN**, behavior sau sửa **UNVERIFIED**, CI **NOT CHECKED**.
-
-**Sửa lỗi HS-OPTIONS đã khoanh vùng bằng log:** log người dùng cho thấy helper/normalize/marker đều thiếu ở ISOLATED, trong khi MAIN có đủ, storage API tồn tại và URL đã có timer. Manifest cũ liệt kê cùng `harvest-options.js` trong cả hai world. [Mã Chromium](https://chromium.googlesource.com/chromium/src/%2B/refs/tags/132.0.6834.213/extensions/renderer/user_script_injector.cc) bỏ qua đường dẫn đã inject; [script_injection.cc](https://chromium.googlesource.com/chromium/src/%2B/HEAD/extensions/renderer/script_injection.cc) truyền tập file theo extension vào quá trình này. Bản sửa dùng `harvest-main-options.js` cho MAIN và `harvest-options.js` cho ISOLATED, đặt helper trước các script dùng nó. Không đổi schema, cài đặt đã lưu, quyền hoặc thuật toán di chuyển.
-
-`harvest-options.js` là file nguồn duy nhất của helper; `harvest-main-options.js` là bản sinh được đưa sẵn vào repo để Load unpacked không cần build. Khi sửa helper, sinh lại bằng `Copy-Item -LiteralPath .\features\automation\auto-harvest\harvest-options.js -Destination .\features\automation\auto-harvest\harvest-main-options.js` từ thư mục extension; không sửa bản MAIN riêng. Sau Reload extension và tải lại game, log mong đợi helper=object, normalize=function, optionsBuild=harvest-options-log-2-split-worlds ở cả hai world. Đây là kết quả mong đợi, **chưa có log sau sửa**; tests/lint/typecheck/browser/gameplay **NOT RUN**, CI **NOT CHECKED**.
-
-**Chẩn đoán tùy chọn:** mở Tự hái → Hỗ trợ khi gặp lỗi → Ghi chẩn đoán khi cần hỗ trợ; chờ gặp lỗi rồi chọn Sao chép log. Ô log/nút chỉ hiện khi bật ghi. Không cần mở Console. Chế độ log mặc định tắt, cờ bật được lưu riêng ở `harvestDebugEnabled`; nội dung chỉ là vòng đệm 60 dòng trong bộ nhớ tab, không lưu storage/file hoặc gửi mạng. Tắt log dừng ghi và xóa buffer/lỗi đã ghi; có nút xóa riêng. Nếu clipboard không cho phép, ô log được chọn để bấm Ctrl+C; không thêm quyền clipboard. Chưa thể kết luận hết mọi lỗi chỉ từ log người dùng cung cấp, nên vẫn giữ phần hỗ trợ gọn.
-
-Log ghi build marker, helper/normalize hiện tại và lúc options tải, manifest có khai báo options ISOLATED hay không, API storage có tồn tại không, URL có timer hay không (không ghi URL), cờ mong muốn/cờ MAIN và giai đoạn lỗi. Lỗi chỉ ghi tên, lý do đã lọc, tên file/dòng/cột; không ghi toàn bộ message/stack, phím bấm, tài khoản, token, tọa độ hoặc danh sách cây đã chọn. MAIN chỉ trả snapshot chẩn đoán đọc trạng thái, không chạy farm/di chuyển để thử. HS-OPTIONS hiện chỉ chứng minh normalize không có ở phía bridge tại thời điểm lỗi; log giúp phân biệt thiếu file nạp, helper bị thay đổi và bản script đang chạy. Nguyên nhân nạp trùng đường dẫn đã được đối chiếu sau khi nhận log người dùng; xem bản sửa HS-OPTIONS ở đầu phần này. Chỉ review source/diff; tests/browser/gameplay **NOT RUN**, behavior **UNVERIFIED**.
-
-Khi popup đã đọc xong storage, các yêu cầu trạng thái mang theo cấu hình đó qua chrome.tabs.sendMessage từ chính extension. Tab không bắt buộc đọc storage lần thứ hai để áp dụng cấu hình; popup chưa tải xong cài đặt sẽ không gửi giá trị tắt mặc định. Lượt đọc khởi tạo trong tab bị lỗi không còn gửi cấu hình tắt phỏng đoán. Các client cũ không gửi cấu hình vẫn được đọc storage như trước. Lỗi chẩn đoán phân biệt HS-STORAGE (đọc API), HS-CONTEXT (context extension bị vô hiệu), HS-OPTIONS (thiếu bộ chuẩn hóa) và HS-CONFIGURE (xử lý cấu hình/gửi sang trang), không gom tất cả thành lỗi storage. Các thay đổi chỉ review source/diff; tests/browser/gameplay **NOT RUN**, behavior **UNVERIFIED**.
-
-Khi popup yêu cầu trạng thái, cầu nối đọc lại tùy chọn đã lưu rồi gửi lệnh `synchronize` gồm cấu hình và yêu cầu trả trạng thái. MAIN áp dụng trước khi trả kết quả trong cùng một handler; cấu hình trùng không đặt lại đường đi/lượt hái/thời gian chờ. Yêu cầu trạng thái thông thường từ overlay vẫn không tự thay cấu hình trong MAIN. Lượt này không thay thuật toán di chuyển; tập trung vào trường hợp phần chạy báo tắt dù checkbox bật.
-
-Theo dõi bật/tắt: **Bảng trạng thái → Tự hái (bật/tắt và trạng thái)** cho phép ẩn/hiện mục Tự hái riêng. Mục này hiển thị BẬT/TẮT/CHƯA RÕ đọc từ phần chạy trong trang game, kèm hành động đang chờ; không lấy checkbox đã lưu làm bằng chứng đang chạy. Bảng góc màn hình không còn dòng tiêu đề GAME SPEED TESTER. Popup nhận biết cầu nối cũ thiếu xác nhận và báo tải lại extension/tab, hoặc hiển thị riêng cài đặt đã lưu với trạng thái trang khi không khớp. Trạng thái được đối chiếu với storage hiện tại, tránh chỉ dùng bản cấu hình đọc lúc khởi tạo; checkbox trong popup cập nhật nếu cài đặt lưu bị đổi từ nơi khác. Các thay đổi này chỉ được review source/diff, tests/browser/gameplay **NOT RUN**, behavior **UNVERIFIED**.
-
-Đồng bộ bật/tắt: popup phân biệt **đã lưu** với **trang game đã áp dụng**. Cầu nối chờ phản hồi cấu hình từ MAIN world (tối đa 800 ms); không còn xác nhận đã áp dụng chỉ vì đã gửi postMessage. Trạng thái trả cả cờ enabled và khóa cấu hình chuẩn hóa. Nếu hai bên lệch, cầu nối gửi lại tối đa một lần cho cấu hình hiện tại; lệnh chỉnh cài đặt mới hoặc pageshow mở lại lượt thử. Bản script cũ thiếu khóa cấu hình sẽ được báo cần tải lại, không liên tục gửi lại. MAIN nhận cùng cấu hình sẽ xác nhận mà không đặt lại lượt đi/hái hoặc thời gian chờ. Lỗi đọc storage khởi tạo muộn không ghi đè lệnh popup đã nhận. Đây là sửa thiếu sót đồng bộ tìm thấy sau báo cáo checkbox bật nhưng trạng thái tắt; chưa xác minh nguyên nhân duy nhất trong tab thực tế. Tests/browser/gameplay: **NOT RUN**, behavior **UNVERIFIED**.
-
-Dòng **Trạng thái** nằm ngay đầu nhóm Tự hái, phía trên công tắc, để đọc được mà không cuộn qua danh sách cây. Thông báo chặn phân biệt hộp thoại tương tác, đổi phím, đánh/ngắm chiêu, bế quan/hồi máu, câu cá, lệnh đi tay, khoảng chờ sau thao tác, kết nối và điều kiện phối hợp Auto Farm. Chat/ô nhập và bảng thông thường không còn tự chặn Tự hái. Đây là chẩn đoán từ trạng thái client, không xác nhận nguyên nhân của mọi báo cáo đứng yên.
-
-Tính năng **đã triển khai**, mặc định tắt, cài đặt riêng ở `chrome.storage.local.harvestPreferences`. Bật **Tự hái**, chờ game tải với `timer`, chọn **Hái tất cả cây** hoặc **Chỉ loại đã chọn**. Ô tìm hỗ trợ không dấu (ví dụ `tho linh`); có thể tick nhiều loại, loại đã chọn lên đầu và giữ qua đổi map. **Bỏ chọn tất cả** xóa toàn bộ lựa chọn, kể cả loại bị ô tìm kiếm ẩn. Chọn riêng nhưng danh sách trống thì không hái. Mọi tên được hiển thị bằng textContent; khớp đúng tên game, không đoán từ ảnh.
-
-Danh mục lấy từ `scene.world.herbs.scenes` game đã tải, trạng thái hiện diện từ `scene.nodes`, chỉ cây `!ore`. Loại đã lưu nhưng không có ở map vẫn hiện với ghi chú. Nếu chưa đọc được game, popup giữ các loại đã chọn và báo chờ dữ liệu, không coi danh sách trống là không có tài nguyên. Không fetch danh mục hoặc hardcode danh sách tên cây.
-
-Ba khoảng cách dùng nút **Lưu khoảng cách**: vùng tìm cây mặc định **6 ô** (1–30), vùng cần sạch quái **4 ô** (2–15) quanh cả nhân vật và cây, khoảng cách hái **1.2 ô** (0.5–1.5, nhỏ hơn tầm nhận diện 1.6 của game). Hai chế độ đều chờ vùng an toàn ổn định 1 giây. Tâm tìm cây được chụp cố định khi gắn scene, hoặc khi bắt đầu một phiên Auto Farm mới; nếu có phiên mở rộng thì lấy tâm farm ban đầu của phiên đó. Không dời tâm theo từng cây. Bật/tắt Tự hái để chọn lại tâm ngoài farm. Bán kính là vùng chọn cây, không phải cam kết mọi đoạn đường vòng đều nằm trong vòng tròn đó.
-
-**Cho phép thu hoạch khi Auto Farm đang bật** mặc định tắt. Tắt checkbox này thì không bắt đầu/tiếp tục đi tới cây trong lúc farm; nếu lượt hái đã được game xác nhận, chờ lượt đó kết thúc. Khi cho phép, chờ mục tiêu chiến đấu, kỹ năng đang chờ, nhặt loot và hồi máu phù hợp kết thúc. Đọc toàn bộ quái trực tiếp từ `scene.views`, không dùng danh sách đã lọc level/boss làm bằng chứng sạch quái. Có quái gần hoặc trạng thái chặn thì nhường lại cho game; không ép đánh quái ngoài bộ lọc để dọn đường.
-
-Module bọc riêng `auto.update` trong lúc Tự hái bật. Chỉ khi đang điều khiển lượt đi/hái an toàn mới tạm nhường nhịp chiến đấu; những lúc khác gọi nguyên hàm gốc, giữ cơ chế chết/hồi sinh/hồi máu. Đọc ngưỡng HP/MP của Auto Farm để nhường cho cơ chế đan dược gốc. Không bật/tắt `auto.on`, không gọi `auto.pause`, không thay `auto.ax/ay`, không dùng `startClickOrder`. Đường đi lấy từ host.route/clear, dùng autoX/autoY để đi qua move/collision gốc. Chỉ giữ đường riêng của việc hái, không đổi native auto.path. Phần mở rộng tâm farm và hỗ trợ tiếp cận tăng tốc tạm nhường khi Tự hái đang điều khiển; speed override hiện có vẫn giữ nguyên. Sau khi nhường lại, Auto Farm tự chọn hành động theo cơ chế gốc.
-
-Tới gần cây, kiểm tra node còn ready, đúng loại, đúng vị trí trong vùng và cả pickTarget() mới lẫn scene.target hiện tại đều chỉ tới đúng index node, không phải cổng/realm. Sau đó gọi scene.interact() gốc tương đương F **một lần**; nếu kho đang mở thì dùng đúng nhánh node của hàm này như mô tả ở trên. Không sửa target hoặc gửi packet riêng. Chờ tối đa 4 giây để thấy self.harvest cùng harvestNode; chưa xác nhận thì bỏ qua 20 giây. Không dùng ready=false làm bằng chứng chính người chơi hái thành công. Không tiến bộ trong 5 giây hoặc đi quá 15 giây thì bỏ qua cây 20 giây. Cây có cổng/NPC được ưu tiên tương tác sẽ bị bỏ qua thay vì ép tương tác.
-
-Tự hái kiểm tra hộp `[role=alertdialog]` hiển thị, bao gồm hộp kiểm tra người chơi ngoài scene; tạm dừng và chờ người dùng, không xác nhận/ẩn/bỏ qua hộp. Hộp thoại tương tác, di chuyển/chiến đấu tay, câu cá, chết, đổi scene và mất kết nối cũng nhường điều khiển. Lệnh chuột di chuyển/đánh trên canvas tạm dừng thu hoạch 3 giây; click bảng/kho không tự ngắt. Tắt Tự hái sẽ dọn điều khiển, khôi phục descriptor auto.update/move/useSkill/startClickOrder nếu còn sở hữu và dừng watcher/listener scene; không hủy yêu cầu hái game đã nhận. Rời trang dọn tương tự, pageshow/scene mới đọc lại cài đặt. Tối đa một watcher 1 giây lúc chưa có scene; khi có scene dùng preupdate, tìm cây nhịp 200 ms khi rảnh, theo đường mỗi khung hình khi đang đi. Không tạo timer theo từng cây. Bảng góc phải có mục **Thu hoạch** bật/tắt riêng, dùng chung timer đọc trạng thái hiện có; popup dùng chung nhịp refresh.
-
-**Giới hạn:** chưa xác minh server cho hái khi bay hay các điều kiện cấp/vật phẩm, ngắt bởi sát thương và kết quả yêu cầu bị từ chối. Tốc độ cao có thể vượt điểm dừng; đường bị chặn/tới tâm cây không được sẽ bị bỏ qua. Chrome có thể hạn chế tab nền, đặc biệt lúc Auto Farm tắt. Tính năng không tự chạy máy chủ hay tạo combat engine; không thay HP, damage, tốc độ đánh, cooldown, gói tin hoặc cơ chế kiểm tra. Tests/lint/typecheck/browser/gameplay cho Tự hái: **NOT RUN**, behavior **UNVERIFIED**, CI **NOT CHECKED**. Không dùng QA 29/29 lịch sử làm bằng chứng cho tính năng này.
-
-**Bỏ qua kiểm tra quái gần** mặc định tắt, lưu riêng trong `harvestPreferences.ignoreMonsters`. Bật tùy chọn này để bỏ kiểm tra quái quanh cả nhân vật và cây khi chọn cây, đang đi và ngay trước tương tác; vùng sạch quái không áp dụng. Vẫn chờ 1 giây trước lượt đi mới để tránh đổi mục tiêu liên tục, nhưng không tuyên bố khu vực an toàn. Không tự đánh quái; nếu muốn chỉ hái thì tắt Auto Farm của game. Tùy chọn này không bỏ ưu tiên mục tiêu chiến đấu khi Auto Farm đang bật, quyền cho phép hái khi farm, hồi máu gốc, tránh cổng/NPC, chết, mất kết nối, thao tác tay hoặc hộp kiểm tra người chơi. Yêu cầu F đang chờ vẫn được giữ đến xác nhận/thời hạn khi đổi tùy chọn để không gửi trùng sớm. Server có thể ngắt/từ chối thu hoạch khi bị đánh; các lượt kết thúc/chưa xác nhận vẫn có thời gian bỏ qua cây 20 giây. Tests/lint/typecheck/browser/gameplay cho tùy chọn mới: **NOT RUN**; behavior **UNVERIFIED**, CI **NOT CHECKED**.
-
-## Tiếp cận mục tiêu khi đang tăng tốc
-
-Mã game cung cấp đặt nhịp quyết định Auto Farm gốc `em = .2` giây (`code.txt` 14929, 15057–15059). Khi dùng override tốc độ cao, nhân vật có thể vượt qua tầm đánh/điểm rẽ trong thời gian giữa hai quyết định, dẫn tới đổi hướng qua lại. Đây là nguyên nhân khả dĩ được xác định từ source và thông tin người dùng đang bật tăng tốc; chưa xác nhận là nguyên nhân duy nhất trong gameplay.
-
-Khi tốc độ hiện tại đúng là giá trị extension vừa tăng trên bản sao của nhân vật, `page.js` gắn một listener `preupdate` để đọc khoảng cách tới mục tiêu/điểm đường đi hiện có. Chỉ khi Auto Farm đang điều khiển di chuyển và gần những điểm này, cho `auto.think` về 0 để Auto Farm gốc sớm quyết định lại. Khi đứng đánh, nghỉ hồi máu, thao tác kỹ năng/UI, di chuyển tay hoặc chưa tăng tốc so với giá trị game, không điều chỉnh nhịp này. Không đổi mục tiêu, tâm farm, tọa độ, mức tốc độ cấu hình, attack speed hoặc cooldown; không gọi đánh thường/skill thay game. Có thể tăng số lần game cân nhắc quyết định trong những khung hình gần mục tiêu, nhưng kỹ năng/đánh vẫn phải qua điều kiện và cooldown gốc. Không thêm timer; tắt override, rời trang hoặc kết thúc scene sẽ tháo listener.
-
-Bản sửa tiếp theo xử lý waypoint đã đi qua: lưu vị trí từ lượt cập nhật trước và kiểm tra đoạn di chuyển có đi xuyên qua vùng nhận diện 0.35 quanh waypoint hay không. Chỉ bỏ **một waypoint đầu** khi vẫn cùng mảng đường đi/điểm đầu, `fix` gốc có số và không thay đổi, còn điểm tiếp theo, và `autoHost().clear()` xác nhận đoạn từ vị trí hiện tại tới điểm tiếp theo thông. Không bỏ điểm cuối, không sửa tọa độ, không nới va chạm, không đổi toàn bộ đường hoặc bỏ mục tiêu. Nếu điều kiện không đủ thì giữ nguyên đường để game xử lý. Dữ liệu vị trí trước được xóa khi tháo listener. QA cục bộ dùng lớp Auto Farm gốc đã qua **29/29 ca**, gồm hai ca từng lỗi (tốc độ 2 / 20 FPS, tốc độ 6 / 60 FPS) và các ca chặn bỏ waypoint không an toàn. Route/kiểm tra clear trong harness là giả lập, chưa phải bản đồ/gameplay thật.
-
-Không bảo đảm xử lý được việc server sửa vị trí liên tục, đường đi không đến được, hết linh lực, đang rút lui hồi máu hoặc không có quái đúng level. Đặc biệt mức 5–6 chưa có bằng chứng ổn định trên server. Kiểm tra cú pháp file sửa và harness cục bộ: **PASS**. Browser/gameplay: **NOT RUN / UNVERIFIED**.
-
-## Extended Auto Farm Range
-
-### Lọc level quái
-
-Trong nhóm **Auto Farm → Quái muốn farm**, chọn **Tất cả quái** (mặc định), **Level ≤ mức chọn**, **Level ≥ mức chọn**, **Trong khoảng level**, hoặc **Chỉ boss**. Các mức level là số nguyên dương: ≤ 10 gồm level 10 trở xuống, ≥ 10 gồm level 10 trở lên, kể cả boss khớp level. Chế độ khoảng hiện hai ô **Thấp nhất/Cao nhất**: ví dụ 10–20 chỉ chọn quái level 10 đến 20, tính cả hai đầu; 10–10 chỉ chọn level 10. Không lưu khoảng ngược hoặc ô trống/số lẻ. Chỉ boss gồm boss thường và boss thế giới, bỏ qua các ô level. Nhấn **Lưu lựa chọn quái** hoặc Enter trong ô level; nút Lưu phạm vi cũng lưu toàn bộ tùy chọn farm đang nhập. Cài đặt lưu trong `farmPreferences.targetMode/targetLevel`; chế độ `range` dùng thêm `targetMinLevel/targetMaxLevel` (giá trị ban đầu 1/20), giữ qua đổi map. Chế độ `level` cũ được đọc thành `maxLevel` (≤ mức đã lưu); các chế độ còn lại giữ nguyên. Nếu dữ liệu ngoài UI có min > max, chế độ khoảng không chọn quái thay vì tự đảo hoặc chuyển sang Tất cả. Tắt các công tắc hỗ trợ vẫn không phụ thuộc vào ô level đang nhập dở. Tests/lint/typecheck/browser/gameplay của chế độ khoảng **NOT RUN**; behavior **UNVERIFIED**, CI **NOT CHECKED**.
-
-Bộ lọc hoạt động độc lập với mở rộng bán kính: tắt mở rộng vẫn lọc trong vùng gốc 11 ô. Chỉ farm khi Auto Farm game đang bật; không tự bật phím V/phím tùy chỉnh. Khi chỉ bật lọc level, extension không tự bật bay hoặc dịch tâm; các thao tác đó vẫn thuộc phần mở rộng bán kính.
-
-Đối chiếu source `code.txt`, host cung cấp `enemy.lv`, `enemy.cls` và `enemy.wb`; game đặt `cls: "boss"` cho boss thế giới. Extension bọc riêng `scene.autoHost()` để giữ nguyên các chức năng và lọc `enemies()` khi game lựa chọn mục tiêu; cả Auto Farm gốc và phần mở rộng cùng nhận danh sách phù hợp. Chỉ boss khớp `cls === "boss"` hoặc `wb === true`. Không đoán level/boss từ tên hoặc HP; quái thiếu level hợp lệ bị loại trong hai chế độ level. Khi game đang nghỉ hồi máu (`auto.resting`), trả danh sách mối đe dọa đầy đủ để cơ chế rút lui vẫn nhận ra quái ngoài bộ lọc, không dùng việc đó để chọn mục tiêu farm.
-
-Đổi level đặt lại nhịp chọn mục tiêu `think` để game tự bỏ mục tiêu không còn khớp ở lượt xử lý kế tiếp; không hủy ngược kỹ năng đã được game phát hoặc đang chờ thực thi. Không có quái khớp thì nhặt loot rồi đứng chờ hoặc quay về theo lựa chọn Khi không còn mục tiêu; phần mở rộng trả tâm tìm kiếm về gốc nhưng không ép đi về nếu chọn đứng chờ. Chọn Tất cả và tắt né level cao sẽ gỡ wrapper, khôi phục descriptor/hàm gốc nếu vẫn do extension sở hữu. Bộ lọc giữ qua lúc chết/hồi sinh hoặc Auto Farm tắt trong cùng scene để lượt chọn mục tiêu đầu tiên khi tiếp tục vẫn được lọc; wrapper trả host gốc khi `auto.on` tắt. Mất kết nối, scene shutdown/destroy hoặc rời trang sẽ gỡ wrapper và các listener riêng của bộ lọc. Không sửa level, HP, damage, packet hoặc tạo bộ chiến đấu mới.
-
-Bộ lọc giới hạn mục tiêu Auto Farm lựa chọn, không sửa vùng tác động của kỹ năng: đòn đánh lan vẫn có thể trúng quái ngoài bộ lọc. Quái phù hợp vẫn phải qua điều kiện chọn mục tiêu, đường đi và chiến đấu gốc; chế độ boss không ép game chọn boss bị cơ chế gốc loại bỏ hoặc chưa được server cung cấp.
-
-Nguồn/interface đã đối chiếu tĩnh và có kiểm tra khi cài wrapper. Việc bắt đầu lọc phụ thuộc phát hiện scene (watcher khoảng 1 giây), không bảo đảm hủy các hành động game đã chọn trước khi wrapper được gắn. Bộ lọc khoảng level/boss mới: **Tests/lint/typecheck/browser/gameplay: NOT RUN. Behavior: UNVERIFIED.** Kết quả harness bộ lọc chính xác cũ không xác minh các chế độ mới.
-
-### Phím Auto Farm tùy chỉnh
-
-Khi màn hình game đang chờ gán phím (`keyCapture`) và trang đang có focus, extension nhường sự kiện cho bộ chọn phím của game. Các sự kiện phím farm ở tab bị ẩn/mất focus vẫn bị chặn như trước.
-
-Trong popup, chọn **Đặt phím**, sau đó bấm phím muốn dùng. Hỗ trợ một chữ A–Z, số 0–9 hoặc F1–F10 trừ F5, không kèm Ctrl/Alt/Shift/Meta; Esc hủy. Gợi ý **F6**. Lưu riêng ở `farmShortcut`, giữ qua tải lại/đổi map, áp dụng cho các tab game. Nếu cần, URL được thêm `timer` và tải lại một lần để truy cập scene; không bỏ tham số khác.
-
-Khi có phím tùy chỉnh, phím bật Auto Farm gốc của game (thường V) bị chặn; phím mới gọi đúng `scene.toggleAutoFarm()` một lần mỗi lần bấm hợp lệ. Không sửa `auto.on`, không tạo Auto Farm riêng và không cần tự xóa binding V trong game. Nhấn **Dùng phím gốc** để bỏ tùy chỉnh và dùng binding game hiện có. Khi truy cập được scene, cả phím gốc lẫn phím tùy chỉnh đều gọi trực tiếp hàm này sau khi kiểm tra focus, thay vì chuyển sự kiện xuống hàng đợi phím Phaser. Nếu chưa truy cập được scene và không đặt phím tùy chỉnh, phím gốc vẫn được game xử lý khi trang có focus. Những chỗ ghi V trong hướng dẫn này được hiểu là phím Auto Farm mới nếu đã tùy chỉnh. Nhãn/hướng dẫn phím do chính game vẽ có thể vẫn ghi V vì extension không sửa bảng binding của game.
-
-Chỉ xử lý phím trong trang game đang hiển thị và có focus, không trong ô nhập liệu/chat, composition hoặc key repeat. Phím trùng binding của hành động khác sẽ không bật/tắt Auto Farm và popup báo chọn phím khác; hãy tránh các phím game đang dùng. Nút Auto Farm trên giao diện game vẫn hoạt động. Không có phím tắt toàn hệ thống; chưa chứng minh hoặc sửa tận gốc hiện tượng được báo khi gõ trong ứng dụng khác. Hiển thị/phím tắt thực tế: **UNVERIFIED**, chưa chạy browser/gameplay test.
-
-- Trong popup, bật **Mở rộng vùng Auto Farm**, nhập bán kính rồi chọn **Lưu phạm vi** hoặc Enter. Mặc định tính năng tắt, bán kính **22 đơn vị game**, cho phép **11–100**. Phạm vi website/quyền vẫn như trước. Cài đặt được lưu riêng ở `farmPreferences`, không thay tùy chọn tốc độ, font hoặc bảng trạng thái.
-- Dùng **V của game** để bật/tắt Auto Farm như bình thường. Extension không bật Auto Farm thay người dùng và không tạo một hệ thống chiến đấu khác. Khi bật tính năng trên URL thiếu `timer`, trang tải lại một lần để game công khai `window.game`; giữ query/fragment hiện có.
-- Bảo vệ phím Auto Farm: listener `keydown` cài từ `document_start` trước listener Phaser, theo mã phím `scene.controls.bindings.V` (dự phòng V nếu scene chưa sẵn sàng). Chặn sự kiện đến game khi trang bị ẩn/mất focus, đang nhập trong input/textarea/select/contenteditable/textbox, đang composition, giữ phím lặp hoặc dùng Ctrl/Alt/Meta. Đọc cả activeElement và composedPath để nhận diện ô nhập. Chỉ gọi `preventDefault` khi nhận phím Auto Farm hợp lệ để xử lý trực tiếp; sự kiện bị bỏ qua vẫn giữ hành vi nhập liệu mặc định. Không tạo phím tắt toàn hệ thống, không tự bật lại Auto Farm. Listener được tháo khi rời trang và gắn lại khi quay về; hoạt động độc lập với checkbox mở rộng phạm vi. Các thao tác thông thường từ nút Auto Farm của game vẫn giữ nguyên. Đây là lớp bảo vệ cho sự kiện **được gửi tới trang game**; chưa chứng minh game thật sự nhận được phím từ tab/ứng dụng khác. Thay đổi xử lý phím gốc lần này: tests/browser/gameplay **NOT RUN**, hiệu quả với lỗi được báo **UNVERIFIED**; kết quả QA cũ không xác minh thay đổi này.
-- Tự hồi sinh luôn ON khi Auto Farm, Tự hái hoặc Tự vào bí cảnh hoạt động; không có checkbox tắt riêng. Hoạt động độc lập với mở rộng bán kính và speed override. Khi bật trên URL thiếu `timer`, trang cũng cần tải lại một lần. Chỉ bấm `scene.hud.deathBtn` của game khi nhân vật đang chết, scene hoạt động, kết nối hợp lệ, nút hiện và không bị disabled. Nút của game gọi action respawn gốc (`code.txt` dòng 12426, 19672 và 12797–12807), không sửa HP, đồng hồ hồi sinh hoặc packet.
-- Game có sẵn yêu cầu hồi sinh của Auto Farm sau khoảng 5,3 giây, thử lại cách 2 giây (`code.txt` 15025–15035). Extension không bấm trùng khi `auto.reviveTry` còn đang chờ. Khi đến lượt extension, chỉ bấm một lần trong mỗi đợt chết rồi chờ xác nhận; nếu game từ chối/mất phản hồi thì người dùng có thể bấm lại bằng tay, không tự spam. Tắt các chế độ tự động ngừng các lần bấm mới, không hủy yêu cầu game đã nhận. Đóng tab/rời trang dọn watcher; bộ hồi sinh dùng watcher 1 giây hiện có; việc giữ ý định farm qua map do module farm-session riêng xử lý.
-- Popup và bảng phía trên bên phải, chừa khoảng cách với bản đồ có trạng thái **Auto Farm của game: BẬT/TẮT/CHƯA RÕ**, đọc trực tiếp `scene.auto.on`; không lấy checkbox mở rộng làm trạng thái Auto Farm. Có thể chọn ẩn/hiện mục này qua checkbox riêng. Khi mục đang hiện, dùng một timer **chỉ đọc trạng thái mỗi giây**, kể cả lúc speed override và mở rộng bán kính tắt; ẩn bảng/bỏ chọn mục/rời trang sẽ dừng timer này.
-- Game gốc tự tắt Auto Farm sau **3 lần chết trong 10 phút** (`code.txt` 14934, 15030–15044). Theo yêu cầu mới, `farm-revive-policy.js` dùng dispatcher hiện có, ưu tiên 0, bỏ `stopOnRevive` trước native update chỉ khi farm ON và đang có lượt chết/hồi sinh. Không sửa `deaths`, thời gian chờ, yêu cầu hồi sinh hoặc combat; không thêm timer. Sau mọi lần hồi sinh, farm gốc tiếp tục. Chính sách hoạt động cả khi tắt giữ farm qua đổi map; OFF chủ động vẫn giữ OFF. Dọn hook khi rời scene/trang. Giới hạn hồi sinh do server vẫn có hiệu lực; chưa kiểm chứng live.
-- Khi phần mở rộng đang bật và Auto Farm V đang hoạt động: nếu `scene.self.fly` đã bật thì không gửi thao tác bay, tiếp tục xử lý phạm vi farm. Nếu chưa bay, sau 1 giây quan sát trạng thái sẵn sàng sẽ gọi **`scene.act("fly")` một lần**, cùng thao tác game gán cho R (`code.txt`, dòng 19717 và 20031). Chờ game xác nhận `self.fly`; không sửa trực tiếp `fly`, không giả phím hoặc chỉnh packet. Trong lúc chờ, Auto Farm gốc vẫn hoạt động, chỉ tạm dừng dịch tâm mở rộng.
-- Không gửi lại toggle khi chưa xác nhận, vì gửi lặp có thể làm hạ xuống. Nếu sau 8 giây vẫn chưa bay thì popup báo kiểm tra điều kiện game hoặc dùng R; không tự gửi liên tục. Sau khi đã quan sát được đang bay, nếu về sau game hạ xuống thì một đợt mới có thể yêu cầu bật lại. Không yêu cầu bay khi đang nghỉ/hồi máu, thao tác UI/kỹ năng, chết, mất kết nối hoặc rời scene. Không tự hạ xuống khi tắt V/phần mở rộng. Game/server quyết định có cho phép bay hay không; việc này chưa được kiểm chứng live.
-- Khi nhận diện phiên Auto Farm đang bật, lưu `auto.ax/ay` làm tâm farm gốc. Nếu mục tiêu hiện tại vẫn hợp lệ thì giữ mục tiêu đó. Nếu vùng tìm kiếm hiện tại có mục tiêu mà bộ chọn gốc tiếp cận được, không dịch tâm để tranh quyền chọn mục tiêu.
-- Khi vùng hiện tại không có mục tiêu phù hợp, xét quái còn sống, hostile, trong bán kính cấu hình tính từ tâm gốc, không nằm trong danh sách bỏ qua đang hiệu lực. Tìm quái gần người chơi nhất mà `auto.pick()` của game chấp nhận. Bộ chọn này dùng `auto.reachable`, `auto.skipped`, `host.clear()` và `host.route()`, bao gồm thời gian bỏ qua mục tiêu không đến được. Mỗi lượt chỉ thử tối đa bốn ứng viên ngoài vùng hiện tại; các lượt sau tiếp tục khi game đã đánh dấu bỏ qua các ứng viên không phù hợp.
-- Dịch `auto.ax/ay` về phía quái vừa tìm được, giữ toàn bộ vòng tìm kiếm gốc bán kính 11 bên trong vòng mở rộng. Đặt lại `auto.think` khi tâm thực sự thay đổi để game tự cân nhắc vùng mới. Phần tìm mục tiêu không gán mục tiêu, không sửa `auto.path`, không gọi hàm đánh, dùng kỹ năng, hồi máu, nhặt đồ hay gửi lệnh mạng; chỉ thao tác hỗ trợ bay gọi action gốc như đã nêu. Chiến đấu, va chạm và tìm đường vẫn do Auto Farm gốc xử lý. Skill/pill cooldown không bị thay đổi hoặc bỏ qua.
-- Cho game xử lý loot quanh tâm hiện tại trước khi mở vùng khác. Khi không còn quái phù hợp, trả tâm tìm kiếm về gốc; idle nhặt loot rồi đứng chờ (mặc định mới) hoặc đi về theo lựa chọn đã lưu. Việc đi về vẫn phụ thuộc đường đi hợp lệ của game. Tạm ngừng dịch tâm khi Auto Farm đang nghỉ/hồi máu, người chơi tự di chuyển, mở UI hoặc dùng kỹ năng. Nếu người dùng tự đổi tâm theo điều khiển gốc, chấp nhận tâm mới thay vì kéo lại tâm cũ.
-- Tắt tính năng sẽ tháo listener scene, dừng watcher và khôi phục tâm gốc một lần nếu tâm hiện tại vẫn do extension sở hữu. Không ghi đè tâm mới do thao tác người dùng/game đặt lại. Không thay `auto.on`, vì vậy Auto Farm gốc tiếp tục hoạt động với bán kính gốc. V tắt sẽ dừng phiên mở rộng; bật V lại có thể tạo phiên mới.
-- Khi chết: dừng phiên mở rộng, tháo listener và khôi phục tâm còn sở hữu; watcher chờ hồi sinh và chỉ bấm nút sẵn sàng khi Auto Farm hoặc chế độ tự động còn hoạt động. Sau khi game xác nhận sống lại và Auto Farm gốc xử lý xong trạng thái chết, chờ **2 giây** rồi tiếp tục nếu `auto.on` vẫn bật. Phiên mới kiểm tra bay lại: đã bay thì bỏ qua; chưa bay thì yêu cầu bật một lần theo cơ chế chờ 1 giây nêu trên. Chết nhiều lần không còn làm Auto Farm tự dừng. Nếu người dùng chủ động tắt Auto Farm thì giữ OFF. Thời gian chờ hồi sinh của game vẫn giữ nguyên.
-- Khi driver mất kết nối/đang reconnect, rời scene hoặc interface không hợp lệ: dừng phiên và không tự tiếp tục trên cùng instance. Sau khi kết nối lại vẫn cần **V tắt rồi V bật**. Đổi map tạo scene mới được module giữ ý định Auto Farm khôi phục nếu bật lựa chọn giữ farm; OFF chủ động vẫn giữ OFF. Cơ chế tiếp tục sau hồi sinh chỉ áp dụng khi còn cùng scene/instance và kết nối vẫn hợp lệ.
-- Khi mở rộng hoặc tự hồi sinh bật nhưng đang chờ Auto Farm/scene, dùng một watcher mỗi giây. Khi đã gắn scene, dừng watcher và dùng event `preupdate` có giới hạn xử lý mỗi 500 ms. Không tạo timer theo từng quái; khi tắt cả hai tùy chọn hoặc rời trang không còn watcher/listener scene của các thao tác tự động này. Timer chỉ đọc của bảng trạng thái là riêng và phụ thuộc mục Auto Farm đang được hiển thị. Popup đọc thông báo riêng trong **Extended Auto Farm Range**, không phụ thuộc timer speed override.
-
-### Đứng chờ sau khi hết mục tiêu
-
-Trong **Auto Farm → Khi hết mục tiêu · nhặt đồ**, chọn nhặt đồ rồi đứng chờ tại chỗ, quay về điểm bắt đầu hoặc chủ động tìm quái mới. Lựa chọn tự lưu; không có nút Lưu riêng. Ưu tiên nhặt đồ sau giao tranh vẫn là tùy chọn riêng và dùng cơ chế nhặt gốc của game.
-
-Tính năng né quái theo ngưỡng level đã được gỡ. Các cài đặt né cũ không còn được đọc hoặc áp dụng. Bộ lọc quái theo cảnh giới/tầng, né chiêu boss và rút lui khi đánh boss vẫn là các tính năng riêng.
-
-Hành vi runtime/gameplay chưa được xác minh cho thay đổi này.
-
-### Tối ưu FPS (2026-11-04)
-
-Sau khi cập nhật, Reload extension tại chrome://extensions rồi tải lại game. Mở nhóm **Tối ưu FPS**, bật công tắc và tick phần muốn giảm; mọi lựa chọn mặc định tắt. Nhóm này có thể kéo đổi vị trí như các nhóm khác. Cài đặt `fpsPreferences` lưu ở chrome.storage.local và tự áp dụng lại khi đổi map. Nếu thiếu tham số timer, tính năng hoặc hiển thị FPS có thể tải lại trang một lần để game công khai instance; giữ nguyên query/hash hiện có.
-
-- Ẩn hình người chơi khác: thân, lớp vũ khí/thú cưỡi xác định được, bóng và hào quang. Giữ tên theo điều kiện game; không ẩn nhân vật của bạn.
-- Giảm hiệu ứng người chơi khác/của bạn/quái: lọc nguồn qua you/views.k; bỏ tạo liveSkills/weaponFx trong castFx tương ứng, bỏ statusFx và dư ảnh xác định được, che hào quang/thiền của đúng chủ thể. Giữ lời gọi castFx gốc và các nhánh animation; không bỏ onEvent, không sửa lock/cooldown. Không phân loại theo khoảng cách hoặc texture chung.
-- Ẩn hình quái: thân và bóng, không áp dụng cho pet. Chỉ thêm bit cameraFilter của camera chính sau update; hoàn trả bit sở hữu trước update tiếp theo hoặc khi tắt, không đổi visible/active. Vì tên/thanh máu gốc đọc visible, chúng vẫn theo điều kiện khoảng cách/đã nhận đòn vốn có; không ép hiện toàn map. Giữ mục tiêu, dữ liệu, va chạm, cổng, NPC, cây và phong ấn.
-- Ẩn số: không tạo floatText cho chuỗi số sát thương/hồi máu và chữ Né; giữ thông báo chữ khác. Số đã xuất hiện sẽ kết thúc theo game.
-- Giảm nền: weather.update dùng nhánh disabled chỉ trong lời gọi rồi trả cờ enabled, air.update dùng nhánh ẩn gốc; bỏ update emitter trang trí có sẵn trong scene, che sprite sương/bụi/hạt nền. Không giảm độ phân giải hoặc tần số mô phỏng.
-- Giảm rung/chớp: vẫn gọi feel gốc, trả cameraKick về 0 và che riêng lớp flash/vignette. Không bỏ vòng cập nhật HP hoặc heartbeat.
-
-**Khôi phục hình ảnh gốc** tắt tối ưu và bỏ mọi lựa chọn FPS; tắt công tắc tổng giữ các lựa chọn cho lần sau. Gỡ wrapper chỉ khi vẫn sở hữu, hoàn trả cameraFilter/visibility CSS còn thuộc tool và dọn listener khi shutdown/destroy/pagehide. Không ép mọi hình sang visible=true: quái chết/hình vốn ẩn vẫn theo game. Hiệu ứng đã bị bỏ tạo không được phát lại khi tắt; các hiệu ứng đang chạy trước khi bật có thể còn đến lúc hết hạn. Một số lớp trang trí chưa nhận diện đầy đủ sẽ được giữ nguyên; không cam kết ẩn toàn bộ hiệu ứng của mọi class. Không đụng groundFx, sự kiện chiến đấu hoặc cảnh báo vùng đánh.
-
-Trong **Bảng trạng thái**, tick **FPS** (mặc định tắt). Đọc số làm mượt game.loop.actualFps, không dùng FPS do timer giả tạo. Một watcher mỗi giây chỉ tồn tại khi cần giảm hình ảnh hoặc hiển thị FPS; bộ lọc dùng preupdate/postupdate của scene, không quét DOM hoặc tạo timer theo từng đối tượng. Không đổi game loop, requestAnimationFrame, tốc độ, damage, packet hoặc Auto Farm. Không thêm quyền/dependency/network request. Nhịp nền vẫn do Chrome/game quyết định; số FPS khi tab ẩn là chưa rõ.
-
-Chỉ đối chiếu source code.txt và tài liệu Phaser, review diff/status. **Tests, lint, typecheck, browser và gameplay: NOT RUN. Hiệu quả FPS, hiển thị/khôi phục thực tế và tương thích mọi class: UNVERIFIED. CI: NOT CHECKED.** Không giải quyết lag mạng/server; chưa có số đo cải thiện.
-
-Tham khảo API: [Phaser cameraFilter](https://docs.phaser.io/api-documentation/4.0.0/class/gameobjects-gameobject), [TimeStep.actualFps](https://www.phaser.io/oss/docs/api-documentation/class/core-timestep). Chỉ dùng các thuộc tính đã có trong source/interface; chưa xác minh phiên bản Phaser của phiên chơi hiện tại.
-
-### Nguồn và giới hạn xác minh
-
-Đã đối chiếu mã người dùng cung cấp: `code.txt` có `za = 11` (dòng 14927), `lm.update/pick/idle/walk` (15022–15234), `autoHost()` (22362–22471). Mỗi phiên chạy có kiểm tra kiểu/trường của `scene.auto`, event scene, driver và host trước khi sử dụng; nếu không tương thích thì dừng, không tự đoán đường dẫn khác. Ưu tiên scene `world` qua `window.game`; chỉ dùng `window.__ntkScene` khi có key scene `world`.
-
-**Chưa trực tiếp kiểm chứng interface trong phiên game live hiện tại; runtime/behavior: UNVERIFIED.** Chỉ thấy các quái được game cung cấp qua `autoHost().enemies()`; mở rộng bán kính không khiến server gửi thêm quái ngoài vùng đang hiển thị/stream. Kiểm tra trạng thái theo nhịp 500 ms có thể trễ và bỏ lỡ thay đổi quá nhanh; tab nền có thể bị hạn chế nhịp. Không bảo đảm farm ổn định ở mọi bản đồ hoặc khi game cập nhật module. Các tính năng speed override cũ vẫn độc lập; phần mở rộng Auto Farm không đọc/sửa `ms`, damage, attack speed hoặc cooldown.
-
-Các giới hạn gốc vẫn tồn tại: game có thể ưu tiên quái đang tấn công sát người chơi ngoài vòng tìm kiếm; extension không chặn cơ chế tự vệ đó. Sau khi phiên mở rộng dừng vì mất kết nối, nên để V ở trạng thái tắt ít nhất một lượt watcher (khoảng 1 giây ở tab hoạt động) trước khi bật lại để nhận diện phiên mới. Sau hồi sinh bình thường không cần thao tác này nếu Auto Farm gốc vẫn bật; thời gian chờ có thể dài hơn ở tab nền.
-
-Đã chạy harness cục bộ theo yêu cầu QA: **29/29 PASS** sau bản sửa waypoint. Lint, typecheck, browser smoke tests và live gameplay tests: **NOT RUN**. CI: **NOT CHECKED**. Không coi harness/source/diff là bằng chứng gameplay.
-
-## Font giao diện web
-
-Trong popup, mục **Font giao diện web** có checkbox **Đổi font web** và danh sách 10 font: Times New Roman, Arial, Calibri, Segoe UI, Verdana, Tahoma, Georgia, Cambria, Consolas, Courier New. Mặc định bật với **Times New Roman**, giữ cách hiển thị của bản trước. Chọn font hoặc bật/tắt sẽ tự lưu vào `chrome.storage.local`, độc lập với tùy chọn tốc độ và hiển thị bảng trạng thái.
-
-Sau khi DOM sẵn sàng hoặc quay về trang từ bộ nhớ điều hướng, chờ **1 giây** rồi áp dụng một stylesheet duy nhất. Đổi font liên tiếp sẽ hủy lượt chờ cũ và tính lại từ lựa chọn cuối cùng; chỉ dùng tối đa một timeout. **Tắt Đổi font web sẽ hủy lượt chờ và gỡ stylesheet ngay**, trả lại font hiện tại do game quy định, không cần tải lại trang. Bật lại dùng font đã chọn. Đổi map tải trang mới sẽ tự đọc lại lựa chọn; nếu rời trang trước khi hết thời gian chờ thì hủy timer. Các phần tử HTML tạo thêm tự nhận quy tắc CSS, không quét DOM, không polling và không ghi stylesheet lặp lại. Các tab game khác nhận tùy chọn qua storage.
-
-Chỉ dùng font có sẵn trên máy, mỗi lựa chọn có font dự phòng nếu máy thiếu font, không tải font từ mạng. Font áp dụng chỉ trên website game, kể cả khi speed override tắt. Không thêm thông tin font vào bảng trạng thái; bảng trạng thái và chữ của popup vẫn dùng font riêng. CSS thay biến `--ui-font` của game và font-family các phần tử HTML; **không đổi chữ đã vẽ trong canvas Phaser, chữ trong ảnh hoặc nội dung shadow DOM riêng của game**. Sau khi cập nhật extension, Reload extension rồi tải lại tab game một lần để bỏ stylesheet/script bản cũ. Khi gỡ extension cũng cần tải lại tab để bỏ CSS còn trong tab. Chưa kiểm chứng hiển thị thực tế trên trình duyệt.
-
-## Sử dụng
-
-- Nhập riêng **Walking speed** (mặc định 3.5) và **Flying speed** (mặc định 2), mỗi ô từ **1.0 đến 6.0**; chọn **Save speeds** hoặc Enter. Đây là giá trị gán trực tiếp vào `self.ms`, không phải hệ số nhân. Có thể nhập 5 hoặc 6 để tự kiểm tra độ ổn định; chưa có kết quả kiểm thử các mức này.
-- Khi bật lần đầu hoặc có người chơi sau khoảng chờ, extension áp dụng ngay tốc độ của trạng thái hiện tại. Sau đó, trạng thái mới phải giữ liên tục **1 giây** qua các lần quan sát mới đổi tốc độ. Trong thời gian chờ vẫn dùng tốc độ của trạng thái đã chấp nhận; đổi trở lại trước khi đủ thời gian sẽ hủy lượt chờ. Bộ đếm không bị đặt lại chỉ vì game thay đối tượng `self` trong snapshot. Quan sát bằng `preupdate` khi scene hoạt động; thời gian thực tế còn phụ thuộc nhịp game và giới hạn tab nền của Chrome.
-- Bảng hiển thị trạng thái bay/đi bộ thật ngay khi đọc được, kèm thông báo đang chờ đủ 1 giây khi tốc độ chưa đổi. Chỉnh tốc độ bằng popup được áp dụng ngay cho trạng thái đã chấp nhận, không thêm thời gian chờ hoặc timer.
-- Khi nâng cấp từ bản chỉ có một ô tốc độ, giá trị chung cũ không được dùng cho hai trạng thái: mặc định mới là đi bộ 3.5, bay 2; giữ tùy chọn bật/tắt đã lưu. Nhấn **Save speeds** để lưu hai giá trị mới. Những lần sau sẽ dùng lại tốc độ riêng đã lưu. Nếu trước đây đã lưu tốc độ đi bộ 4, giá trị đã lưu được giữ; nhập 3.5 rồi lưu để áp dụng mức mới.
-- Bật **Enable speed override** để bắt đầu. Thao tác bật/tắt lưu ngay cả tốc độ đang nhập hợp lệ.
-- Khi điều chỉnh tốc độ bật, Auto Farm gốc (`scene.auto.on === true`) dùng mức riêng cố định: **bay 1.5, đi bộ 2**, độc lập với checkbox mở rộng bán kính. Tắt Auto Farm trở lại đúng tốc độ bay/đi bộ đã lưu, không ghi đè cài đặt đó. Tổ hợp trạng thái Auto Farm + bay/đi bộ phải ổn định **1 giây** mới chuyển mức; nếu đổi lại trước khi đủ thời gian thì hủy chuyển. Hai trạng thái dùng chung độ trễ, không cộng thành 2 giây. Khi mới bật override/có nhân vật lần đầu, chọn ngay mức phù hợp trạng thái hiện tại. Không thêm timer. Tắt override vẫn khôi phục tốc độ gốc ngay một lần theo điều kiện sở hữu; không tiếp tục áp dụng mức farm. Tests/lint/typecheck/browser/gameplay cho mức farm riêng: **NOT RUN**; behavior: **UNVERIFIED**.
-- Lần bật trên URL chưa có tham số `timer`, extension dùng `location.replace` để tải lại cùng địa chỉ với tham số này. Việc tải lại có thể làm gián đoạn hoạt động đang diễn ra.
-- Đọc **Current speed**, **Movement state** và **Fix since speed change**. `Fix` hiển thị là bộ đếm tương đối của extension, bắt đầu ở **1** mỗi khi bắt đầu áp dụng một tốc độ khác. Nếu giá trị gốc `self.fix` tăng thêm N, số hiển thị tăng thêm N. Ví dụ: vừa đổi tốc độ là 1, server sửa thêm một lần là 2. Chỉ chỉnh tốc độ của trạng thái chưa áp dụng hoặc game ghi lại cùng tốc độ không làm reset. Khi đang chờ đổi trạng thái 1 giây, bộ đếm chưa reset; chỉ reset khi tốc độ mới được áp dụng. Khi tắt override hoặc dữ liệu gốc không có/chưa phải số thì hiển thị `—`.
-- Bảng nhỏ kiểu bộ đếm FPS ở **phía trên bên phải màn hình game, lệch trái bản đồ khoảng 20 px (màn hình hẹp đặt dưới bản đồ)** hiển thị bật/tắt override, tốc độ, bay/đi bộ, `fix` và thông báo. Bảng không đo FPS và không chặn thao tác chuột. Khi bật, bảng nhận cập nhật từ interval 500 ms sẵn có, không cần mở popup hay thêm timer. Chỉ thay nội dung bảng khi thông tin thay đổi.
-- Trong popup, **Show status panel** bật/tắt riêng bảng trạng thái. Các checkbox bên dưới chọn từng mục muốn hiện: bật/tắt override, tốc độ, bay/đi bộ, `fix`, thông báo. Lựa chọn lưu ngay, độc lập với tốc độ, áp dụng cho mọi tab game và giữ qua đổi map/tải lại. Bỏ chọn tất cả mục cũng ẩn bảng. Mặc định hiện bảng với tất cả mục. Tắt bảng không tắt speed override; không thêm thông tin font vào bảng.
-- Popup gửi thêm lệnh áp dụng hiển thị trực tiếp tới content script của tab đang mở và nhận xác nhận, kể cả khi override tắt và không còn timer game. Các tab khác nhận thay đổi qua storage. Nếu tab chưa có script bản mới hoặc không nhận được xác nhận, popup báo đã lưu lựa chọn và cần tải lại tab; không báo là đã áp dụng thành công. Lệnh hiển thị không đi qua Phaser, không ghi tốc độ và không bật lại override.
-- Khi tắt, bảng nhận trạng thái cuối rồi tạm dừng cập nhật tự động; mở popup vẫn có thể làm mới số liệu đọc. Bảng được gỡ khi rời trang và tạo lại khi quay về. Bảng có thể không hiện khi game dùng chế độ toàn màn hình riêng cho canvas.
-- Tắt **Enable speed override** để dừng bộ theo dõi và trả quyền điều khiển tốc độ cho game. Extension khôi phục tốc độ gốc đã quan sát **một lần**, chỉ khi đúng đối tượng người chơi hiện tại vẫn giữ giá trị extension đã ghi và trạng thái bay/đi bộ khớp lúc đọc tốc độ gốc. Nếu game đã đổi tốc độ, extension giữ nguyên giá trị mới của game. Nếu vừa đổi trạng thái và chưa có tốc độ gốc phù hợp, không đoán con số mặc định; chờ bản cập nhật tốc độ kế tiếp từ game và báo rõ trên giao diện. Sau đó không còn ghi lặp lại. Các ô cấu hình 3.5/2 vẫn được giữ để dùng khi bật lại; tắt override không ép game về các giá trị cấu hình này và không đổi trạng thái bay/đi bộ.
-- Bản sửa khôi phục tốc độ: decoder của game giữ `self` để ghép các snapshot dạng delta (`this.self = {...this.self}`); scene nhận cùng đối tượng đó. Nếu sửa `ms` trực tiếp, delta sau không chứa `ms` có thể mang tiếp giá trị override và bị nhận nhầm là tốc độ gốc. Vì vậy, trước mỗi lần cần đổi tốc độ, extension gán cho `scene.self` một bản sao nông của đối tượng hiện tại, chỉ thay giá trị `ms`. Giữ nguyên mọi giá trị/trường khác và không sửa snapshot decoder, packet hoặc đường truyền. Khi tắt, snapshot nguồn của game vẫn sạch để khôi phục/tiếp tục cập nhật. **Sau khi cập nhật từ bản cũ, cần Reload extension rồi tải lại trang game một lần** để loại dữ liệu đã bị bản cũ sửa; chỉ reload extension không sửa được dữ liệu đã nhiễm trong tab cũ.
-- Tùy chọn được lưu trong `chrome.storage.local`, áp dụng cho mọi tab đúng website và qua lần khởi động Chrome tiếp theo. Popup chỉ hiển thị trạng thái tab đang được chọn.
-- Tắt override trước khi tắt/gỡ extension. Chrome không bảo đảm script trong tab cũ được dọn ngay khi extension bị vô hiệu hóa/cập nhật; tải lại tab với override tắt để chắc chắn ngừng script cũ.
-
-## Tham số timer và điều hướng
-
-- Bấm tắt mở rộng phạm vi hoặc tự hồi sinh chỉ cập nhật cờ tương ứng trên cài đặt đã lưu; không bị chặn bởi level/bán kính đang nhập dở và không tự lưu các bản nháp đó. Nếu lưu thất bại, checkbox trở lại bật và có thông báo lỗi. Các thao tác lưu/bật khác vẫn kiểm tra dữ liệu đầu vào.
-- Khi trang được khôi phục từ bộ nhớ điều hướng (BFCache), extension kiểm tra ngay để gắn lại bộ lọc và phiên mở rộng phù hợp. Tạm rời trang không tạo cờ chặn mất kết nối; cờ chặn do mất kết nối đã có vẫn được giữ. Không tự bật Auto Farm đang tắt.
-- Bốn bản sửa sau review (lệnh tắt, bộ lọc qua hồi sinh, BFCache, bộ chọn phím): chỉ đọc lại source/diff; tests/lint/typecheck/browser/gameplay **NOT RUN**, behavior **UNVERIFIED**, CI **NOT CHECKED**.
-
-Extension không giả định có thể tìm Phaser khi thiếu `window.game`. Nó dựa trên điều kiện đã cung cấp: game chỉ công khai biến này khi trang **được tải** với tham số `timer`.
-
-Khi override bật và tham số còn thiếu, code thêm `timer` bằng cách nối vào query hiện có, không dùng `searchParams.set/append` để tránh mã hóa lại giá trị tham số cũ. Giữ nguyên đường dẫn, các tham số trùng tên, thứ tự tham số, giá trị và fragment. Ví dụ:
-
-```text
-https://nghichthienky.online/?foo=a%20b&foo=c#world
-https://nghichthienky.online/?foo=a%20b&foo=c&timer#world
-```
-
-Nếu đã có khóa `timer` (kể cả `timer=...`), extension không sửa giá trị hoặc tải lại. Nếu game yêu cầu giá trị cụ thể khác, cần điều chỉnh URL bằng tay; extension không tự đoán. Tắt override không xóa `timer`, tránh phát sinh tải lại khi tắt.
-
-Mỗi lần chuyển bản đồ làm tải trang mới, content script đọc lại tùy chọn và bổ sung tham số nếu cần. Extension không thay link, không chặn điều hướng hoặc sửa History API. Khi chỉ đổi scene trong cùng trang, bộ theo dõi tìm lại `world` và `self`.
-
-## Cách hoạt động và giới hạn
-
-- Hai content script tĩnh: một script chạy trong môi trường trang để truy cập `window.game`, một script chạy trong môi trường riêng của extension để dùng storage và liên lạc với popup. Không cần service worker, quyền `tabs`, `scripting`, `activeTab`, hoặc tài nguyên public cho trang.
-- Chỉ xin quyền API `storage`; phạm vi website nằm trong `content_scripts.matches`. Không inject vào subdomain, HTTP, website khác hoặc iframe. Xem [tài liệu Chrome về content scripts và execution worlds](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts).
-- Khi bật, dùng duy nhất một interval **500 ms** mỗi trang để tìm lại scene và cập nhật bảng. Listener `preupdate` sẵn có áp dụng tốc độ trước bước di chuyển, rồi mới hỗ trợ tiếp cận Auto Farm. Chỉ tạo bản sao `self` với `ms` mới khi giá trị khác cấu hình; không sửa đối tượng dữ liệu gốc decoder giữ. Không thêm timer hoặc listener theo mỗi snapshot. Tắt override sẽ tháo listener, dừng interval và khôi phục tốc độ gốc một lần nếu còn sở hữu giá trị. Khi popup mở, popup yêu cầu ảnh chụp trạng thái mỗi giây; đóng popup sẽ kết thúc việc này.
-- Scene/người chơi chưa có hoặc đang được tạo lại: chờ và thử lại. `pagehide` dừng interval và khôi phục một lần nếu phù hợp; `pageshow` cho phép hoạt động lại khi quay về trang từ bộ nhớ điều hướng.
-- Snapshot thay `self` được xử lý ở lượt `preupdate` kế tiếp của scene, thay vì chờ interval 500 ms; chuyển bay/đi bộ vẫn có độ trễ ổn định 1 giây. Scene mới sau đổi map có thể cần chờ phát hiện bằng interval. Không bảo đảm nhịp game ở tab nền, thứ tự ghi từ module khác hoặc việc server chấp nhận tốc độ; server sửa vị trí vẫn cần quan sát Fix và giảm tốc độ nếu cần.
-- Trạng thái bay/đi bộ đọc trực tiếp từ `scene.self.fly` trong mỗi bản tin trạng thái, độc lập với tốc độ override. Dùng cùng quy tắc với game: `fly` truthy là bay, falsy là đi bộ; chưa có `self` thì `unknown`. Không lưu trạng thái nhận diện một lần hoặc suy đoán từ `ms`. Việc game thay đối tượng `self` theo bản tin mới không làm mất khả năng đọc trạng thái. Đây là trạng thái bay, không phân biệt đi bộ với chạy hoặc đứng yên.
-- Nguồn đối chiếu tĩnh ngày 2026-11-03: [WorldScene-BFrp0V0P.js](https://nghichthienky.online/assets/WorldScene-BFrp0V0P.js) dùng `self.fly` khi tính tốc độ di chuyển và hiển thị thú cưỡi, đồng thời gán lại `this.self` từ snapshot. [index-Cj0KitBn.js](https://nghichthienky.online/assets/index-Cj0KitBn.js) chỉ gán `window.game` khi URL có `timer`. Chỉ tải và đọc mã JavaScript công khai, không thực thi mã game, đăng nhập hoặc gọi API game.
-- `self.fix` gốc chỉ được đọc nếu là số hữu hạn, không bị sửa. Bộ đếm giao diện lấy độ tăng giữa hai lần đọc và không bị reset chỉ vì game thay đối tượng `self`; nếu bộ đếm gốc giảm (ví dụ server bắt đầu lại), giao diện bắt đầu lại từ 1. Tải lại trang bắt đầu phiên đếm mới. Ý nghĩa và vòng đời giá trị gốc do game quyết định. Override không bảo đảm vượt qua kiểm tra phía server; server vẫn có thể sửa vị trí.
-- Chỉ thay giá trị tốc độ `ms` trên bản sao `scene.self` dùng cho hiển thị/di chuyển; khi tắt có thể ghi lại tốc độ gốc một lần. Không thay giá trị HP, damage, authentication, packet, mã nguồn game hoặc server. Không có fetch/XHR, telemetry, script từ xa hoặc phụ thuộc mạng. Tải lại trang để thêm `timer` vẫn khiến chính game tải tài nguyên như bình thường.
-- Cầu nối `postMessage` chỉ truyền tùy chọn và trạng thái dạng số/chuỗi; phía storage không thực thi lệnh từ trang. MAIN world dùng chung môi trường JavaScript với game, nên trang có thể quan sát/giả mạo thông điệp hoặc can thiệp vào script; đây không phải ranh giới bảo mật đối với chính website.
-- Các truy cập `window.game`, scene `world` và `self.fly` đã được đối chiếu với mã công khai; hành vi khi chơi thật chưa kiểm chứng. Không tự tìm hoặc móc vào Phaser khi `window.game` không có. Thay đổi cấu trúc game có thể khiến extension chỉ hiển thị trạng thái chờ hoặc cần cập nhật trường trạng thái.
-
-## Trạng thái xác minh lúc bàn giao
-
-Đã rà source/diff, kiểm tra cú pháp 7 file JavaScript trong lượt QA và kiểm tra lại file page.js sau FIX. Harness cục bộ: **29/29 PASS**. Lint/typecheck/browser QA/E2E: **NOT RUN**. Hành vi trên game/server thật: **UNVERIFIED**. CI: **NOT CHECKED**. Xem [QA-report.md (lịch sử)](https://github.com/ThagMilky/game-speed-tester/blob/036ddbafd3891320039317f7f18dda38db208867/QA-report.md) để biết các fixture/giới hạn và kết quả trước/sau sửa. Lượt đóng gói không chạy lại gameplay hoặc bộ test.
-
-Nếu tự kiểm tra sau khi có quyền: xác nhận tắt mặc định; thử URL có nhiều tham số và fragment; bật và quan sát tải lại thêm `timer`; đổi tốc độ; chuyển bay/đi bộ và bản đồ; tắt rồi kiểm tra extension không tiếp tục ghi tốc độ. Không dùng kết quả đọc source làm bằng chứng chạy thực tế.
-
-### Tốc độ riêng khi farm (2026-11-04)
-
-Trong Tốc độ di chuyển, nhập Đi bộ khi farm / Bay khi farm (1–6), rồi Lưu tốc độ. Mặc định 2 / 1.5; bật điều chỉnh tốc độ để áp dụng. Ngoài farm dùng hai mức ngoài farm đã lưu. Giữ cơ chế chờ trạng thái ổn định 1 giây khi bật/tắt farm hoặc đổi bay/đi bộ. Nút Về tốc độ mặc định của game tắt override qua cơ chế hoàn trả hiện có, giữ các mức đã lưu, không liên tục ép số mặc định ước lượng. Cài đặt giữ qua đổi map. Đây thay thế mô tả mức farm cố định trong các mục lịch sử. Chỉ review diff/status; tests/lint/typecheck/gameplay NOT RUN, hành vi thực tế UNVERIFIED, CI NOT CHECKED.
-
-### Bản đồ tối giản và chọn nhanh FPS (2026-11-04)
-
-Trong Tối ưu FPS có Chọn tất cả/Bỏ chọn tất cả. Hai nút chỉ thay các tick, giữ nguyên công tắc tổng; đang bật thì áp dụng ngay. Khôi phục hình ảnh gốc vẫn bỏ tick và tắt công tắc. Ba tick mới mặc định tắt: Bản đồ tối giản, Ẩn cây cỏ trang trí có chuyển động, Ẩn vật che khuất (nhà/cây lớn nhận diện được). Không có metadata chắc chắn để phân biệt mọi nhà/cây nên giữ tên nhóm theo source sway/occluders; không hứa ẩn hết mọi loại riêng lẻ.
-
-fps-map.js đọc collision.blockedCell và độ phân giải từ cols/map.w, xác nhận rows và phép toPx 32px/ô theo source debug collision. Nền tối là vùng đi được, xám là vùng bị chặn, chưa cộng bán kính nhân vật nên khe hẹp nhìn trống vẫn có thể không đi qua được. Vẽ canvas cache theo vùng 16×16 ô, tối đa 2 vùng mới mỗi frame và 64 vùng lưu; chỉ hiện lớp thay thế khi toàn viewport đã sẵn sàng. Không tạo object cho từng ô, không vẽ lại collision mỗi frame. Khi thiếu interface/viewport quá lớn giữ hình gốc và báo chưa sẵn sàng. Đổi scene/map/collision instance sẽ dựng lại; chưa theo dõi thay đổi bên trong cùng collision instance hoặc xác minh vật cản động.
-
-Chỉ ẩn frame m: của map, nền ground/overview và RenderTexture có depth khớp bakeTiles, cùng sway/occluders. Tài nguyên dùng w: theo placeNodes nên được giữ; không đổi collision, NPC, cổng, cảnh báo, farm/hái hoặc movement. Lớp chưa nhận diện như texture atlas/tone đặc biệt có thể còn hiện. Cache ảnh/texture dọn khi tắt hoặc rời scene. Một số tile streaming mới có thể hiện tối đa khoảng 1 giây trước lần nhận diện kế tiếp. Source game đã có collision debug tương đương; không gọi toggleDebug hoặc sửa source game.
-
-Đã review source/diff/status. Tests/lint/typecheck/browser/gameplay: NOT RUN. Độ khớp runtime, vật cản động và hiệu quả FPS: UNVERIFIED; CI: NOT CHECKED. Reload extension rồi tải lại game để áp dụng.
-
-Bản đồ tối giản dạng ô vuông: đường lưới cách 32px tương ứng 1 ô game, vẽ một lần vào canvas cache. Giữ các phần va chạm nhỏ trong mỗi ô, không tô kín cả ô khi chỉ một phần bị chặn. Nền tối là đi được, xám sáng là phần bị chặn, gần đen là vùng thừa ngoài map ở chunk biên. Không thêm object/timer theo từng ô. Chỉ review diff/status; tests/lint/typecheck/gameplay NOT RUN, hình ảnh thực tế UNVERIFIED.
-
-### Auto Farm toàn map và hiển thị boss riêng (2026-11-04)
-
-Bật Mở rộng vùng tìm quái, chọn Phạm vi tìm quái → Toàn map hiện tại rồi bấm Lưu phạm vi. Theo bán kính vẫn là mặc định để giữ cài đặt cũ; toàn map bỏ qua số bán kính nhưng giữ bộ lọc, skipped/reachability và tìm đường gốc. Chỉ chọn tọa độ hợp lệ trong biên scene hiện tại; không đi xuyên map/cổng. Dịch tâm tìm kiếm tạm tới mục tiêu thay vì chặn tâm trong vòng bán kính. Mục tiêu hiện tại còn hợp lệ được giữ; quãng đường dài chỉ gia hạn chaseSince khi thực sự tiến gần mục tiêu ít nhất 0.5 ô, không gia hạn khi đứng yên. Native vẫn quyết định skill, damage, loot, cooldown và xử lý không tới được. Tâm farm gốc không đổi; hết quái vẫn đứng chờ hoặc về tâm theo lựa chọn. Chọn Chỉ boss không tự chuyển sang quái thường sau khi boss chết. Né level cao trong chế độ toàn map được dùng phạm vi biên map, không bị chặn bởi bán kính cũ; vẫn chỉ né ngắn theo cấu hình.
-
-Source nhận t.ents/t.gone để tạo/xóa views; không chứng minh server gửi mọi quái ở xa. Chế độ toàn map chỉ tìm quái đã có dữ liệu. Source realmUI có self.realm.inside.boss.x/y/hp dùng cho minimap. farm-map.js dùng tọa độ đó khi Chỉ boss + toàn map và chưa có actor boss sống: native auto.walk trên navigation riêng, dispatcher priority 4; không tạo quái giả hoặc gọi đánh khi thiếu actor. Đến gần thì chờ actor để bàn giao Auto Farm; không đi vòng dò toàn map. Nếu actor boss bị lọc hoặc đang trong thời gian skipped, không dùng metadata để vượt điều kiện đó. Khi đang bật né level cao và chưa có level boss, không tự tiếp cận theo metadata. Dừng/nhường khi chết, OFF, thao tác tay, hộp kiểm tra, hồi phục, mất kết nối/đổi scene; đường không tiến triển 8 giây hoặc không có đường thì nghỉ 15 giây. Cổng/hái/phong ấn nhường tiếp cận boss; né quái và hồi sinh ưu tiên cao hơn. Không thêm timer riêng hoặc thay dữ liệu mạng; tọa độ boss ngoài bí cảnh nếu game không cung cấp thì không đoán. Source hiện tại và runtime có thể khác; chưa xác nhận server scope hoặc tới được boss thật.
-
-Tối ưu FPS tách Ẩn hình/bóng boss và Giảm hiệu ứng boss, mặc định OFF. Boss = cls boss hoặc wb true. Các tick ẩn/giảm hiệu ứng quái cũ chuyển thành chỉ quái thường, không tự ẩn boss. Chọn tất cả/bỏ chọn tất cả bao gồm hai tick mới. Tên/thanh máu/cảnh báo giữ điều kiện hiển thị gốc. Không sửa bộ lọc chiến đấu theo checkbox FPS.
-
-Chỉ đối chiếu source và review diff/status. Tests/lint/typecheck/browser/gameplay: NOT RUN; hành vi toàn map, tiếp cận boss, tách hình/FX và tương thích live: UNVERIFIED; CI: NOT CHECKED. Reload extension rồi tải lại game để áp dụng.
-
-Quy tắc tên: menu dùng tiếng Việt dễ hiểu, giữ Auto/FPS/boss/level/map. Code và mã cài đặt dùng tiếng Anh. Nhóm Bí cảnh giữ panel ID realm để bảo toàn thứ tự đã lưu; không đổi realmPreferences. *-page: xử lý game, *-content: cầu nối/storage, *-popup: UI, *-options: chuẩn hóa.
-
-Thời gian bí cảnh: chọn mục trong Bảng trạng thái, thông báo bật riêng trong Bí cảnh. Dùng realm.now/next/ends/retryAt; dữ liệu đứng quá 10 giây hoặc mất kết nối thì báo chưa cập nhật. Nhắc 5 phút trước đợt, có cổng mở (chưa lọc bậc cấp), 2 phút trước khi đóng; chống trùng theo tab sessionStorage, không thêm quyền OS notification, không tự vào/thoát. Tests/gameplay NOT RUN; runtime UNVERIFIED.
-
-Thu hoạch: kind plant/ore/both, mặc định plant để giữ ý định cũ. Source tương tác node đều dùng native harvest; chỉ gỡ điều kiện loại ore sau khi chọn Chỉ đào/Hái và đào. Catalog lọc cùng kind và có nhãn Hái/Đào; kiểm tra mục tiêu F, ready, inventory và nhường tay giữ nguyên. Helper MAIN được sinh lại từ canonical. Tests/gameplay NOT RUN; đào thực tế UNVERIFIED.
-
-Auto nhặt rương nằm trong Bí cảnh, cài đặt chestPreferences độc lập OFF mặc định; loại common/hidden/treasure/all theo kind source, không đoán vị trí rương chưa có dữ liệu. Dispatcher priority15 sau chiến đấu/phong ấn/né, trước thu hoạch; né quái trong 6 ô, native walk, xác minh picked và cached F realm-chest arg đúng ID trước scene.interact. Không tự tắt bảo vệ/đóng UI/thoát cổng; giữ quyền sở hữu rương và điều kiện server. Request một lần chờ8s, đường không tiến8s bỏ30s. Rương mất khỏi danh sách chỉ báo quan sát, không khẳng định nhận vật phẩm. Ngừng khi chết/đổi scene; hỗ trợ hồi sinh qua helper hiện có. Tests/gameplay NOT RUN; mở rương runtime UNVERIFIED.
-
-Menu giữa trang: nút Menu tool trong game hoặc Mở menu giữa màn hình game từ popup. Iframe extension dùng lại popup.html và chrome.storage, không có bản cài đặt riêng. Esc/× đóng, iframe được gỡ để dừng refresh; font/style game không chạm UI iframe. Bảng trạng thái nhỏ giữ vị trí cũ. Chỉ popup.html được web-accessible trên đúng host, không thêm permissions. Tests/browser/gameplay NOT RUN; focus/phím/bố cục trong Chrome thực tế UNVERIFIED.
-
-### Đồng bộ di chuyển và nhịp nền (2026-11-04)
-
-page.js nhường chống vượt điểm rẽ cho toàn bộ chủ thể di chuyển (hái/đào, phong ấn, cổng, tới boss, rương, né), không sửa auto.path cũ khi chủ thể khác điều khiển. navigation.js dùng WeakMap theo navigation riêng, chỉ bỏ waypoint trung gian đã đi qua khi path/waypoint không đổi, self.fix hữu hạn không đổi và clear tới điểm kế tiếp hợp lệ. Dùng cho các private auto.walk; không thay auto.walk gốc, không sửa ms/damage/cooldown hoặc ép vị trí. Né có kiểm tra đã đi qua vùng đến để tránh quay tới lui ở bước di chuyển lớn. Thu hoạch giữ kiểm tra đường riêng đã có.
-
-background-page.js dùng cùng headlessStep mà backgroundAuto của game dùng: một Worker Blob cục bộ, nhịp50ms, chỉ khi tab ẩn, Auto Farm gốc OFF và Thu hoạch bật hoặc Auto nhặt rương bật trong bí cảnh. Không tự bật farm hoặc gửi lệnh đánh. Worker gốc sở hữu nhịp nền khi Auto Farm ON; helper dừng/terminate khi thấy trạng thái này, tab hiện, mất kết nối, tắt chế độ hoặc rời scene/trang. Quan sát postupdate và bỏ tick nếu vừa có frame trong40ms, delta giới hạn50ms; không chạy scene.update riêng lần nữa hoặc thay game loop gốc. Chỉ dùng watcher1s trong lúc đợi scene, gỡ khi gắn scene. Worker URL thu hồi khi sẵn sàng/dọn; lỗi CSP/interface được chốt để không thử lặp mỗi frame và hiện qua trạng thái Thu hoạch/rương. Tắt cả hai chế độ rồi bật lại để thử sau lỗi.
-
-Không thêm permission, dependency, request mạng hoặc đổi cài đặt Chrome. Chrome/OS có thể đình chỉ tab/Worker; không đảm bảo chạy khi máy ngủ, tab discard hoặc CSP chặn Blob Worker. Cần Reload extension rồi tải lại game. Chỉ đối chiếu source và review diff/status; tests/lint/typecheck/browser/gameplay NOT RUN; hiệu quả vượt waypoint và phối hợp Worker thật UNVERIFIED; CI NOT CHECKED. Kết quả QA55 ca trước sửa không xác minh các thay đổi này.
-
-### Auto Farm: đường đi và thao tác giao diện
-
-Khi bật hỗ trợ Auto Farm, tool theo dõi tiến độ tới các điểm rẽ, thay vì chỉ đo khoảng cách thẳng tới quái. Đi vòng tránh vật cản vẫn được tính là tiến triển. Chỉ bỏ điểm rẽ trung gian đã đi qua khi đường tới điểm kế tiếp được kiểm tra thông thoáng bằng collision của game. Nếu không tiến triển trong 2 giây, yêu cầu game tính lại đường, tối đa hai lần mỗi lượt đuổi; giữ cơ chế đi vòng và bỏ mục tiêu không tới được của game. Một lượt được gia hạn đuổi tối đa 120 giây; không tự tạo hệ thống đánh riêng.
-
-Có thể xem kho, bảng thông tin hoặc nhập chat trong lúc farm: dùng khả năng sẵn có của game, không thay getter uiBlocked. Hội thoại NPC, đặt phím và hộp bảo vệ vẫn tạm dừng điều khiển farm nhưng giữ ON; đóng xong sẽ tự tính lại đường và tiếp tục. Di chuyển/ngắm chiêu tay vẫn được ưu tiên theo thời gian nghỉ của game. Nếu thao tác trang bị yêu cầu tắt Auto Farm, vẫn phải tắt; OFF chủ động không bị tự bật lại bởi phần sửa này. Chết, mất kết nối và đổi scene tiếp tục dùng cơ chế hồi sinh/khôi phục hiện có.
-
-Phần tìm boss theo tọa độ cũng tính tiến độ dọc đường vòng, có giới hạn thời gian để không chạy vòng vô hạn. Các chủ thể di chuyển khác (thu hoạch, cổng, rương, né, phong ấn) vẫn giữ quyền điều khiển riêng. Không đổi tốc độ, sát thương, cooldown, gói mạng hoặc vị trí nhân vật trong phần sửa này. Không thêm timer hoặc dependency.
-
-Chỉ đối chiếu source game được cung cấp và review diff/status. Tests/lint/typecheck/browser/gameplay: **NOT RUN**; độ mượt, hội thoại và kẹt đường trong game thật: **UNVERIFIED**; CI: **NOT CHECKED**. Reload extension rồi tải lại game. Khi Chrome đình chỉ tab hoặc máy ngủ, phần sửa đường đi không bảo đảm Auto Farm tiếp tục chạy.
-
-### Vị trí nút Menu tool
-
-Nhóm Vị trí nút Menu tool có sáu preset (trên/dưới, trái/giữa/phải), mặc định Trên giữa. Preset tự lưu. Chỉnh vị trí đóng bảng giữa, bật kéo bằng pointer capture; kéo nút rồi bấm Lưu vị trí trên thanh dưới màn hình. Hủy/Esc trả vị trí đã lưu. Tùy chỉnh lưu x/y chuẩn hóa 0–1 trong vùng màn hình còn lại sau kích thước nút và lề12px, không ghi storage mỗi pointermove. Resize/ResizeObserver giữ nút trong viewport; chrome.storage.local menuPosition đồng bộ tab và giữ qua reload/map. Về mặc định đặt lại top-center. Bảng điều khiển vẫn giữa màn hình; không đổi vị trí bảng trạng thái. Khi đang chỉnh vị trí, chặn click/phím truyền tới game. Dọn pointer capture/observer khi rời trang; storage lỗi giữ chỉnh sửa để thử Lưu lại. menu-position.js chỉ dùng popup/ISOLATED, không MAIN. Không đổi quyền hoặc cài đặt game.
-
-Chỉ review diff/status. Tests/lint/typecheck/browser/gameplay: NOT RUN; kéo/thả/focus/resize thực tế UNVERIFIED; CI: NOT CHECKED. Reload extension rồi tải lại game để có nhóm mới.
-
-### Sửa tiếp cận boss xa trong chế độ Toàn map
-
-Trước đây chỉ cần có actor boss trong views là farm-map nhường ngay cho Auto Farm gốc. Bộ chọn pick() gốc kiểm tra đường đầy đủ trên lưới có kích thước giới hạn, nên boss xa có thể bị đánh dấu không tới được dù walk()/hop() gốc có thể đi từng chặng. Nay giữ mục tiêu boss hợp lệ đang đuổi (hoặc chọn boss hợp lệ gần nhất), dùng walk/hop gốc đi tới trong 6 ô rồi bàn giao chiến đấu cho game. Không gọi pick() thử đường xa trong watcher mở rộng để tránh liên tục đưa boss vào skipped. Boss bị lọc/ngưỡng né hoặc còn cooldown skipped vẫn không được tiếp cận. Boss chưa có actor vẫn dùng tọa độ bí cảnh đã được game gửi về; không dựng mục tiêu giả hay tự đánh khi thiếu actor.
-
-Cách dùng: bật **Mở rộng vùng tìm quái**, chọn **Toàn map hiện tại** và **Chỉ boss**, bấm **Lưu phạm vi**, rồi bật Auto Farm bằng phím đã đặt. Trạng thái cảnh báo khi chọn toàn map nhưng công tắc mở rộng vẫn tắt. Reload extension và tải lại game sau khi cập nhật.
-
-Giới hạn: không tự khám phá từng khu vực khi game chưa gửi vị trí boss; chưa bảo đảm đi được qua mọi mê cung vì vẫn dùng đường đi/hop gốc. Chỉ review source/diff/status; tests/lint/typecheck/gameplay **NOT RUN**, hành vi trong game **UNVERIFIED**, CI **NOT CHECKED**.
-
-### Tự tìm và mở rương trong toàn bí cảnh
-
-Mở nhóm **Bí cảnh → Tự tìm và mở rương bí cảnh**, bật **Bật tự tìm và mở rương** và chọn loại rương. Các lựa chọn tự lưu, không phụ thuộc phạm vi Auto Farm. Nếu đang farm, tick thêm **Cho phép nhặt khi Auto Farm bật**: chiến đấu vẫn được ưu tiên, sau đó tự tới rương phù hợp/an toàn gần nhất trong toàn bí cảnh rồi mở bằng tương tác F gốc. Có thể bật riêng khi Auto Farm tắt. Cài đặt chestPreferences và giá trị mặc định giữ nguyên.
-
-Đường tới rương dùng walk/hop và collision của game. Theo dõi tiến độ qua waypoint để chấp nhận đường vòng; yêu cầu tính lại tối đa hai lần khi không tiến triển hơn 2 giây. Không tiến triển 8 giây hoặc một lượt quá 120 giây thì bỏ qua 30 giây. Auto Farm mở rộng nhường di chuyển và giữ tâm farm khi đang tới rương. Trạng thái hiển thị khoảng cách còn lại hoặc đang tính lại đường. Không thay sát thương, tốc độ, cooldown, packet hay vị trí nhân vật.
-
-Chỉ mở khi cả mục tiêu F vừa đọc và mục tiêu game lưu đều là realm-chest đúng ID. Giữ kiểm tra quyền sở hữu, quái gần, giao tranh, bảo vệ đầu bí cảnh, hồi phục, UI và thao tác tay; một yêu cầu rồi chờ phản hồi, không spam F. Rương ẩn chưa được game gửi tọa độ không thể tự tìm; rương biến mất chưa chứng minh nhận được đồ. Không tự thoát bí cảnh.
-
-Chỉ đối chiếu source và review diff/status. Tests/lint/typecheck/gameplay **NOT RUN**; tự di chuyển/mở rương trên server **UNVERIFIED**; CI **NOT CHECKED**. Reload extension rồi tải lại game.
-
-### Rà soát và thống nhất logic auto
-
-Các lỗi tìm thấy qua đọc source đã được sửa:
-
-- **High:** Nhặt rương khi Auto Farm OFF vẫn đọc auto.moved/pauseUntil cũ; cờ moved không được native update xóa khi OFF, có thể chờ mãi. Nay chỉ dùng cờ nghỉ của Auto Farm khi farm thực sự ON; lệnh đi tay hiện tại vẫn được ưu tiên.
-- **Medium:** Tới cây/cổng trước đây tính mọi dịch chuyển là tiến triển, kể cả chạy qua lại. Cây, cổng, boss và rương nay dùng chung GSTNavigation.progressed: chỉ tính đủ tiến độ về đích hoặc điểm rẽ hiện tại; self.fix đổi thì đặt lại mốc đo và không ghi nhận tiến triển. Giữ thời hạn từng chế độ; dữ liệu theo job trong WeakMap tự hết khi job bị bỏ.
-- **Medium:** Lượt chờ phản hồi vào cổng xử lý trước một số kiểm tra thao tác tay/UI/hồi phục. Nay kiểm tra các điều kiện đó trước khi tiếp tục chờ, không giữ điều khiển qua lệnh tay hoặc hộp kiểm tra. Chọn cổng dùng callback native đúng bậc level; vẫn cho chờ kết thúc giao tranh, không bỏ qua điều kiện disabled lúc thực sự vào.
-
-GSTFarmInput.movement dùng chung cho hái/đào, cổng, rương, né, tiếp cận boss, ổn định farm và phong ấn: nhận lệnh click/joystick, chỉ coi WASD/mũi tên là di chuyển khi không nhập chat/ô chữ/đặt phím. Né/phong ấn khi Auto Farm ON theo cùng quy tắc UI với farm: xem bảng thông tin không tự chặn; NPC, đặt phím, hộp bảo vệ vẫn chờ. Cổng/rương vẫn không tự tương tác xuyên qua UI đang mở. Không đổi thứ tự ưu tiên dispatcher, cài đặt đã lưu, damage, cooldown, tốc độ hoặc cơ chế collision của game; không thêm timer/dependency.
-
-Đây là review source và cải tiến cục bộ, chưa chứng minh mọi trường hợp kẹt hoặc phối hợp nhiều chế độ trên game thật đã hết. Tests/lint/typecheck/browser/gameplay **NOT RUN**; hành vi thực tế **UNVERIFIED**; CI **NOT CHECKED**. Reload extension và tải lại game để nhận bản sửa.
-
-### Auto Quest cơ bản (bản thử)
-
-Nhóm **Auto Quest · Cơ bản** chỉ đọc nhiệm vụ đã nhận. Có tìm tên, tick chọn, Bỏ chọn tất cả và sắp xếp tu vi/linh thạch cao trước. Lựa chọn lưu trong chrome.storage.local questPreferences.selected; không tự nhận quest mới, không tự chọn theo ngưỡng thưởng hoặc làm điều kiện tiên quyết.
-
-Cách dùng:
-
-1. Reload extension và tải lại game có tham số timer. Mở bảng **N / Hành trình** trong game một lần rồi đóng lại. Tool quan sát DOM bảng do game tự tạo để đọc đúng thưởng; không đoán công thức, không tự mở bảng hoặc gửi menu action để lấy thưởng. Khi lên level, mở N lại để cập nhật thưởng theo level mới.
-2. Mở nhóm Auto Quest, sắp xếp thưởng và tick quest mong muốn. Từng dòng ghi tiến độ và có hỗ trợ trong map hiện tại hay không.
-3. Với quest chưa đủ, bản này chỉ hỗ trợ mục tiêu **kill-in:<map hiện tại>**: đánh quái trong đúng map đang đứng, dùng Auto Farm gốc và phạm vi farm đã cài. Đặt bộ lọc Auto Farm **Tất cả quái** rồi lưu; tool không tự sửa bộ lọc, tốc độ, vùng tìm hoặc cài đặt Tự hái. Các điều kiện né quái vẫn áp dụng. Tắt Auto Farm trước khi bắt đầu.
-4. Bấm **Bắt đầu Auto Quest**. Tool tự bật Auto Farm khi cần. Đủ mục tiêu thì tắt lượt farm do nó bật, đi về NPC trả quest trong cùng map, kiểm tra đúng mục tiêu F và danh sách handIn của game, rồi bấm đúng nút **Nhận thưởng** native cho quest đã chọn. Chỉ một lần yêu cầu, chờ claimed xác nhận tối đa 8 giây; chưa xác nhận thì dừng, không spam.
-5. Có thể chọn quest đã đủ tiến độ để chỉ tự về trả, miễn NPC ở ngay map hiện tại. Không cần tự di chuyển tới sát NPC trước. Bấm **Dừng Auto Quest** để hủy. Đổi lựa chọn trong lúc chạy cũng dừng lượt, cần bấm Bắt đầu lại.
-
-Giới hạn bản đầu: chưa hỗ trợ qua cổng/đổi map, quest hái/đào, collect, kill-band, boss cụ thể, chế tạo, trang bị, chọn môn phái hoặc tiêu tài nguyên. Quest khác hiện rõ chưa hỗ trợ và không được tự nhận/trả. Khi farm, tiến độ quest không chọn có thể tăng theo hành vi vốn có của game; tool không nhận thưởng cho chúng. Nếu NPC ở map khác, dừng để bạn tự chuyển map rồi bắt đầu lại.
-
-Chế độ auto cổng/rương/hái/phong ấn/tiếp cận boss tạm nhường khi Auto Quest đang chạy; cài đặt của chúng không bị ghi lại. Né quái vẫn ưu tiên trước lượt quest. Di chuyển/ngắm chiêu tay nhường 3 giây; thao tác nào khiến Auto Farm gốc OFF (kể cả click đi tay) sẽ dừng Auto Quest. Chết, mất kết nối, đổi map/nhân vật hoặc rời trang cũng dừng, không tự khôi phục Auto Quest. Xóa ý định khôi phục của lượt farm do Auto Quest sở hữu khi dừng để tránh tự bật farm ngoài lượt quest. Các tính năng auto khác đã bật có thể tiếp tục theo cài đặt của chúng sau khi quest dừng.
-
-Giai đoạn đánh quái dùng nhịp nền native của Auto Farm; giai đoạn đi về NPC khi Auto Farm OFF chưa tích hợp Worker nền, nên giữ tab game hoạt động. Đường về NPC dùng walk/hop/collision gốc, dừng nếu không tiến 8 giây hoặc lượt quá 120 giây. Không tự đóng bảng người dùng đang xem; chỉ tự đóng đúng body hội thoại tool mở sau khi game xác nhận claimed. Hộp kiểm tra, bảo vệ, NPC khác và trạng thái hồi phục vẫn được tôn trọng. Không sửa damage, cooldown, ms, tọa độ hay network packets; không thêm permission/dependency/request từ extension.
-
-Source mới: quest-page.js (đọc quest, quan sát thưởng và điều phối cùng dispatcher), quest-content.js (bridge ISOLATED/storage, chỉ cho phép trường trạng thái cần dùng), quest-popup.js (menu). Không tự chạy khi reload; chỉ danh sách tick được lưu. Đối chiếu source game đã cung cấp và review diff/status. Tests/lint/typecheck/browser/gameplay **NOT RUN**; đọc thưởng, farm và trả thưởng trong runtime thực tế **UNVERIFIED**; CI **NOT CHECKED**.
-
-### Chẩn đoán rương đứng cạnh nhưng không mở
-
-Trạng thái nhóm Bí cảnh → Tự tìm và mở rương nay ghi rõ từng điều kiện chặn: Auto Quest, bảo vệ, bảng game đang mở, lệnh tay, hồi phục, lượt tới boss/phong ấn/né, hoặc chưa cho phép nhặt cùng Auto Farm. Khi không chọn được rương, phân biệt danh sách game trống, bộ lọc/quyền sở hữu/tọa độ, thời gian tạm bỏ và quái trong 6 ô. Khi đã tới, phân biệt mục tiêu F hiện tại khác rương cần mở và cache F chưa cập nhật. Trạng thái được đọc lại khi mở menu ngay cả khi vòng update chưa tiến; không tạo log nền hoặc thêm timer.
-
-Thay đổi này phục vụ xác định nguyên nhân; **chưa xác nhận hoặc khắc phục tận gốc** báo cáo đứng kế rương nhưng không mở. Không bỏ kiểm tra quái, quyền sở hữu, mục tiêu F hoặc ép gọi tương tác khi game chưa cho phép. Cần Reload extension, tải lại game và cung cấp nguyên dòng trạng thái rương lúc lỗi xuất hiện để xác định nhánh cần sửa. Chỉ review diff/status. Tests/lint/typecheck/gameplay **NOT RUN**; behavior **UNVERIFIED**; CI **NOT CHECKED**.
-
-### Sửa Toàn map cho Tất cả quái / bộ lọc level
-
-Đi từng chặng trước đây chỉ được kích hoạt khi Chỉ boss, nên quái thường ở bãi xa vẫn bị pick() thử đường đầy đủ và có thể bị skipped vì giới hạn lưới gốc. Nay farm-map áp dụng cho mọi bộ lọc khi bật Mở rộng vùng tìm quái + Toàn map: lấy danh sách host.enemies đã qua bộ lọc level/ngưỡng né, ưu tiên aggro sát người theo quy tắc native, giữ mục tiêu/lượt di chuyển hợp lệ, nếu chưa có thì chọn mục tiêu phù hợp gần nhất. Dùng walk/hop gốc tiếp cận tới trong 6 ô rồi bàn giao Auto Farm chiến đấu. Watcher không thử pick đường xa cho mọi mode toàn map, tránh vòng lặp skipped.
-
-Sau bãi hiện tại, nhường native nhặt chiến lợi phẩm gần thuộc tâm tìm đồ native trước khi đi bãi khác. Mục tiêu không tới được được tạm bỏ riêng 15 giây (không sửa skipped của game), sau nhịp 0.5 giây có thể xét con khác; giới hạn 200 mục tiêu trong bộ nhớ, xóa khi đổi cấu hình/scene. Vẫn tôn trọng skipped, hồi phục, thao tác tay, bảo vệ, NPC/hộp kiểm tra và né quái; không đổi cooldown, tốc độ, packet hoặc tọa độ. Auto Quest đang đánh kill-in cùng map có thể dùng tiếp cận toàn map khi bộ lọc Tất cả; giai đoạn về NPC/trả quest vẫn giữ quyền điều khiển.
-
-Giới hạn: không tự tuần tra những ô chưa có dữ liệu. Nếu server chưa gửi quái ở bãi xa, tool báo rõ chưa có mục tiêu/tọa độ thay vì khẳng định hết quái toàn map. Tọa độ boss bí cảnh khi thiếu actor vẫn chỉ dùng cho Chỉ boss và giữ các kiểm tra cũ. Lượt sửa này không thay logic mở rương; chẩn đoán rương ở lượt trước vẫn cần nguyên dòng trạng thái khi lỗi.
-
-Chỉ đối chiếu source và review diff/status. Tests/lint/typecheck/gameplay **NOT RUN**; chuyển bãi trong bí cảnh thực tế **UNVERIFIED**; CI **NOT CHECKED**. Reload extension rồi tải lại game, bật Mở rộng vùng tìm quái, chọn Toàn map + Tất cả quái và bấm Lưu phạm vi.
-
-### Sửa phối hợp bí cảnh và bỏ tự lùi vì hết đan HP
-
-Theo yêu cầu hiện tại, Auto Farm không tự chuyển sang resting/backOff/bế quan chỉ vì HP thấp và không còn đan HP. farm-combat.js gắn vào dispatcher hiện có, vẫn gọi nguyên update/pick/castSkills/walk/basic của game. Khi đan HP bằng 0, chỉ host.hp() trong phần kiểm tra trước inCombat() của native update được chặn ở tỷ lệ 1 để không đi vào nhánh rest; sau inCombat() mọi đọc HP cho kỹ năng lại là HP thật. Không gán self.hp/mh, không giả số đan, không đổi skill, sát thương, cooldown, gói tin hoặc dữ liệu server. Nếu còn đan HP, giữ nguyên host và ngưỡng/thời gian uống đan của game. Trường hợp đang ở lượt resting tự động cũ, tắt bế quan bằng hành động native một lần và chờ game xác nhận rồi tiếp tục; không tự tắt bế quan người dùng bật khi auto.resting là false. Nếu giao diện native thay đổi thứ tự các bước, cần đối chiếu lại chính sách này.
-
-Các bộ hỗ trợ chỉ nhường hồi HP khi còn đan HP để uống; hết đan không khiến chúng chờ HP vô hạn. Né theo level vẫn theo lựa chọn riêng của người dùng, không bị tắt cùng nhánh lùi do thiếu HP. Hồi sinh và điều kiện chết/server không đổi.
-
-Phá phong ấn chạy ở priority 3.5, trước tìm bãi xa (4), sau né (2) và Auto Quest (3). Bỏ nhánh phong ấn nhường ngược tìm bãi; bộ tìm bãi nhường khi phong ấn hoặc rương đang sở hữu di chuyển. Phong ấn không tới được/không giảm số đòn tạm bỏ 15 giây rồi thử lại; khi tất cả đang chờ, giữ đứng và không trả ngay về đánh boss trong lúc phong ấn chưa xử lý. Không đánh nhanh hơn hay tăng tầm đánh. Bộ tìm bãi cũng nhường một rương hợp lệ/an toàn trong 6 ô khi không có giao tranh hoặc mục tiêu farm hiện tại, để rương có cơ hội bắt đầu giữa các bãi. Giữ quyền sở hữu rương, bộ lọc, kiểm tra quái gần và mục tiêu F.
-
-navigation.js tách bước move gốc thành các bước nhỏ tối đa 1/240 giây khi ở sát (3 ô) điểm rẽ/đích của navigation riêng; dừng ở khoảng cách đến thật, không coi việc vượt qua là đã trong tầm đánh. Vẫn dùng move/collision gốc, không gán px/py hoặc ms. Tổng delta giữ nguyên nếu chưa tới; dừng phần di chuyển dư khi đã tới. Bỏ qua khi có lệnh tay, dash, ngắm chiêu, correction hoặc hướng đi đã đổi; không thêm timer. Wrapper gỡ khi shutdown/destroy/pagehide, intent cũ được xóa khi dọn. Thay đổi áp dụng các private navigation đang dùng helper, gồm phong ấn/rương/tới mục tiêu/cổng/né; không thay đường đi riêng của Tự hái.
-
-Chỉ đối chiếu source và review diff/status. Tests/lint/typecheck/browser/gameplay **NOT RUN**, tương tác boss/phong ấn/rương và bỏ nhánh nghỉ trong runtime **UNVERIFIED**, CI **NOT CHECKED**. Không khẳng định đã hết mọi nguyên nhân chạy tới lui hoặc nguyên nhân của lần chết đã báo. Reload extension và tải lại game để nhận thay đổi.
-
-### Di chuyển: Luôn bay và giải thích gọn trong menu
-
-Nhóm Tốc độ di chuyển đổi tên thành **Di chuyển**. Công tắc **Luôn giữ trạng thái bay** mặc định OFF, lưu riêng ở chrome.storage.local flightPreferences.always. Bật để giữ bay cả khi không Auto Farm: đang bay thì không gửi lệnh; đang đi bộ thì chờ ổn định 1 giây, gọi act("fly") native một lần rồi chờ self.fly xác nhận. Không ghi fly hoặc giả phím. Khi chưa xác nhận sau 8 giây, báo trạng thái và không tự gửi lặp; tắt/bật tùy chọn để thử lại. Có chặn yêu cầu trùng trong 8 giây cả khi đổi cài đặt nhanh. Kiểm tra lại sau hồi sinh, kết nối lại, scene/map mới. Nếu người dùng tự tắt bay khi đang bật Luôn bay, tool sẽ yêu cầu bật lại sau khoảng nghỉ. Tắt tùy chọn chỉ dừng ý định Luôn bay, không ép đi bộ; hỗ trợ bay Auto Farm khi Mở rộng vùng tìm quái bật vẫn được giữ.
-
-flight-page.js là bộ điều khiển chung cho Luôn bay và ensureFlying của Auto Farm, không còn hai chỗ phát lệnh bay riêng. Gắn preupdate khi đã có scene; dùng một watcher 1 giây chỉ trong lúc chờ scene, gỡ khi gắn được scene. Chết, rời scene, mất kết nối, bảng game, ngắm chiêu, thu hoạch, bế quan, câu cá, bảo vệ và hộp kiểm tra đều chờ. Tắt hết nhu cầu hoặc pagehide thì dọn timer/listener. flight-content.js chỉ bridge/storage, thêm timer vào URL nếu bật Luôn bay mà thiếu; giữ query/fragment hiện có, không tự tải lại khi tắt.
-
-Menu giữ trạng thái/lỗi trực tiếp. Giải thích tĩnh dài ở Auto Farm, Thu hoạch, Bí cảnh và Di chuyển được chuyển thành nút **?** cạnh điều khiển bằng popup-help.js; không đổi ID/input/storage hoặc logic các tùy chọn cũ. Trỏ chuột, Tab/focus hoặc bấm ? để đọc, bấm để ghim; bấm ngoài/Esc để đóng. Hộp giải thích giới hạn trong viewport và cuộn được. Các nút ? khoảng cách Thu hoạch cũ cũng hỗ trợ bấm/Enter/Space. Nhóm vẫn mặc định thu gọn; chỉ hiện ô mức tốc độ khi điều chỉnh tốc độ đang bật. Nút về tốc độ mặc định vẫn luôn có, không ảnh hưởng Luôn bay. Font/FPS và các nhóm ngoài phạm vi này giữ cách hiển thị hiện có.
-
-Reload extension và tải lại game, mở **Di chuyển → Luôn giữ trạng thái bay** để bật. Không thêm quyền, dependency, script từ xa hoặc telemetry. Không bảo đảm chạy khi Chrome đình chỉ tab/máy ngủ; bộ giữ bay không tạo Worker chạy nền riêng. Chỉ đối chiếu source và review diff/status. Tests/lint/typecheck/browser/gameplay **NOT RUN**; bay qua đổi map/hồi sinh, thao tác tooltip và bố cục thật **UNVERIFIED**; CI **NOT CHECKED**.
-
-### Dò Toàn map và quan sát đường Auto Farm
-
-Phần này thay thế giới hạn cũ “không tự tuần tra những ô chưa có dữ liệu”. Bật Mở rộng vùng tìm quái, chọn Toàn map hiện tại và bấm Lưu phạm vi. Khi không còn quái phù hợp đã biết, tool dò các điểm không bị chặn trên bản đồ; thấy quái đúng bộ lọc thì chuyển sang tiếp cận và dùng Auto Farm gốc chiến đấu. Không sửa bộ lọc hay tự đánh quái ngoài lựa chọn. Giữ mục tiêu/lượt tiếp cận hợp lệ trước khi xét quái khác. Boss bí cảnh có HP bằng 0 thì không dò tiếp trong chế độ Chỉ boss.
-
-Dò tối đa 32 × 32 điểm mẫu; chỉ chọn điểm mới tối đa một lần mỗi giây, dùng walk/hop và collision của game. Điểm đã tới không lặp trong cùng lượt; hết điểm thì chờ 10 giây trước lượt mới. Điểm không tới được tạm bỏ 60 giây, mục tiêu quái không tới được vẫn tạm bỏ 15 giây. Không tiến triển 8 giây hoặc một lượt đi quá 120 giây thì bỏ lượt. Dò có ưu tiên thấp hơn né, phong ấn, cổng, rương và hái, không khóa các tính năng đó. Không phải quét bảo đảm từng ô: map rất rộng, lối hẹp, điểm mẫu bị chặn hoặc game chưa cung cấp dữ liệu có thể làm bỏ sót vùng/quái.
-
-Chọn Hiện đường tới mục tiêu rồi Lưu phạm vi: xanh lá là quái hoặc tọa độ boss đang tiếp cận; vàng nét đứt là điểm dò chưa có quái; xanh dương là đường qua các điểm rẽ. Đường thẳng chỉ để quan sát, không phải đường xuyên vật cản. Tùy chọn mặc định tắt, lưu cùng cài đặt farm; vẽ tối đa 10 lần/giây, không vẽ khi tab ẩn hoặc farm tắt. Gỡ hình/listener khi tắt tùy chọn, rời trang hoặc scene bị hủy. Không thêm polling/timer riêng cho đường kẻ.
-
-Chống vượt điểm rẽ/đích nay áp dụng cả khi Auto Farm gốc đuổi quái, vẫn giữ khoảng dừng và tầm đánh native. Khi nhận thay đổi fix trong lúc đi, hủy hướng cũ, chờ ổn định 0.45 giây và tính lại đường. Không sửa fix, vị trí, tốc độ, cooldown hoặc dữ liệu va chạm; không tự coi quái ngoài bộ lọc thành vật cản. Chưa xác nhận nguyên nhân thực tế của mọi lần giật tới lui.
-
-Reload extension rồi tải lại game để dùng bản mới. Chỉ đọc source và review diff/status trong lượt này. Tests/lint/typecheck/browser/gameplay: NOT RUN. Hành vi trong game, độ mượt và khả năng dò đủ map: UNVERIFIED. CI: NOT CHECKED.
-
-### Giữ nền tối giản ổn định khi di chuyển
-
-Không chuyển lại nền gốc mỗi khi camera tới vùng chưa dựng đủ ô lưới. Một nền màu đơn giản giữ ổn định trong khi từng mảnh lưới được bổ sung; mảnh đã dựng vẫn hiển thị. Giữ giới hạn 64 mảnh và tối đa 2 mảnh mới mỗi frame. Khi zoom rất xa, chỉ dựng tối đa vùng 8 × 8 mảnh gần tâm camera, phần còn lại là nền màu đơn giản. Tắt bản đồ tối giản hoặc rời scene sẽ dọn cả nền và cache. Không thay collision, tải ảnh hay logic streaming của game. Đã đối chiếu source/review diff; tests và gameplay NOT RUN, hết chớp trong runtime UNVERIFIED, CI NOT CHECKED.
-
-### Minimap dạng ô vuông
-
-Bật Tối ưu FPS rồi tick Minimap dạng ô vuông. Tùy chọn mặc định tắt, lưu trong fpsPreferences, độc lập với bản đồ tối giản của nền game. Nền minimap thành các ô tối (đi được) và xám (bị chặn), lấy mẫu collision ở tâm mỗi ô; không bảo đảm cả ô đều thông hoặc biểu diễn đủ vật cản nhỏ. Giữ khung tròn, dấu nhân vật/quái, vùng an toàn, PK, nút ẩn và thao tác mở map/thảo dược gốc. Không sửa bản đồ lớn.
-
-Chỉ thay lượt vẽ ảnh nền đồng bộ trong minimap.draw, khôi phục ngay hàm canvas sau lượt vẽ. Bộ nhớ đệm chỉ chứa vùng nhìn tối đa 34 × 34 ô, cập nhật khi đi qua ô hoặc collision/kích thước map đổi; không dựng ảnh toàn map hoặc thêm timer. Ảnh nền gốc vẫn được game quản lý, kể cả khi tải bất đồng bộ; tắt tùy chọn/rời scene khôi phục wrapper gốc theo cơ chế FPS hiện có. Đối chiếu với source game cục bộ; tests/browser/gameplay NOT RUN, runtime UNVERIFIED, CI NOT CHECKED.
-
-### Màu dấu trên minimap
-
-Trong FPS, bật Màu dấu trên minimap để dùng quái thường/tinh anh đỏ, boss (cls boss hoặc wb) tím lớn hơn, NPC xanh lá, người chơi khác xanh dương. Bản thân giữ hình mũi tên native, chọn màu sáng ngẫu nhiên một lần và lưu riêng tại minimapSelfColor. Cài đặt mặc định tắt; hoạt động trên cả nền minimap gốc và ô vuông. Dấu của cổng, tài nguyên, hướng dẫn quest và vùng an toàn giữ nguyên. Chỉ bổ sung quái/người chơi/NPC có tọa độ trong scene, không phát hiện đối tượng chưa được game cung cấp; ẩn hình ở FPS không làm mất dấu.
-
-Native dots không có ID, nên việc ghép dấu dùng tọa độ và mẫu màu/kích thước native đã đối chiếu trong source, phân loại bằng dữ liệu actor/NPC. Nếu game thay cách dựng dấu cần đối chiếu lại, có thể có dấu trùng khi mẫu native thay đổi. Chỉ sao chép danh sách dấu cho lượt vẽ, không sửa actor, dữ liệu minimap gốc hay gameplay. Wrapper canvas chỉ đổi màu phần fill của chỉ báo bản thân trong lượt vẽ đồng bộ, khôi phục ngay sau đó; tắt tùy chọn/rời scene dùng cleanup FPS hiện có. Review diff/status đã thực hiện; tests/lint/browser/gameplay NOT RUN, runtime UNVERIFIED, CI NOT CHECKED.
-
-### Rương vàng cam và vùng nhìn minimap
-
-Màu dấu trên minimap nay đổi rương bí cảnh đã có trong self.realm.inside.chests thành vàng cam; tọa độ boss bí cảnh dùng tím, ẩn dấu metadata boss khi HP bằng 0. Không tự phát hiện rương chưa có trong dữ liệu và không đổi tương tác/mở rương. Tắt Màu dấu thì giữ các dấu native.
-
-FPS → Vùng nhìn minimap: mặc định 32 ô, rộng ×2/×3/×4 tương ứng tối đa 64/96/128 ô mỗi cạnh. Giữ kích thước khung và kích thước dấu; map nhỏ giới hạn theo cạnh nhỏ hơn như minimap native. Chỉ đổi hệ tọa độ trong lượt vẽ đồng bộ, gồm vị trí nhân vật, mọi dấu và vùng an toàn, khôi phục ngay sau đó bằng finally. Không ghi vị trí actor hoặc scene.map. Hoạt động với cả nền gốc và ô vuông; cache ô vuông theo vùng nhìn tối đa 130 × 130 ô, thay cho giới hạn 34 × 34 trước đây. Vùng nhìn rộng có chi phí dựng lưới cao hơn, không bảo đảm tăng FPS. Chỉ thấy đối tượng game đã cung cấp tọa độ. Cài đặt lưu cùng fpsPreferences và yêu cầu công tắc FPS bật; reset FPS trả vùng nhìn về mặc định. Review diff/status đã thực hiện; tests/lint/browser/gameplay NOT RUN, runtime UNVERIFIED, CI NOT CHECKED.
-
-### Giảm tải CPU của lớp tối ưu FPS
-
-Lớp ẩn camera được giữ giữa các frame: chỉ thêm lớp ẩn cho đối tượng mới/reset cameraFilter, khôi phục đối tượng không còn được chọn và bỏ tham chiếu tới đối tượng đã hủy. Đổi cài đặt/tắt FPS/rời scene vẫn dùng cleanup để khôi phục; không thay gameplay hoặc timer.
-
-Lưới địa hình có một canvas đang dựng, xử lý tối đa 16 hàng mỗi frame và dừng sau hàng khi đạt ngân sách mềm 2 ms. Đây không phải giới hạn toàn bộ công việc FPS: bước hoàn thiện/upload texture vẫn có chi phí riêng. Mỗi frame hoàn thiện tối đa một mảnh, giữ tối đa 64 mảnh. Mảnh chưa xong chưa đưa lên màn hình; nền tối giản giữ ổn định. Đổi vùng nhìn làm hủy công việc ngoài vùng cần, đổi scene/tắt tùy chọn dọn cùng state. Lưới vùng mới có thể hiện dần chậm hơn để giảm khối lượng việc dồn trong một frame.
-
-Minimap ô vuông cache vùng nhìn có đệm và chỉ dựng lại khi vùng nhìn ra khỏi cache hoặc collision/kích thước/phạm vi đổi. Giữ đúng tọa độ và dấu native; tối đa 144 × 144 ô ở mức ×4, thay giới hạn 130 × 130 trước đây. Bộ nhớ ảnh lớn hơn một chút để giảm số lần dựng lại khi di chuyển; không thêm timer hay vòng vẽ game. Chưa tối ưu riêng bước tô màu dấu. Không bảo đảm 60 FPS với software rendering. Chỉ đối chiếu source và review diff/status; tests/lint/typecheck/benchmark/gameplay NOT RUN, hiệu quả FPS/CPU và runtime UNVERIFIED, CI NOT CHECKED.
-
-Menu lớn: khung trong game tối đa 760 × 960 px, giới hạn theo màn hình; chữ điều khiển/hướng dẫn 18 px. Tổng quan chỉ liệt kê tùy chọn đang bật từ storage; riêng Auto Farm và Auto Quest lấy trạng thái từ phản hồi game qua nhịp đọc sẵn có. Tùy chọn bật không bảo đảm hành động đang diễn ra. Tests/browser QA cho lần chỉnh này: NOT RUN; CI: NOT CHECKED.
-
-Auto Farm: mục Vùng tìm quái gom thành Mặc định của game / Theo bán kính / Toàn map hiện tại, áp dụng bằng Lưu phạm vi. Giữ contract storage enabled + searchScope hiện có; cài đặt cũ được hiển thị theo hai trường này. Không rút lui hồi máu khi hết đan HP được mô tả riêng là tự áp dụng khi Auto Farm bật; không thêm công tắc hay thay đổi chính sách chiến đấu. Tests/browser QA lần chỉnh này: NOT RUN; CI: NOT CHECKED.
-
-Cập nhật Auto Farm: phím tắt thu gọn; Vùng tìm quái chỉ còn Tự chọn số ô / Toàn map. Cài đặt cũ tắt mở rộng hiển thị Tự chọn số ô = 11, chỉ đổi khi lưu. Giới hạn nhập 11–1.000 ô, không bảo đảm tìm đường xa trên mọi map. Hiện đường tới mục tiêu tự lưu riêng. Không rút lui hồi máu khi hết đan HP có công tắc riêng noRetreat, mặc định true cho dữ liệu cũ/mới; false nhường cơ chế hồi phục native. Các bên điều phối map/hái/né/rương/cổng/phong ấn phải nhường khi cần hồi phục. Tests/browser QA cho cập nhật này: NOT RUN; CI: NOT CHECKED.
-
-Thu hoạch: thêm searchScope radius/map; Tự chọn số ô hỗ trợ 1–1.000 ô, Toàn map chỉ chọn tài nguyên hợp lệ trong map hiện tại mà game cung cấp. Đường xa dùng native walk/hop, giới hạn hành trình 120 giây; không cam kết mọi đường đều tới được. ignoreMonsters mặc định true nếu chưa lưu, giữ lựa chọn false cũ. Khi bật Tiếp tục hái dù có quái hoặc bị đánh: quan sát sự kiện dmg của quái, tính 10 giây từ đòn đầu với mục tiêu hiện tại; nếu chưa xác nhận thu hoạch thì bỏ mục tiêu 60 giây. Lượt bị gián đoạn chỉ thử lại sau khoảng chờ 1,5 giây hoặc timeout yêu cầu 4 giây; không sửa cơ chế game/server và không hủy lượt native đang diễn ra. Chết/UI/thao tác tay, quyền phối hợp và chiến đấu native vẫn ưu tiên. Tests/browser QA lần chỉnh này: NOT RUN; CI: NOT CHECKED.
-
-Thu hoạch có công tắc Hiện đường tới tài nguyên, tự lưu riêng với phạm vi. Đường vàng nối tới tài nguyên đang chọn, đường xanh thể hiện tối đa 64 điểm đường đi đã có; chỉ vẽ bằng postupdate tối đa 10 lần/giây, không timer riêng. Đổi riêng tùy chọn vẽ không hủy lượt tiếp cận hiện tại. Tắt Thu hoạch/rời scene/trang dọn graphics/listener. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Trạng thái Thu hoạch hiển thị bộ đếm theo vòng đời trang/tab: Thành công (túi tăng và node hết ready), Thất bại/bỏ qua (đường đi/tương tác/attack timeout), Chưa xác nhận (kết thúc/timeout/mục tiêu thay đổi nhưng thiếu xác nhận đồ). Lượt hủy/nhường tay không tính thất bại; mỗi job kết thúc được tính tối đa một lần. Giữ qua đổi scene/bật tắt, reload đặt lại. Thông tin cũng đi qua cầu nối trạng thái sẵn có tới bảng trong game khi chọn hiển thị Thu hoạch. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Thu hoạch: mọi job kết thúc được phân loại Thành công / Thất bại-bỏ qua / Chưa xác nhận / Hủy-nhường. Giữ lý do lượt cuối trong thông báo trạng thái, kể cả nhường native, thay chế độ, rời scene hoặc lỗi interface. Chờ cả mục tiêu F mới và cached đúng tài nguyên tối đa 1,5 giây trước khi bỏ qua; không ép target hoặc tương tác cổng/NPC. Đây chưa phải xác nhận nguyên nhân sự cố gameplay người dùng báo. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Thu hoạch → 10 lượt thu hoạch gần nhất → Sao chép 10 lượt gần nhất: tự ghi mọi job kết thúc, độc lập công tắc debug cũ. Bản ghi gồm thời gian UTC, tài nguyên, kết quả/lý do, phase, khoảng cách, thời lượng, số yêu cầu, ACK và cờ bị đánh/chỉnh vị trí. Giới hạn 10 bản ghi trong trang/tab; reload đặt lại; không lưu tài khoản, token, packet hoặc raw stack. Cầu nối lọc trường trước khi trả popup; sao chép clipboard có fallback Ctrl+C. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Cập nhật Thu hoạch: bỏ vùng sạch quái và công tắc bỏ qua quái tương ứng; luôn chọn tài nguyên theo phạm vi/bộ lọc, không chờ sạch quái. Dữ liệu clearRadius/ignoreMonsters cũ không còn được sử dụng. Giữ nguyên mốc bị đánh 10 giây, bỏ mục tiêu 60 giây, quyền phối hợp và ưu tiên thao tác tay/game. UI ghép số ô và khoảng cách hái thành hai ô cạnh nhau, dùng tên Tài nguyên cho cả hái/đào. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Thu hoạch ở cụm cây sát nhau: nếu native F đang chọn cây khác, thử tiếp cận gần hơn một lần (tối đa 0,35 ô) bằng native walk/collision, vẫn kiểm tra đúng fresh/cached target trước tương tác. Không ép target, không tăng tầm hái. Chờ xác nhận kết thúc 3 giây thay vì 1,5 giây; lượt bị đánh vẫn giới hạn 10 giây. Giữ baseline túi đồ của lần request đầu qua các lần retry. harvest-history-2 bổ sung túi trước/sau/request cuối, node native đang hái, fresh/cached target, cờ tiếp cận gần hơn và thời gian chờ; không quan sát phản hồi từ chối server, nên không suy đoán lý do từ chối. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-harvest-history-3: log request/end position (local px/py, snapshot self.x/y, snapshot age and distance); only reads native state. Records up to three harvest-related native note/toast messages around the request, excluding chat/transport/raw stacks and redacting URLs/emails/long token-like strings. These messages are correlated observations, not proof of a server rejection. After an acknowledged harvest yields to manual input, existing preupdate observes up to 8 seconds: inventory increase plus original node unavailable promotes the same log row/counters to success, retaining endedBy. A new request for the same item stops attribution as ambiguous. Scene teardown ends observation; no new timer or automatic request added. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Chẩn đoán nền: Auto Farm → Hỗ trợ khi gặp lỗi → Sao chép log chạy nền / hồi sinh. background-log-1 giữ tối đa 50 mốc trong sessionStorage riêng tab qua reload: visibility/focus/freeze/resume, state, postupdate gap >3 giây, kết nối/chết, revive button request và thay đổi native reviveTry, worker failure. Nhịp frame đọc từ postupdate hiện có, không timer/worker mới; không tự hồi sinh/gửi lại hay sửa scheduling. Khoảng ngừng chỉ được ghi khi JS chạy lại, không tự chứng minh nguyên nhân. Ghi nhận reviveTry là quan sát lịch thử native, không receipt server. Không ghi tài khoản, tọa độ, URL, packet hoặc raw stack. Tests/browser QA: NOT RUN; CI: NOT CHECKED.
-
-Rương/cổng: dọn GSTNavigation intent khi release; đồng bộ cấu hình rương giống nhau không hủy hành trình/request. Bí cảnh có nút sao chép 10 lượt rương và 10 lượt cổng gần nhất, kèm current enabled/attached/phase/message, số đối tượng game cung cấp và quyền phối hợp. Log mỗi hành trình đã kết thúc gồm lý do, thời lượng, khoảng cách, fresh/cached target type và requested; không ghi tên nhân vật, ID cổng/rương, packet hoặc credential. Reload đặt lại. disappeared chỉ là rương không còn trong danh sách, không receipt vật phẩm; entered chỉ khi cùng controller quan sát inside sau request; rời scene trước xác nhận ghi ended, không suy đoán thành công. Giữ lọc quái 6 ô, bảo vệ, cooldown, eligibility native và ownership. Source đối chiếu: Downloads/Game/WorldScene.js (realmUI target/interact, native F). Tests/browser/live QA: NOT RUN; CI: NOT CHECKED.
-
-Auto Bí cảnh và tự thiền khi Farm hết quái đã được gỡ. Luôn thiền vẫn là công tắc riêng; thiền hồi phục giữ theo game. Giữ Farm qua đổi map nằm trong nhóm Auto Farm. Tự mở rương, lịch sử và đồng hồ/thông báo Bí cảnh cũng đã được gỡ.
+2. Bật **Developer mode** rồi chọn **Load unpacked**.
+3. Chọn thư mục repository chứa `manifest.json`.
+4. Mở hoặc tải lại trang game; có thể ghim extension để tiện sử dụng.
+
+Không cần build, npm hoặc backend. Khi cập nhật local, chạy `pull-game-speed-tester.bat` nếu đã có script này trên máy, sau đó Reload extension và tải lại tab game. Giữ nguyên đường dẫn cài đặt để tránh đổi ID extension và mất quyền truy cập cài đặt cũ.
+
+Muốn gửi tool cho người khác, dùng ZIP phát hành theo [RELEASE.md](RELEASE.md). Không có cập nhật tự động từ Chrome Web Store.
+
+## Các trang chức năng
+
+| Trang | Dùng để làm gì |
+| --- | --- |
+| Tổng quan | Xem trạng thái và truy cập nhanh |
+| Auto của tool | Chọn controller Farm, bật/tắt Farm, phạm vi, mục tiêu, kỹ năng và cấu hình hồi phục |
+| Tiện ích độc lập | Các tiện ích riêng, gồm đan HP/MP và hiển thị hỗ trợ Farm |
+| Thu hoạch | Chọn tài nguyên và phạm vi, xem trạng thái thu hoạch |
+| Auto Quest | Tìm, chọn và chạy quest theo các điều kiện được hỗ trợ |
+| Hình ảnh & FPS | Tùy chọn hiển thị, minimap và giảm tải hình ảnh |
+| Tài khoản | Quản lý nick, mở tab và cấu hình đăng nhập |
+| Giao diện | Cài đặt giao diện và phím tắt |
+| Chẩn đoán | Xuất log để tìm lỗi |
+| Kết nối & tự tải lại | Hỗ trợ kết nối lại và tự tải lại có giới hạn |
+
+Tên trang lấy từ `popup.html`; các nhóm điều khiển có thể được bố trí lại bởi script giao diện. Tùy chọn bị khóa, ẩn hoặc chưa khả dụng không đồng nghĩa tính năng đang chạy.
+
+## Auto Farm
+
+- Chọn **Farm của game** để dùng controller gốc, hoặc **Farm của tool** để dùng controller hiện hành của extension. Chọn controller không tự bật Farm.
+- Cấu hình bán kính (1–1.000 ô) hoặc toàn map hiện tại, bộ lọc quái và kỹ năng theo các điều khiển khả dụng. Bấm Bật Farm trong menu hoặc dùng phím tắt Farm đã cài.
+- Kỹ năng có hai cách chọn: mặc định theo game hoặc tùy chỉnh thứ tự ưu tiên các ô 1–6. Tool sử dụng các kiểm tra an toàn hiện có; đổi lựa chọn trong phiên Tool Farm được áp dụng sau hành động đang thực hiện.
+- Nhặt theo game được hỗ trợ theo cơ chế gốc. Lựa chọn nhặt theo tool vẫn khóa vì chưa xác minh được cách tắt riêng việc nhặt đồ gốc.
+- Tool Farm có thể nhường thao tác tay; thay đổi danh tính, controller hoặc kết nối có thể dừng phiên. Kiểm tra trạng thái hiển thị thay vì suy đoán từ công tắc.
+- Các mode Extended/Custom Farm cũ không còn là controller hoạt động. Không dùng hướng dẫn lịch sử trong `CUSTOM_AUTO_FARM.md` để bật mode cũ.
+
+## Kết nối & tự tải lại
+
+| Tùy chọn | Mặc định |
+| --- | --- |
+| Hỗ trợ kết nối lại | Bật |
+| Tự tải lại khi lỗi kéo dài | Tắt |
+| Chờ trước khi đếm ngược | 90 giây |
+| Thời gian đếm ngược | 10 giây |
+| Giới hạn tải lại | 3 lần trong 15 phút |
+
+Extension theo dõi phản hồi mạng và sử dụng cơ chế kết nối lại gốc của game khi đủ điều kiện. Tải lại chỉ thực hiện khi lỗi mạng được nhận diện, danh tính và phiên an toàn, không có recovery đang chờ, và chưa vượt giới hạn. Có thể hủy đếm ngược.
+
+Worker hỗ trợ theo dõi khi chạy nền nhưng không bảo đảm trình duyệt/hệ điều hành không đình chỉ tab. Server reset có thể làm mất phiên; khi cần đăng nhập lại hoặc xác minh, người dùng phải kiểm tra thủ công. Chưa tự bấm nút “Kết nối lại” của game; chưa triển khai Auto Resume sau recovery.
+
+## Tìm lỗi và bảo mật
+
+- Khi gặp lỗi, ghi lại tính năng, tab/nhân vật, thao tác trước lỗi và thời điểm; dùng trang **Chẩn đoán** để xuất log liên quan.
+- Không gửi mật khẩu, token hoặc dữ liệu xác thực trong log. Tính năng tài khoản lưu thông tin đăng nhập trong bộ nhớ local của Chrome; chỉ dùng trên thiết bị tin cậy.
+- Dữ liệu trạng thái client không chứng minh server đã chấp nhận hành động.
+- Không tự suy luận kết quả gameplay từ review source. Lần chuẩn hóa tài liệu này không chạy tests, lint, QA hoặc CI; runtime chưa được xác minh.
+
+## Tài liệu dự án
+
+| Tài liệu | Mục đích |
+| --- | --- |
+| [ROADMAP.md](ROADMAP.md) | Mục tiêu, tiến độ và việc tiếp theo |
+| [AGENTS.md](AGENTS.md) | Quy tắc làm việc của Agent |
+| [CODEGRAPH.md](CODEGRAPH.md) | Bản đồ kỹ thuật, entry point và cách tra source extension |
+| [RELEASE.md](RELEASE.md) | Phát hành ZIP |
+| [GAME_ASSET_WIKI_v2.0](GAME_ASSET_WIKI_v2.0/README.md) | Tra source game lưu trữ, không phải bằng chứng phiên bản live |
+
+Lịch sử chi tiết được giữ trong [README trước khi chuẩn hóa](https://github.com/Vibe-Milk/game-speed-tester/blob/e8efee261066fc55d9839d9e5746f79dca814e48/README.md) và [Git commit history](https://github.com/Vibe-Milk/game-speed-tester/commits/main/). Các tài liệu Farm theo giai đoạn cũ được giữ để tham khảo lịch sử, không phải hướng dẫn hiện hành.

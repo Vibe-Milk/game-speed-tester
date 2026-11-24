@@ -38,6 +38,11 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 - Task 4 dự kiến tùy chọn khôi phục Farm/Harvest sau kết nối được xác minh, mặc định tắt; cần chốt phạm vi riêng, không tự triển khai.
 - Các nhóm tính năng khác (Farm, Harvest, tiện ích) chưa được rà soát lại trong lần setup roadmap này. Không coi trạng thái lịch sử trong tài liệu cũ là kết quả review HEAD.
 
+## Tài liệu dự án
+
+- Documentation 1 — README và CodeGraph: IMPLEMENTED trong commit tài liệu hiện tại (source baseline `e8efee2`); rút gọn hướng dẫn/định tuyến, giữ bản cũ bằng liên kết commit. Không thay code, không chạy test. Chưa audit đầy đủ từng tính năng.
+- Documentation 2 — PENDING, đề xuất rà soát hai tài liệu Farm lịch sử và RELEASE; cần người dùng chốt phạm vi trước khi thực hiện. Không tự xóa file.
+
 ## Cách duy trì
 
 Cập nhật mục liên quan khi thực hiện task được duyệt; ghi commit, trạng thái review/runtime, blocker và việc tiếp theo. Giữ ngắn, không sao chép chi tiết code hay lịch sử commit. Nếu chỉ review hoặc tạo prompt, không tự ghi repository khi chưa được phép sửa tài liệu.
