@@ -93,3 +93,54 @@ Bảy tệp import tĩnh được liệt kê trên là dependency file-level h�
 - Trong bảy dependency import, sáu file có trong bộ 9 source; `donation-BLL6eTTD.js` chưa được cung cấp. Các hành vi chưa đọc trực tiếp không được coi là đã xác minh.
 - Wiki tổng hợp đối chiếu SHA-256 và anchor với đúng source gốc trong `source/`.
 - Chưa xác minh đầy đủ toàn bộ nhánh trong `create()` và `update()`; bảng ưu tiên các điểm điều hướng tiêu biểu.
+
+
+## Trích đoạn game live do người dùng cung cấp: backgroundAuto
+
+Nguồn: trích đoạn `backgroundAuto()` từ `WorldScene-BelhegXS.js`, do người dùng cung cấp; không phải bundle lưu trữ `WorldScene-bJccyikN.js` được lập chỉ mục ở trên. Chưa có toàn bộ bundle hoặc hash để đối chiếu. Đoạn này không cập nhật hay xác minh toàn bộ wiki cho phiên bản game live.
+
+```javascript
+backgroundAuto() {
+    let e;
+    try {
+        e = new Worker(URL.createObjectURL(new Blob([
+            "let t=0;onmessage=e=>{clearInterval(t);if(e.data)t=setInterval(()=>postMessage(0),50)}"
+        ], {
+            type: "text/javascript"
+        })))
+    } catch {
+        return
+    }
+
+    let i = performance.now(),
+        n = !1;
+
+    e.onmessage = () => {
+        const o = performance.now(),
+            h = Math.min(250, o - i);
+
+        i = o;
+        document.hidden && this.game.headlessStep(o, h)
+    };
+
+    const s = () => {
+        const o = document.hidden && this.auto.on;
+        o !== n && (
+            n = o,
+            i = performance.now(),
+            e.postMessage(o)
+        )
+    };
+
+    this.bgSync = s;
+    document.addEventListener("visibilitychange", s);
+
+    this.events.once(tt.Scenes.Events.SHUTDOWN, () => {
+        document.removeEventListener("visibilitychange", s);
+        e.terminate();
+        this.bgSync = null
+    })
+}
+```
+
+Đoạn mã cho thấy Worker phát nhịp 50 ms khi trang ẩn và Auto Farm gốc đang bật; callback gọi `headlessStep` khi trang ẩn, còn sự kiện shutdown dừng Worker. Chỉ từ đoạn này không thể xác định toàn bộ hành vi mạng hoặc bảo đảm tab nền luôn được chạy. Chưa kiểm chứng runtime.

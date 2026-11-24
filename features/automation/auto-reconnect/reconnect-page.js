@@ -544,9 +544,57 @@
     }
     manageReload(owner, now);
   }
+  // Exactly one scheduler invokes watch: the interval stays active until a
+  // hidden-tab worker confirms it is ready, and is restored on any failure.
+  let schedulerWorker = null, workerUrl = null, workerFailed = false;
+  function stopWorker() {
+    const current = schedulerWorker;
+    schedulerWorker = null;
+    if (current) current.terminate();
+    if (workerUrl) { URL.revokeObjectURL(workerUrl); workerUrl = null; }
+  }
+  function ensureInterval() {
+    if (!suspended && timer === null) timer = setInterval(watch, 1000);
+  }
+  function syncScheduler() {
+    if (suspended) return;
+    if (!document.hidden) {
+      stopWorker();
+      workerFailed = false;
+      ensureInterval();
+      return;
+    }
+    if (schedulerWorker) return;
+    ensureInterval();
+    if (workerFailed) return;
+    try {
+      workerUrl = URL.createObjectURL(new Blob([
+        'postMessage("ready");setInterval(()=>postMessage("tick"),1000)'
+      ], { type: "text/javascript" }));
+      const current = new Worker(workerUrl);
+      schedulerWorker = current;
+      current.onmessage = (event) => {
+        if (schedulerWorker !== current || suspended || !document.hidden) return;
+        if (event.data === "ready") {
+          if (workerUrl) { URL.revokeObjectURL(workerUrl); workerUrl = null; }
+          clearInterval(timer); timer = null;
+        } else if (event.data === "tick" && timer === null) watch();
+      };
+      current.onerror = current.onmessageerror = () => {
+        if (schedulerWorker !== current) return;
+        workerFailed = true;
+        stopWorker();
+        ensureInterval();
+      };
+    } catch {
+      workerFailed = true;
+      stopWorker();
+      ensureInterval();
+    }
+  }
   function start() {
-    if (suspended || timer !== null) return;
-    timer = setInterval(watch, 1000);
+    if (suspended) return;
+    syncScheduler();
     watch();
   }
   globalThis.GSTConnectionRecovery = {
@@ -573,10 +621,11 @@
     applyProfileMessage(event.data);
   });
   window.postMessage({ channel: "gst:account-profile:v1", type: "ready" }, location.origin);
+  document.addEventListener("visibilitychange", () => { syncScheduler(); });
   window.addEventListener("pagehide", () => {
     suspended = true;
-    clearInterval(timer); timer = null; detach();
+    clearInterval(timer); timer = null; stopWorker(); detach();
   });
-  window.addEventListener("pageshow", () => { suspended = false; start(); });
+  window.addEventListener("pageshow", () => { suspended = false; workerFailed = false; start(); });
   start();
 })();
