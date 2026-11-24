@@ -37,9 +37,9 @@ Tên trang lấy từ `popup.html`; các nhóm điều khiển có thể đượ
 - Chọn **Farm của game** để dùng controller gốc, hoặc **Farm của tool** để dùng controller hiện hành của extension. Chọn controller không tự bật Farm.
 - Cấu hình bán kính (1–1.000 ô) hoặc toàn map hiện tại, bộ lọc quái và kỹ năng theo các điều khiển khả dụng. Bấm Bật Farm trong menu hoặc dùng phím tắt Farm đã cài.
 - Kỹ năng có hai cách chọn: mặc định theo game hoặc tùy chỉnh thứ tự ưu tiên các ô 1–6. Tool sử dụng các kiểm tra an toàn hiện có; đổi lựa chọn trong phiên Tool Farm được áp dụng sau hành động đang thực hiện.
-- Nhặt theo game được hỗ trợ theo cơ chế gốc. Lựa chọn nhặt theo tool vẫn khóa vì chưa xác minh được cách tắt riêng việc nhặt đồ gốc.
+- Nhặt theo game được hỗ trợ theo cơ chế gốc. Lựa chọn nhặt theo tool vẫn khóa vì chưa xác minh được cách tắt riêng việc nhặt đồ gốc. Nếu cài đặt cũ còn chọn nhặt theo tool, hãy chuyển sang nhặt theo game trước khi bật Farm.
 - Tool Farm có thể nhường thao tác tay; thay đổi danh tính, controller hoặc kết nối có thể dừng phiên. Kiểm tra trạng thái hiển thị thay vì suy đoán từ công tắc.
-- Các mode Extended/Custom Farm cũ không còn là controller hoạt động. Không dùng hướng dẫn lịch sử trong `CUSTOM_AUTO_FARM.md` để bật mode cũ.
+- Các mode Extended/Custom Farm cũ không còn là controller hoạt động. Xem [tài liệu kỹ thuật](CODEGRAPH.md#policy-và-controller-farm) để biết controller hiện hành.
 
 ## Kết nối & tự tải lại
 
@@ -72,4 +72,4 @@ Worker hỗ trợ theo dõi khi chạy nền nhưng không bảo đảm trình d
 | [RELEASE.md](RELEASE.md) | Phát hành ZIP |
 | [GAME_ASSET_WIKI_v2.0](GAME_ASSET_WIKI_v2.0/README.md) | Tra source game lưu trữ, không phải bằng chứng phiên bản live |
 
-Lịch sử chi tiết được giữ trong [README trước khi chuẩn hóa](https://github.com/Vibe-Milk/game-speed-tester/blob/e8efee261066fc55d9839d9e5746f79dca814e48/README.md) và [Git commit history](https://github.com/Vibe-Milk/game-speed-tester/commits/main/). Các tài liệu Farm theo giai đoạn cũ được giữ để tham khảo lịch sử, không phải hướng dẫn hiện hành.
+Lịch sử chi tiết được giữ trong [README trước khi chuẩn hóa](https://github.com/Vibe-Milk/game-speed-tester/blob/e8efee261066fc55d9839d9e5746f79dca814e48/README.md) và [Git commit history](https://github.com/Vibe-Milk/game-speed-tester/commits/main/). Các tài liệu Farm theo giai đoạn cũ đã được hợp nhất; xem các liên kết bản gốc tại [CODEGRAPH.md — Duy trì và tra lịch sử](CODEGRAPH.md#7-duy-trì-và-tra-lịch-sử).

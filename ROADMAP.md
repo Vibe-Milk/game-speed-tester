@@ -40,8 +40,8 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 
 ## Tài liệu dự án
 
-- Documentation 1 — README và CodeGraph: IMPLEMENTED trong commit tài liệu hiện tại (source baseline `e8efee2`); rút gọn hướng dẫn/định tuyến, giữ bản cũ bằng liên kết commit. Không thay code, không chạy test. Chưa audit đầy đủ từng tính năng.
-- Documentation 2 — PENDING, đề xuất rà soát hai tài liệu Farm lịch sử và RELEASE; cần người dùng chốt phạm vi trước khi thực hiện. Không tự xóa file.
+- Documentation 1 — README và CodeGraph: IMPLEMENTED tại [`a27be5f`](https://github.com/Vibe-Milk/game-speed-tester/commit/a27be5fd9f6de8aae2ff24ab10fbb8aabe66bec6) (source baseline `e8efee2`); rút gọn hướng dẫn/định tuyến, giữ bản cũ bằng liên kết commit. Không thay code, không chạy test. Chưa audit đầy đủ từng tính năng.
+- Documentation 2 — IMPLEMENTED trong commit tài liệu này (baseline `a27be5f`): hợp nhất thông tin Farm còn dùng vào CodeGraph, giữ nguyên hai bản tài liệu lịch sử bằng liên kết commit cố định, bỏ hai file lịch sử khỏi root và sửa RELEASE theo workflow. Không đổi code hoặc chạy test. Bước tiếp theo vẫn là kiểm tra thực tế Connection Recovery.
 
 ## Cách duy trì
 

@@ -1,6 +1,6 @@
 # Phát hành Game Speed Tester
 
-Repository này là Chrome Extension Manifest V3. Không cần build, Node.js, npm hoặc file EXE. Workflow phát hành hiện có tại [`.github/workflows/release-extension.yml`](.github/workflows/release-extension.yml). **Khi commit thay đổi `manifest.json` trên nhánh `main`, workflow tự phát hành phiên bản mới.** Commit chỉ sửa code hoặc tài liệu khác không tự tạo Release.
+Repository này là Chrome Extension Manifest V3. Không cần build, Node.js, npm hoặc file EXE. Workflow phát hành hiện có tại [`.github/workflows/release-extension.yml`](.github/workflows/release-extension.yml). **Commit thay đổi `manifest.json` trên nhánh `main` kích hoạt workflow phát hành.** Muốn tạo phiên bản mới phải tăng `version` và không dùng lại tag/Release đã có; workflow có thể thất bại nếu không thỏa điều kiện. Commit chỉ sửa code hoặc tài liệu khác không tự kích hoạt Release.
 
 ## Tạo Release trực tiếp trên GitHub (không cần dùng Git)
 
@@ -24,7 +24,7 @@ Khi cập nhật, giải nén phiên bản mới vào **cùng đường dẫn th
 
 ## Nội dung ZIP và giới hạn
 
-ZIP chỉ chứa `manifest.json`, các file `.js`, `.css`, `.html` trong `core/`, `features/`, `shared/`, `ui/` và các entry ở thư mục gốc và `INSTALL.txt` cho người dùng. File tài liệu `.md` không nằm trong gói và một commit chỉ sửa tài liệu không yêu cầu tạo ZIP mới. Workflow kiểm tra các file được tham chiếu trong manifest trước khi tạo ZIP. Thư mục `GAME_ASSET_WIKI_v2.0/` (gồm tài liệu Wiki và các file JavaScript source tham chiếu), tài liệu phát triển, Git history, thư mục `work/` và dữ liệu cục bộ không nằm trong gói theo allowlist của workflow. Wiki và các bundle source này là tài nguyên phát triển, không phải file runtime của extension.
+ZIP chỉ chứa `manifest.json`, các file `.js`, `.css`, `.html` trong `core/`, `features/`, `shared/`, `ui/`, `uncategorized/` hoặc nằm trực tiếp ở thư mục gốc, cùng `INSTALL.txt` do workflow tạo. File tài liệu `.md` không nằm trong gói và một commit chỉ sửa tài liệu không yêu cầu tạo ZIP mới. Workflow kiểm tra popup mặc định, JS/CSS trong content scripts, web-accessible resources và đường dẫn JS/CSS trong popup HTML trước khi tạo ZIP. Thư mục `GAME_ASSET_WIKI_v2.0/` (gồm tài liệu Wiki và các file JavaScript source tham chiếu), tài liệu phát triển, Git history, thư mục `work/` và dữ liệu cục bộ không nằm trong gói theo allowlist của workflow. Wiki và các bundle source này là tài nguyên phát triển, không phải file runtime của extension.
 
 Đây là cách phân phối tiện ích **Load unpacked**, không phải CRX hay Chrome Web Store; không có cập nhật tự động trong trình duyệt. ZIP không che giấu mã nguồn.
 
