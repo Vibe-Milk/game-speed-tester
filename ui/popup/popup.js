@@ -39,6 +39,26 @@ const farmAssistanceAvailability = document.getElementById("farmAssistanceAvaila
 const farmNoRetreat = document.getElementById("farmNoRetreat");
 const toolRecoveryControls = document.getElementById("toolRecoveryControls");
 const disableGamePills = document.getElementById("disableGamePills");
+const potionConflictWarning = document.getElementById("potionConflictWarning");
+let potionHpEnabledForWarning = null, potionWarningRevision = 0;
+function updatePotionConflictWarning() {
+  const warning = disableGamePills.checked && potionHpEnabledForWarning === true;
+  potionConflictWarning.hidden = !warning;
+  potionConflictWarning.textContent = warning
+    ? "Auto Potion của tool vẫn bật đan HP: hãy tắt riêng nếu muốn thử hết máu." : "";
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.potionPreferences) return;
+  potionWarningRevision++;
+  potionHpEnabledForWarning = changes.potionPreferences.newValue?.hpEnabled === true;
+  updatePotionConflictWarning();
+});
+const potionWarningInitialRevision = potionWarningRevision;
+chrome.storage.local.get("potionPreferences").then(({ potionPreferences }) => {
+  if (potionWarningRevision !== potionWarningInitialRevision) return;
+  potionHpEnabledForWarning = potionPreferences?.hpEnabled === true;
+  updatePotionConflictWarning();
+}).catch(() => { potionHpEnabledForWarning = null; });
 const toolRecoveryEnabled = document.getElementById("toolRecoveryEnabled");
 const toolRetreatHp = document.getElementById("toolRetreatHp");
 const toolResumeHp = document.getElementById("toolResumeHp");
@@ -738,6 +758,7 @@ function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {})
   const next = normalizedFarmPreferences(raw);
   farmConfirmed = next;
   disableGamePills.checked = next.disableGamePills;
+  updatePotionConflictWarning();
   toolRecoveryEnabled.checked = next.toolRecoveryEnabled;
   if (document.activeElement !== toolRetreatHp && document.activeElement !== toolResumeHp) {
     toolRetreatHp.value = String(next.toolRetreatHp); toolResumeHp.value = String(next.toolResumeHp);
@@ -979,7 +1000,10 @@ async function saveFarmPatch(patch, rollback, { draftWrite = false, preserveDraf
   }
 }
 disableGamePills.addEventListener("change", () => {
-  void saveFarmPatch({ disableGamePills: disableGamePills.checked }, () => { disableGamePills.checked = farmConfirmed.disableGamePills; });
+  updatePotionConflictWarning();
+  void saveFarmPatch({ disableGamePills: disableGamePills.checked }, () => {
+    disableGamePills.checked = farmConfirmed.disableGamePills; updatePotionConflictWarning();
+  });
 });
 toolRecoveryEnabled.addEventListener("change", () => {
   void saveFarmPatch({ toolRecoveryEnabled: toolRecoveryEnabled.checked }, () => { toolRecoveryEnabled.checked = farmConfirmed.toolRecoveryEnabled; });

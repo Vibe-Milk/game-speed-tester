@@ -306,9 +306,13 @@
     if (recover(s, host, time)) return;
     // Native WorldScene may skip auto.update during an action lock; guard still
     // runs on preupdate to release movement before the next native move().
-    if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) { release(s); return; }
+    if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) {
+      release(s); s.message = "Đang chờ game hoàn tất thao tác hiện tại."; return;
+    }
     s.lastTime = time;
-    if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) { release(s); return; }
+    if (globalThis.GSTFarmSkills?.waiting?.(scene, s.skillAction, time)) {
+      release(s); s.message = "Đang chờ game xử lý kỹ năng."; return;
+    }
     const pursuit = GSTFarmPlanner.chase(scene);
     if (s.options.searchScope !== "map" && Math.hypot(scene.px - s.origin.x, scene.py - s.origin.y) > s.options.radius && !pursuit) {
       if (s.state !== "RETURN" && s.targetId !== null) {
@@ -351,7 +355,18 @@
       const error = context(s); if (error) { halt(s, error); return; }
     }
     const plan = GSTFarmPlanner.plan(scene);
-    if (plan.state !== "PLANNED") { release(s); s.state = "SEARCH"; s.message = "Đang chờ mục tiêu hoặc đường đi hợp lệ."; return; }
+    if (plan.state !== "PLANNED") {
+      release(s); s.state = "SEARCH";
+      const reasons = { no_target: "Không có quái phù hợp trong phạm vi tìm kiếm.",
+        no_route_in_probe_budget: "Chưa tìm được đường tới quái; đang thử lại.",
+        route_retry: "Đường tới quái chưa hợp lệ; đang thử lại.",
+        stale_data: "Đang chờ dữ liệu nhân vật mới.", targets_unavailable: "Chưa có danh sách quái; đang chờ game.",
+        data_unavailable: "Chưa đọc được dữ liệu game; đang chờ.", yielding: "Đang nhường điều khiển cho tính năng khác.",
+        outside_radius: "Nhân vật ở ngoài vùng Farm; đang chờ đường quay lại.",
+        return_to_radius: "Đang chờ quay lại vùng Farm." };
+      if (plan.reason !== "planning_throttled") s.message = reasons[plan.reason] || "Đang chờ mục tiêu hoặc đường đi hợp lệ.";
+      return;
+    }
     const target = host.enemies().find((e) => e.id === plan.targetId && !e.dead
       && globalThis.GSTFarmMonsterClassification?.classify(e));
     if (!target || Math.hypot(target.x - plan.target.x, target.y - plan.target.y) > 0.01) { release(s); return; }
