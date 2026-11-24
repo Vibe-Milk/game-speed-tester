@@ -10,6 +10,8 @@
   let groupIds = new Set(), groupUntil = -Infinity, groupOrigin = null;
   const sceneNow = () => window.game?.scene?.getScene?.("world")
     ?? (window.__ntkScene?.sys?.settings?.key === "world" ? window.__ntkScene : null);
+  const policyAllowed = () => globalThis.GSTFarmPolicy?.isTool?.() === true
+    || globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() === true;
   const boss = (actor) => actor?.st?.cls === "boss" || actor?.st?.wb === true;
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const actorFor = (scene, id) => {
@@ -71,7 +73,8 @@
     clearGroup();
   }
   function otherOwner(scene, allowFarmMap = false) {
-    return globalThis.GSTMapTravel?.active?.(scene) || globalThis.GSTQuest?.active?.(scene)
+    return globalThis.GSTToolFarm?.recoveryPriority?.(scene) === true
+      || globalThis.GSTMapTravel?.active?.(scene) || globalThis.GSTQuest?.active?.(scene)
       || globalThis.GSTFarmSeals?.pending?.(scene) || globalThis.GSTFarmBehavior?.pendingLoot?.(scene)
       || (!allowFarmMap && globalThis.GSTFarmMap?.nativeHandling?.(scene))
       || ["GSTMapTravel", "GSTQuest", "GSTRealm", "GSTChest", "GSTFarmSeals", "GSTHarvest", "GSTFarmBossSafety",
@@ -93,6 +96,13 @@
     if (!binding || binding.scene !== scene || !available(scene, host)) {
       clearEpisode("Tự vệ không khả dụng; chờ kết nối và dữ liệu game.");
       return false;
+    }
+    if (globalThis.GSTFarmPolicy?.isTool?.() && (globalThis.GSTFarmConfigurationReady !== true
+        || settings.identityBlocked || settings.identityVerified !== true || !settings.accountProfileKey
+        || String(scene.you) !== settings.characterId || scene.profile?.classId !== settings.classId
+        || scene.profile?.name?.normalize?.("NFC") !== settings.character
+        || (new URLSearchParams(location.search).get("slot") ?? "") !== (settings.slot ?? ""))) {
+      clearEpisode("Tự vệ không khả dụng; chờ xác nhận nhân vật."); return false;
     }
     const key = host.mapKey();
     if (typeof key !== "string" || !key.trim()) {
@@ -118,7 +128,7 @@
       || otherOwner(scene, allowFarmMap);
   }
   function nativeBusy(scene, host) {
-    if (!scene.auto.on) return false;
+    if (!scene.auto.on || globalThis.GSTFarmPolicy?.isTool?.()) return false;
     const current = scene.views?.get?.(scene.auto.target);
     // A stale or remote target must not disable local self-defense.
     if (current && !current.dead && finite(current.x) && finite(current.y)
@@ -167,6 +177,8 @@
       && distance(point, origin) <= radius;
   }
   function retreat(scene, host, attackers) {
+    if (globalThis.GSTFarmPolicy?.isTool?.() && attackers.some((actor) => boss(actor)
+        || globalThis.GSTFarmMonsterClassification?.isElite?.(actor))) return null;
     const pos = { x: scene.px, y: scene.py };
     const away = attackers.reduce((sum, actor) => {
       const dx = pos.x - actor.x, dy = pos.y - actor.y, length = Math.hypot(dx, dy) || 1;
@@ -179,7 +191,8 @@
       const dx = point.x - pos.x, dy = point.y - pos.y;
       const clearsThreats = attackers.every((actor) => dx * (pos.x - actor.x) + dy * (pos.y - actor.y) > 0);
       if (clearsThreats && boundary(scene, pos) && boundary(scene, point)
-          && host.clear(pos.x, pos.y, point.x, point.y)) return point;
+          && host.clear(pos.x, pos.y, point.x, point.y)
+          && (!globalThis.GSTFarmPolicy?.isTool?.() || globalThis.GSTFarmBossSafety?.toolRecoverySegmentSafe?.(scene, pos, point, scene.now()) === true)) return point;
     }
     return null;
   }
@@ -228,7 +241,7 @@
         && continuation.ids.some((id) => threatIds.includes(id) && actorFor(scene, id));
       const stationary = awakened || woke
         || performance.now() - lastIdleAt <= 1200 && idlePoint && distance(pos, idlePoint) <= 0.1;
-      if (!continuing && !stationary && !identified) {
+      if (!continuing && !stationary && (!identified || globalThis.GSTFarmPolicy?.isTool?.())) {
         message = "Tự vệ nhường: chưa xác nhận trạng thái đứng chờ hoặc nguồn đòn đánh."; return;
       }
       if ((scene.autoX || scene.autoY) && !ownNearbyMove
@@ -237,7 +250,7 @@
       lastIdleAt = -Infinity;
       continuation = { ids: threatIds, hitAt: time, until: time + 8 };
       const single = threats.length === 1 ? threats[0] : null;
-      const canAttack = !!single && !boss(single) && !nearbyBoss(scene, pos)
+      const canAttack = !!identified && !!single && single.id === identified.id && !boss(single) && !nearbyBoss(scene, pos)
         && hostileRecord(host, single.id) !== null && distance(pos, single) <= nearby;
       episode = { id: single?.id ?? threatIds[0], threatIds, boss: threats.some(boss), attackAllowed: canAttack,
         ambiguous: threats.length > 1, started: time, hitAt: time, farmOn: scene.auto.on };
@@ -463,15 +476,16 @@
       if ((scene.autoX || scene.autoY) && !nearbySteer) {
         clearEpisode("Tự vệ đang nhường di chuyển khác."); return;
       }
-      if (scene.self.combat || (finite(scene.castAt) && scene.castAt > time)) {
+      if ((!globalThis.GSTFarmPolicy?.isTool?.() && scene.self.combat)
+          || (finite(scene.castAt) && scene.castAt > time)) {
         idleSince = null;
         if (now - lastIdleAt > 1200) { idlePoint = null; lastIdleAt = -Infinity; }
         return;
       }
       continuation = null;
       const pos = { x: scene.px, y: scene.py };
-      if (!idlePoint || distance(pos, idlePoint) > 0.1) { idlePoint = pos; idleSince = now; }
-      if (now - idleSince >= 350) {
+      if (idleSince === null || !idlePoint || distance(pos, idlePoint) > 0.1) { idlePoint = pos; idleSince = now; }
+      if (now - idleSince >= (globalThis.GSTFarmPolicy?.isTool?.() ? 1500 : 350)) {
         lastIdleAt = now;
         message = settings.selfDefense ? "Tự vệ bật · đang chờ." : "Dọn quái gần bật · đang chờ.";
       }
@@ -513,7 +527,9 @@
           && host.clear(pos.x, pos.y, attacker.x, attacker.y)) {
         if (!job.facing) { job.previousLock = scene.lockId; job.previousFace = [scene.faceX, scene.faceY]; }
         if (!validateContext(scene, host)) return false;
+        if (time < (job.nextAttack ?? -Infinity) || scene.skillWait?.("Space") > 0) return true;
         host.face(attacker.x, attacker.y, attacker.id); job.facing = [scene.faceX, scene.faceY];
+        job.nextAttack = time + 0.15;
         host.basic(); message = "Tự vệ · đã yêu cầu đòn đánh thường; chưa xác minh trúng đích."; return true;
       }
       if (!job.goal) {
@@ -551,7 +567,7 @@
       clearEpisode("Tự vệ đang nhường thao tác tay.");
   }
   function attach(scene) {
-    if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !enabled || !configured || suspended) { detach(); return; }
+    if (!policyAllowed() || !enabled || !configured || suspended) { detach(); return; }
     if (binding?.scene === scene && binding.auto === scene?.auto && GSTFarmUpdate.attached(scene)) return;
     detach();
     if (!scene?.auto || !scene.self || !scene.events?.on || !scene.events?.off || typeof scene.auto.update !== "function"
@@ -606,7 +622,7 @@
         && boundary(scene, enemy);
     },
     status(scene, includeIdle = false) {
-      if (!globalThis.GSTFarmPolicy?.hasExtensionAssistance?.() || !enabled || !scene || sceneNow() !== scene) return "";
+      if (!policyAllowed() || !enabled || !scene || sceneNow() !== scene) return "";
       if (!settings.selfDefense && !settings.nearbyClear) return "";
       if (!binding || binding.scene !== scene) return includeIdle ? "Tự vệ không khả dụng; đang chờ scene." : "";
       try {

@@ -226,6 +226,8 @@
   function maintainActivationLock() {
     if (!needsActivationTracking()) { clearActivationLock(); return; }
     const scene = sceneNow();
+    if (settings.policyMode === "tool" && !identityBlocked && settings.identityVerified)
+      globalThis.GSTFarmDefense?.attach?.(scene);
     if (!scene?.sys?.isActive?.() || typeof scene.auto?.on !== "boolean"
         || typeof scene.auto?.toggle !== "function" || typeof scene.toggleAutoFarm !== "function") return;
     if (activationLock?.scene !== scene || activationLock.auto !== scene.auto
@@ -1686,7 +1688,8 @@
       stage = "behavior";
       globalThis.GSTFarmBehavior?.configure(sceneNow(), farmRuntimeSettings);
       stage = "defense";
-      globalThis.GSTFarmDefense?.configure(sceneNow(), farmRuntimeSettings);
+      globalThis.GSTFarmDefense?.configure(sceneNow(), settings.policyMode === "tool" && !identityBlocked && settings.identityVerified
+        ? { ...settings, nearbyClear: false } : farmRuntimeSettings);
       stage = "encounter";
       globalThis.GSTFarmEncounter?.configure(sceneNow(), farmRuntimeSettings);
       stage = "party";
@@ -1774,7 +1777,8 @@
         : network || defense || globalThis.GSTFarmBossSafety?.status(scene) || waitReason
         || globalThis.GSTFarmParty?.status(scene) || globalThis.GSTFarmMap?.status(scene) || globalThis.GSTFarmBehavior?.status(scene)
         || globalThis.GSTFarmSession?.status(scene) || globalThis.GSTFarmSeals?.status(scene) || message);
-      const defenseInfo = autoOn === false && !defense ? globalThis.GSTFarmDefense?.status(scene, true) : "";
+      const defenseInfo = defense || (settings.policyMode === "tool" || autoOn === false
+        ? globalThis.GSTFarmDefense?.status(scene, true) : "");
       const encounterInfo = globalThis.GSTFarmEncounter?.status(scene) || "";
       // Status may compute a read-only proposal, never an activation/action.
       globalThis.GSTFarmPlanner?.configure?.(scene, settings);

@@ -406,6 +406,16 @@
   }
   globalThis.GSTToolFarm = Object.freeze({ configure, prepare, start, stop, dispose, movementOwned,
     active: (scene) => sessions.get(scene)?.enabled === true,
+    recoveryPriority(scene) {
+      const s = scene && sessions.get(scene);
+      if (!s?.enabled || !s.options.toolRecoveryEnabled) return false;
+      if (s.recovery) return true;
+      try {
+        const hp = scene.self?.hp / scene.self?.mh, pills = scene.autoHost()?.pills?.("hp");
+        return finite(hp) && scene.self.mh > 0 && hp < s.options.toolRetreatHp / 100
+          && Array.isArray(pills) && pills.length >= 2 && pills[0] === 0 && pills[1] === 0;
+      } catch { return false; }
+    },
     visualSnapshot(scene) {
       const s = sessions.get(scene);
       if (!s?.enabled || !scene.auto?.on || scene.self?.dead || scene.leaving || context(s)) return null;

@@ -56,6 +56,11 @@
   const shared = section('independent', 'Đan và hồi sinh dùng chung', true);
   independentBody.append(shared.parentElement);
   move([byId('potionSummary').closest('details')], shared);
+  const defense = byId('farmSelfDefense').closest('label');
+  const defenseHint = defense.nextElementSibling;
+  defense.querySelector('span').textContent = 'Tự vệ độc lập khi đứng yên';
+  defenseHint.textContent = 'Khi bị đánh, chỉ phản công nếu game xác định được quái; nếu không, tìm hướng lùi an toàn. Nhường thao tác tay và hồi HP.';
+  move([defense, defenseHint], shared, false);
   // Harvest still consults the Farm profile's autoRespawn flag. Keep it visible
   // and configurable instead of silently disabling Harvest's recovery.
   const respawn = byId('farmAutoRespawn').closest('label');
