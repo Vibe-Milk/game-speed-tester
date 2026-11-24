@@ -446,6 +446,18 @@
 
   window.addEventListener("message", (event) => {
     if (event.source === window && event.origin === origin
+        && event.data?.channel === "gst:account-profile:v1"
+        && event.data.type === "recovery-check" && Number.isSafeInteger(event.data.requestId)) {
+      const requestId = event.data.requestId;
+      void refreshLatestContext().then((ctx) => {
+        window.postMessage({ channel: "gst:account-profile:v1", type: "recovery-check-result",
+          requestId, verified: ctx?.verified === true, accountId: ctx?.accountId ?? "",
+          slot: ctx?.slot ?? "", character: ctx?.character ?? "",
+          classId: ctx?.classId ?? "", characterId: ctx?.characterId ?? "" }, origin);
+      }).catch(() => {});
+      return;
+    }
+    if (event.source === window && event.origin === origin
         && event.data?.channel === "gst:account-profile:v1" && event.data.type === "ready") {
       if (currentContext) void sendProfile(currentContext, true);
       else void refresh(true);
@@ -458,6 +470,13 @@
     respond(event.data);
   });
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && slot && changes[GSTAccountProfiles.accountsKey]) {
+      const change = changes[GSTAccountProfiles.accountsKey];
+      const before = Array.isArray(change.oldValue) ? change.oldValue.find((item) => item?.slot === slot) : null;
+      const after = Array.isArray(change.newValue) ? change.newValue.find((item) => item?.slot === slot) : null;
+      if (JSON.stringify(before) !== JSON.stringify(after))
+        window.postMessage({ channel: "gst:account-status:v1", type: "invalidate-recovery" }, origin);
+    }
     if (area === "local" && [GSTAccountProfiles.accountsKey, GSTAccountProfiles.profilesKey,
       "farmPreferences", "harvestPreferences", "connectionRecoveryPreferences"].some((key) => changes[key])) void refresh(true);
   });

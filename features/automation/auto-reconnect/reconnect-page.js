@@ -11,6 +11,7 @@
   let preferences = { ...defaults }, profileContext = null, preferencesReady = false;
   let activeScopeKey = "", reloadTimer = null, reloadBanner = null;
   const memoryCanceled = new Set();
+  let recoveryCheckId = 0;
 
   function sceneNow() {
     try {
@@ -158,6 +159,8 @@
     const scene = sceneNow();
     const nextScope = scene ? reloadScope(scene) : null;
     const settingsChanged = Object.keys(defaults).some((key) => preferences[key] !== previous[key]);
+    if (state?.recoveryIdentity && nextScope !== state.recoveryIdentity.scopeKey)
+      revokeRecovery(state);
     if (previousScope && (nextScope !== previousScope || settingsChanged)) {
       const oldRecord = readRecords()[previousScope];
       if (oldRecord?.countdownStartedAt) { oldRecord.countdownStartedAt = 0; saveRecord(oldRecord); }
@@ -198,7 +201,8 @@
     const owner = {
       scene, driver, lastInbound: now, diagnosticLastInbound: null, waitingSince: null, downSince: null, downSinceWall: null,
       healthySince: null, attempts: 0, lastAttempt: -Infinity, pending: false,
-      nativeReconnectStarted: false, scopeKey: null, lastWatch: now, minimumPingAt: 0, lastPong: null, freshEpisode: false,
+      nativeReconnectStarted: false, scopeKey: null, lastWatch: now, minimumPingAt: 0, lastPong: null, lastPongRequest: 0, freshEpisode: false,
+      recoveryIdentity: null, recoveryRevoked: false, successCheck: 0, successVerified: false, checkRequestedAt: 0,
       confirmed: false, receiveDescriptor: Object.getOwnPropertyDescriptor(driver, "receive"),
       originalReceive: driver.receive, originalStatus: driver.onStatus
     };
@@ -210,10 +214,14 @@
         owner.lastInbound = performance.now();
         owner.diagnosticLastInbound = owner.lastInbound;
         // Only a native pong confirms a response to the outstanding heartbeat.
-        let pong = false;
-        try { pong = JSON.parse(args[0])?.t === "pong"; } catch {}
-        if (pong && !driver.reconnecting && !driver.handingOver
+        let pong = null;
+        if (args[0].includes('"pong"')) {
+          try { const packet = JSON.parse(args[0]); if (packet?.t === "pong") pong = packet; } catch {}
+        }
+        if (pong && Number.isFinite(pong.at) && !driver.reconnecting && !driver.handingOver
             && !driver.displaced && !driver.noticed) {
+          owner.lastPongRequest = Math.max(owner.lastPongRequest, pong.at);
+          if (owner.waitingSince !== null && pong.at < owner.waitingSince) return result;
           owner.waitingSince = null;
           owner.lastPong = owner.lastInbound;
           owner.healthySince ??= owner.lastInbound;
@@ -232,13 +240,17 @@
         owner.nativeReconnectStarted = true;
         owner.freshEpisode = false;
         owner.confirmed = false;
+        owner.successVerified = false;
+        owner.successCheck = 0;
       }
       // The game emits this only after the server accepted resume.
-      if (state === owner && this === driver && eligible(scene)
-          && owner.scopeKey && reloadScope(scene) === owner.scopeKey
-          && (!profileContext?.managed || profileContext.verified)
+      if (state === owner && this === driver && eligible(scene) && scene.driver === driver
+          && owner.nativeReconnectStarted && recoveryAuthorized(owner)
           && !driver.displaced && !driver.noticed && args[0] === "Đã kết nối lại") {
         owner.confirmed = true;
+        owner.successVerified = !profileContext?.managed;
+        owner.successCheck = 0;
+        owner.checkRequestedAt = 0;
       }
       return result;
     };
@@ -295,12 +307,30 @@
       && panel.getClientRects?.().length > 0 && button?.getClientRects?.().length > 0
       && button.textContent?.trim() === "Kết nối lại";
   }
+  function recoveryAuthorized(owner) {
+    if (!owner || owner.recoveryRevoked || state !== owner || !eligible(owner.scene)
+        || owner.scene.driver !== owner.driver || !owner.scopeKey
+        || reloadScope(owner.scene) !== owner.scopeKey
+        || owner.driver.displaced || owner.driver.noticed) return false;
+    if (!profileContext?.managed) return true;
+    const id = nativeIdentity(owner.scene);
+    return !!owner.recoveryIdentity
+      && owner.recoveryIdentity.scopeKey === owner.scopeKey
+      && owner.recoveryIdentity.characterId === id.characterId;
+  }
+  function revokeRecovery(owner) {
+    if (!owner) return;
+    owner.recoveryIdentity = null;
+    owner.recoveryRevoked = true;
+    owner.confirmed = false;
+    owner.successVerified = false;
+    owner.successCheck = 0;
+  }
   function retry(owner, now, staleOpen) {
     const { driver } = owner;
     if (state !== owner || !eligible(owner.scene) || owner.scene.driver !== driver
-        || !owner.scopeKey || reloadScope(owner.scene) !== owner.scopeKey
-        || (profileContext?.managed && !profileContext.verified)
-        || !preferencesReady || !preferences.autoReconnect || owner.pending || owner.attempts >= retryDelays.length
+        || !recoveryAuthorized(owner)
+        || !preferencesReady || !preferences.autoReconnect || owner.pending || owner.confirmed || owner.attempts >= retryDelays.length
         || driver.displaced || driver.noticed
         || driver.reconnecting || driver.handingOver || navigator.onLine === false
         || typeof driver.reconnect !== "function") return;
@@ -448,12 +478,12 @@
     const driver = owner.driver;
     if (driver.displaced || driver.noticed || driver.closing) return "blocked_session";
     if (navigator.onLine === false) return "blocked_offline";
-    if (!owner.scopeKey || reloadScope(owner.scene) !== owner.scopeKey
-        || (profileContext?.managed && !profileContext.verified)) return "blocked_identity";
+    if (!recoveryAuthorized(owner)) return "blocked_identity";
     if (typeof driver.reconnect !== "function") return "blocked";
     if (owner.pending) return "attempt_started";
+    if (owner.confirmed && profileContext?.managed && !owner.successVerified) return "waiting";
     if (driver.reconnecting || driver.handingOver) return "native_in_progress";
-    if (owner.confirmed === true && driver.link?.open?.() === true
+    if (owner.confirmed === true && (!profileContext?.managed || owner.successVerified) && driver.link?.open?.() === true
         && !driver.reconnecting && !driver.handingOver && !driver.displaced)
       return "completed";
     if (owner.attempts >= retryDelays.length) return "exhausted";
@@ -494,6 +524,19 @@
         if (owner.attempts) owner.lastAttempt = now;
       }
     }
+    // Bind authorization only to a currently verified, connected managed session.
+    if (owner.scopeKey && profileContext?.managed && profileContext.verified
+        && !owner.recoveryIdentity && !owner.recoveryRevoked
+        && !driver.reconnecting && !driver.handingOver && !driver.displaced && !driver.noticed) {
+      let open = false;
+      try { open = driver.link.open() === true; } catch {}
+      const id = nativeIdentity(scene);
+      if (open && scopeKey === owner.scopeKey && id.characterId)
+        owner.recoveryIdentity = { scopeKey, characterId: id.characterId };
+    }
+    if ((owner.recoveryIdentity && (!scopeKey || scopeKey !== owner.recoveryIdentity.scopeKey
+        || nativeIdentity(scene).characterId !== owner.recoveryIdentity.characterId))
+        || driver.displaced || driver.noticed) revokeRecovery(owner);
     // A long scheduler gap can be browser suspension, not a network failure.
     if (now - owner.lastWatch > 5000 && !driver.reconnecting && !driver.handingOver) {
       owner.waitingSince = null;
@@ -501,12 +544,19 @@
       if (owner.downSince !== null) owner.downSince = now;
     }
     owner.lastWatch = now;
+    if (owner.confirmed && profileContext?.managed && !owner.successVerified
+        && now - owner.checkRequestedAt >= 5000 && recoveryAuthorized(owner)) {
+      owner.successCheck = ++recoveryCheckId;
+      owner.checkRequestedAt = now;
+      window.postMessage({ channel: "gst:account-profile:v1", type: "recovery-check",
+        requestId: owner.successCheck }, location.origin);
+    }
     const retryReason = retryReasonFor(owner, now);
     try { globalThis.GSTBackgroundDiagnostics?.recovery?.({ scene, driver, eligible: true,
       lastInbound: owner.diagnosticLastInbound,
-      recoveryComplete: owner.confirmed === true && driver.link.open() === true
-        && !driver.reconnecting && !driver.handingOver && !driver.displaced && !driver.noticed
-        && !!owner.scopeKey && scopeKey === owner.scopeKey,
+      recoveryComplete: navigator.onLine !== false && owner.confirmed === true && driver.link.open() === true
+        && !driver.reconnecting && !driver.handingOver && recoveryAuthorized(owner)
+        && (!profileContext?.managed || (profileContext.verified && owner.successVerified)),
       retryReason,
       attempts: Number.isSafeInteger(owner.attempts) ? owner.attempts : 0,
       waitingMs: owner.waitingSince !== null ? Math.max(0, now - owner.waitingSince) : null,
@@ -515,15 +565,16 @@
     try { open = driver.link.open() === true; } catch { return; }
     const stable = open && !driver.reconnecting && !driver.handingOver;
 
-    if (stable && owner.confirmed && !driver.displaced && !driver.noticed
-        && owner.scopeKey && scopeKey === owner.scopeKey
-        && (!profileContext?.managed || profileContext.verified)) {
+    if (owner.confirmed && (!stable || !recoveryAuthorized(owner))) owner.confirmed = false;
+    if (stable && navigator.onLine !== false && owner.confirmed && recoveryAuthorized(owner)
+        && (!profileContext?.managed || (profileContext.verified && owner.successVerified))) {
       owner.confirmed = false;
       owner.attempts = 0;
       owner.freshEpisode = false;
       owner.lastAttempt = -Infinity;
       owner.nativeReconnectStarted = false;
       owner.waitingSince = null;
+      owner.minimumPingAt = now;
       owner.downSince = null;
       owner.downSinceWall = null;
       owner.healthySince = now;
@@ -569,7 +620,7 @@
 
     // Native update resets waitingSince after >2s between ticks. Track the
     // first unanswered ping ourselves, using actual inbound server messages.
-    if (Number.isFinite(driver.pingAt) && driver.pingAt > Math.max(owner.lastInbound, owner.minimumPingAt)
+    if (Number.isFinite(driver.pingAt) && driver.pingAt > Math.max(owner.lastPongRequest, owner.minimumPingAt)
         && owner.waitingSince === null) owner.waitingSince = driver.pingAt;
     if (owner.waitingSince !== null && now - owner.waitingSince >= replyTimeout) {
       if (owner.downSince === null) {
@@ -657,7 +708,7 @@
       let open = false;
       try { open = driver.link.open() === true && !driver.reconnecting && !driver.handingOver; }
       catch { /* Report the last known state. */ }
-      if (open && state.healthySince !== null && performance.now() - state.lastInbound < 10000
+      if (open && !state.confirmed && state.healthySince !== null && performance.now() - state.lastInbound < 10000
           && !recoverableNetworkNotice() && !driver.noticed && !driver.displaced) return "";
       const failure = observedFailureStatus(state);
       if (failure) return failure;
@@ -669,9 +720,25 @@
     }
   };
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.origin !== location.origin
-        || event.data?.channel !== "gst:account-profile:v1" || event.data.type !== "profile") return;
-    applyProfileMessage(event.data);
+    if (event.source !== window || event.origin !== location.origin) return;
+    if ((event.data?.channel === "gst:account-status:v1" && event.data.type === "invalidate-recovery")
+        || (event.data?.channel === "gst:account:v1" && event.data.type === "stop-for-switch")) {
+      revokeRecovery(state);
+      return;
+    }
+    if (event.data?.channel !== "gst:account-profile:v1") return;
+    if (event.data.type === "recovery-check-result") {
+      const owner = state, result = event.data;
+      if (owner?.confirmed && owner.successCheck === result.requestId && recoveryAuthorized(owner)
+          && result.verified === true && result.accountId === profileContext?.accountId
+          && result.slot === profileContext?.slot
+          && result.character === nativeIdentity(owner.scene).character
+          && result.classId === nativeIdentity(owner.scene).classId
+          && result.characterId === nativeIdentity(owner.scene).characterId)
+        owner.successVerified = true;
+      return;
+    }
+    if (event.data.type === "profile") applyProfileMessage(event.data);
   });
   window.postMessage({ channel: "gst:account-profile:v1", type: "ready" }, location.origin);
   window.addEventListener("online", () => { if (!suspended) watch(); });
