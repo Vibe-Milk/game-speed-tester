@@ -91,19 +91,21 @@
         <fieldset id="connectionRecoveryControls" disabled aria-label="Tùy chọn khôi phục kết nối">
           <p class="save-mode">Tự lưu · nick được quản lý dùng cài đặt riêng; tab không quản lý nick dùng mặc định chung</p>
           <div class="feature-group-grid feature-flat-grid">
-          <section class="feature-flat-section"><h3>Kết nối lại</h3><div class="feature-group-body">
-          <label class="switch-row"><span>Bật hỗ trợ kết nối lại của extension</span><input id="connectionAutoReconnect" class="switch" type="checkbox" checked></label>
-          <p class="hint">Tắt chỉ dừng các lần thử bổ sung do extension gọi. Kết nối lại gốc của game vẫn hoạt động.</p>
+          <section class="feature-flat-section"><h3>Kết nối lại (Auto Reconnect)</h3><div class="feature-group-body">
+          <label class="switch-row" for="connectionAutoReconnect"><span>Bật hỗ trợ kết nối lại của extension</span><input id="connectionAutoReconnect" class="switch" type="checkbox" checked></label>
+          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]'>Khi mất kết nối, tool hỗ trợ kết nối lại với máy chủ bằng cơ chế gốc của game, không tải lại trang. Ưu tiên giữ phiên đăng nhập hiện tại. Tool thử bổ sung tối đa 3 lần khi đủ điều kiện an toàn.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReconnect"]'>Mặc định bật. Tắt chỉ dừng các lượt thử bổ sung của tool; game vẫn có thể tự kết nối lại. Nếu không khôi phục được phiên, cần kiểm tra thủ công hoặc dùng Auto Reload khi đã bật và đủ điều kiện.</p>
           </div></section>
-          <section class="feature-flat-section"><h3>Tự tải lại khi lỗi kéo dài</h3><div class="feature-group-body">
-          <label class="switch-row"><span>Tự tải lại sau khi kết nối lỗi kéo dài</span><input id="connectionAutoReload" class="switch" type="checkbox"></label>
+          <section class="feature-flat-section"><h3>Tự tải lại khi lỗi kéo dài (Auto Reload)</h3><div class="feature-group-body">
+          <label class="switch-row" for="connectionAutoReload"><span>Tự tải lại sau khi kết nối lỗi kéo dài</span><input id="connectionAutoReload" class="switch" type="checkbox"></label>
+          <p class="hint" data-help-for='label[for="connectionAutoReload"]'>Phương án dự phòng: tải lại toàn bộ trang game giống nhấn F5, gián đoạn hơn Auto Reconnect và có thể cần đăng nhập lại. Khi bật cả hai, game thử kết nối lại trước, tool thử bổ sung nếu có thể, sau đó mới xét tự tải lại nếu lỗi mạng kéo dài và đủ điều kiện an toàn.</p>
+          <p class="hint" data-help-for='label[for="connectionAutoReload"]'>Mặc định tắt. Chờ 90 giây, đếm ngược 10 giây, tối đa 3 lần tải lại trong 15 phút (có thể chỉnh bên dưới). Có thể hủy đếm ngược. Không tự tải lại khi đang kết nối lại, đang xác minh phiên, offline hoặc có lỗi tài khoản; không tự xử lý màn đăng nhập hay thử thách xác minh.</p>
           <div class="two-columns separated">
             <div><label for="connectionReloadDelay">Chờ trước khi đếm ngược (30–600 giây)</label><input id="connectionReloadDelay" type="number" min="30" max="600" step="1" value="90"></div>
             <div><label for="connectionReloadCountdown">Thời gian đếm ngược (3–60 giây)</label><input id="connectionReloadCountdown" type="number" min="3" max="60" step="1" value="10"></div>
             <div><label for="connectionReloadLimit">Số lần tối đa (1–10)</label><input id="connectionReloadLimit" type="number" min="1" max="10" step="1" value="3"></div>
             <div><label for="connectionReloadWindow">Trong khoảng thời gian (5–120 phút)</label><input id="connectionReloadWindow" type="number" min="5" max="120" step="1" value="15"></div>
           </div>
-          <p class="hint">Mặc định: chờ 90 giây, đếm ngược 10 giây, tối đa 3 lần trong 15 phút. Chỉ tải lại sau khi game báo đúng lỗi mất kết nối và các lần thử đã kết thúc; không tự xử lý màn đăng nhập, lỗi tài khoản hoặc thử thách xác minh. Có thể hủy trong lúc đếm ngược.</p>
           </div></section>
           </div>
           <p id="connectionRecoveryFeedback" class="notice" role="status" aria-live="polite"></p>

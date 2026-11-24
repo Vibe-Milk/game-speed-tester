@@ -30,6 +30,8 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 | Kiểm tra thực tế Task 1–3 | PENDING — bước tiếp theo | — |
 | 4 — Auto Resume | PENDING — chờ kết quả kiểm tra và duyệt | — |
 
+- UI Connection Recovery: IMPLEMENTED trong commit UI này — nút `?` giải thích Reconnect và Reload bằng tooltip dùng chung; không đổi logic, runtime UI chưa kiểm tra. Bước kiểm tra Task 1–3 vẫn PENDING.
+
 ## Giới hạn và việc còn mở
 
 - Chưa xác minh handler của nút “Kết nối lại” trong game live; chưa triển khai tự bấm nút. Chỉ xem xét sau khi có source phù hợp.
