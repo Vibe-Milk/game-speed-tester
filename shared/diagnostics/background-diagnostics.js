@@ -58,6 +58,10 @@
     const retryReasons = new Set(["idle", "waiting", "attempt_started", "native_in_progress",
       "blocked", "blocked_session", "blocked_offline", "blocked_identity", "exhausted", "completed", "failed", "disabled", "pending"]);
     result.retryReason = retryReasons.has(row?.retryReason) ? row.retryReason : null;
+    const recoveryEvents = new Set(["authorization_revoked", "authorization_restored", "verification_pending",
+      "verification_timeout", "recovery_confirmed", "reload_blocked", "countdown_started",
+      "countdown_canceled", "reload_limit", "reload_executed"]);
+    result.recoveryEvent = recoveryEvents.has(row?.recoveryEvent) ? row.recoveryEvent : null;
     result.attempts = finite(row?.attempts) ? Math.max(0, Math.min(20, Math.floor(row.attempts))) : null;
     for (const k of ["checkGapMs", "tickAgeMs", "inboundAgeMs", "waitingMs", "downMs"]) result[k] = number(row[k]);
     for (const k of ["online", "ready", "closing", "handingOver", "noticed", "eligible", "overlayPresent", "recoveryComplete"])

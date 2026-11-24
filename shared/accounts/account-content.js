@@ -474,7 +474,14 @@
       const change = changes[GSTAccountProfiles.accountsKey];
       const before = Array.isArray(change.oldValue) ? change.oldValue.find((item) => item?.slot === slot) : null;
       const after = Array.isArray(change.newValue) ? change.newValue.find((item) => item?.slot === slot) : null;
-      if (JSON.stringify(before) !== JSON.stringify(after))
+      // A display label does not change the account or credentials.
+      const withoutLabel = (value) => {
+        if (!value || typeof value !== "object") return value;
+        const copy = { ...value };
+        delete copy.label;
+        return copy;
+      };
+      if (JSON.stringify(withoutLabel(before)) !== JSON.stringify(withoutLabel(after)))
         window.postMessage({ channel: "gst:account-status:v1", type: "invalidate-recovery" }, origin);
     }
     if (area === "local" && [GSTAccountProfiles.accountsKey, GSTAccountProfiles.profilesKey,

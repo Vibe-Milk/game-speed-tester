@@ -440,3 +440,10 @@ No class-specific cause is claimed without the affected skill names/runtime evid
 `reconnect-page.js` tiếp tục dùng driver của game và tối đa ba lượt thử bổ sung. Lượt thử bị chặn khi scene/driver hoặc phạm vi nhân vật không còn khớp, tài khoản quản lý chưa từng được xác nhận cho phiên hiện tại, trình duyệt offline, game đang reconnect/handover, hoặc driver báo phiên bị thay thế/thông báo lỗi. Danh tính đã xác minh khi còn kết nối được giữ riêng cho scene/driver hiện tại trong lúc mất mạng; sau tín hiệu thành công phải xác minh lại tài khoản trước khi hoàn tất. Bộ đếm được khôi phục từ record của tab khi còn episode và chỉ được xóa sau tín hiệu reconnect thành công của game, hoặc sau khi driver mới gắn đã vào phiên và nhận pong ổn định, kèm kết nối và danh tính hợp lệ. Nhịp nền và Auto Reload giữ cơ chế riêng hiện có. Nút reconnect không được tự bấm vì chưa xác minh được handler của nút ở bản game hiện tại.
 
 Theo snapshot `index-ymL7Xfvg.js` trong Wiki, driver tự thử resume và phát trạng thái thành công sau khi nhận phản hồi resume; khi thất bại nó báo lỗi mạng chung. Lỗi chung này không cho biết chắc server đã reset hay phiên hết hiệu lực. Snapshot không chứng minh hành vi của bản game live; chưa kiểm chứng runtime.
+
+
+### Phối hợp xác minh và tự tải lại (Task 3)
+
+Đổi nhãn tài khoản không thu hồi quyền khôi phục. Khi cấu hình tài khoản liên quan thay đổi, quyền được thu hồi và chỉ có thể cấp lại sau kiểm tra danh tính mới trên cùng scene/driver đang kết nối; lệnh chuyển tài khoản giữ khóa cho owner đó. Tín hiệu khôi phục của game tạm dừng đếm ngược tải lại trong lúc xác minh. Sau 30 giây chưa xác minh được, trạng thái mơ hồ yêu cầu kiểm tra thủ công, không coi timeout là lỗi mạng.
+
+Tự tải lại tiếp tục chỉ áp dụng cho thông báo mạng gốc được nhận diện và tài khoản/scene an toàn; nó kiểm tra lại giới hạn, hủy thủ công và trạng thái kết nối trước khi tải. Không tự bấm nút game. Trường hợp mất phiên, lỗi không được nhận diện, yêu cầu đăng nhập hoặc phiên bị từ chối có thể cần thao tác thủ công. Mô tả này dựa trên code extension và snapshot game lưu trữ, chưa xác nhận runtime game live.

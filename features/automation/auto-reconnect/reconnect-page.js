@@ -4,6 +4,7 @@
   // decisions inside the game's original driver.
   const retryDelays = [15000, 30000, 60000];
   const replyTimeout = 12000;
+  const verificationTimeout = 30000;
   const defaults = Object.freeze({ autoReconnect: true, autoReload: false, reloadDelaySeconds: 90,
     reloadCountdownSeconds: 10, reloadLimit: 3, reloadWindowMinutes: 15 });
   const episodeStorageKey = "gst:connection-recovery:v1";
@@ -160,10 +161,10 @@
     const nextScope = scene ? reloadScope(scene) : null;
     const settingsChanged = Object.keys(defaults).some((key) => preferences[key] !== previous[key]);
     if (state?.recoveryIdentity && nextScope !== state.recoveryIdentity.scopeKey)
-      revokeRecovery(state);
+      revokeRecovery(state, true);
     if (previousScope && (nextScope !== previousScope || settingsChanged)) {
       const oldRecord = readRecords()[previousScope];
-      if (oldRecord?.countdownStartedAt) { oldRecord.countdownStartedAt = 0; saveRecord(oldRecord); }
+      if (oldRecord?.countdownStartedAt) { oldRecord.countdownStartedAt = 0; if (!saveRecord(oldRecord)) memoryCanceled.add(previousScope); }
       stopReloadCountdown();
       hideReloadBanner();
     }
@@ -176,7 +177,7 @@
     state = null;
     if (activeScopeKey) {
       const record = readRecords()[activeScopeKey];
-      if (record?.countdownStartedAt) { record.countdownStartedAt = 0; saveRecord(record); }
+      if (record?.countdownStartedAt) { record.countdownStartedAt = 0; if (!saveRecord(record)) memoryCanceled.add(activeScopeKey); }
     }
     stopReloadCountdown();
     hideReloadBanner();
@@ -202,7 +203,8 @@
       scene, driver, lastInbound: now, diagnosticLastInbound: null, waitingSince: null, downSince: null, downSinceWall: null,
       healthySince: null, attempts: 0, lastAttempt: -Infinity, pending: false,
       nativeReconnectStarted: false, scopeKey: null, lastWatch: now, minimumPingAt: 0, lastPong: null, lastPongRequest: 0, freshEpisode: false,
-      recoveryIdentity: null, recoveryRevoked: false, successCheck: 0, successVerified: false, checkRequestedAt: 0,
+      recoveryIdentity: null, revokedIdentity: null, recoveryRevoked: false, switchLocked: false, successCheck: 0, successVerified: false, checkRequestedAt: 0,
+      verificationStartedAt: 0, verificationTimedOut: false, reauthCheck: 0, reauthRequestedAt: 0, reloadState: "",
       confirmed: false, receiveDescriptor: Object.getOwnPropertyDescriptor(driver, "receive"),
       originalReceive: driver.receive, originalStatus: driver.onStatus
     };
@@ -251,6 +253,9 @@
         owner.successVerified = !profileContext?.managed;
         owner.successCheck = 0;
         owner.checkRequestedAt = 0;
+        owner.verificationStartedAt = performance.now();
+        owner.verificationTimedOut = false;
+        recoveryEvent(owner, "verification_pending");
       }
       return result;
     };
@@ -307,6 +312,14 @@
       && panel.getClientRects?.().length > 0 && button?.getClientRects?.().length > 0
       && button.textContent?.trim() === "Kết nối lại";
   }
+  function recoveryEvent(owner, event) {
+    try { globalThis.GSTBackgroundDiagnostics?.record?.("recovery", owner?.scene, null, { recoveryEvent: event }); } catch {}
+  }
+  function reloadTransition(owner, event) {
+    if (owner.reloadState === event) return;
+    owner.reloadState = event;
+    recoveryEvent(owner, event);
+  }
   function recoveryAuthorized(owner) {
     if (!owner || owner.recoveryRevoked || state !== owner || !eligible(owner.scene)
         || owner.scene.driver !== owner.driver || !owner.scopeKey
@@ -318,13 +331,17 @@
       && owner.recoveryIdentity.scopeKey === owner.scopeKey
       && owner.recoveryIdentity.characterId === id.characterId;
   }
-  function revokeRecovery(owner) {
+  function revokeRecovery(owner, permanent = false) {
     if (!owner) return;
+    if (!owner.recoveryRevoked) recoveryEvent(owner, "authorization_revoked");
+    if (permanent) owner.switchLocked = true;
+    if (owner.recoveryIdentity) owner.revokedIdentity = owner.recoveryIdentity;
     owner.recoveryIdentity = null;
     owner.recoveryRevoked = true;
     owner.confirmed = false;
     owner.successVerified = false;
     owner.successCheck = 0;
+    owner.reauthCheck = 0;
   }
   function retry(owner, now, staleOpen) {
     const { driver } = owner;
@@ -367,7 +384,7 @@
     if (!scopeKey || !preferencesReady || !preferences.autoReload) return;
     if (!recoverableNetworkNotice()) {
       const current = readRecords()[scopeKey];
-      if (current?.countdownStartedAt) { current.countdownStartedAt = 0; saveRecord(current); }
+      if (current?.countdownStartedAt) { current.countdownStartedAt = 0; if (!saveRecord(current)) memoryCanceled.add(scopeKey); }
       stopReloadCountdown();
       hideReloadBanner();
       return;
@@ -387,11 +404,24 @@
         return;
       }
     }
-    if (navigator.onLine === false || owner.pending || driver.reconnecting || driver.handingOver
-        || driver.closing || driver.displaced || new URLSearchParams(location.search).has("gstAttempt")) {
-      if (record.countdownStartedAt) { record.countdownStartedAt = 0; saveRecord(record); }
+    // Stop a running countdown on every safety block, including a native
+    // success awaiting verification. An open but unverified session is ambiguous.
+    const blocked = state !== owner || !eligible(owner.scene) || owner.scene.driver !== driver
+      || !recoveryAuthorized(owner) || driver.noticed || driver.closing || driver.displaced
+      || navigator.onLine === false || owner.pending || driver.reconnecting || driver.handingOver
+      || owner.confirmed || (owner.lastPong !== null && owner.downSince !== null
+        && owner.lastPong > owner.downSince && now - owner.lastPong < replyTimeout)
+      || new URLSearchParams(location.search).has("gstAttempt");
+    if (blocked) {
+      if (record.countdownStartedAt) {
+        record.countdownStartedAt = 0;
+        if (!saveRecord(record)) memoryCanceled.add(scopeKey);
+        reloadTransition(owner, "countdown_canceled");
+      }
       stopReloadCountdown();
       hideReloadBanner();
+      if (owner.confirmed) reloadTransition(owner, owner.verificationTimedOut ? "verification_timeout" : "verification_pending");
+      else reloadTransition(owner, "reload_blocked");
       return;
     }
     if (record.canceled || memoryCanceled.has(scopeKey)) {
@@ -399,9 +429,14 @@
       return;
     }
     if (!owner.nativeReconnectStarted
-        || preferences.autoReconnect && record.extensionAttempts < retryDelays.length) return;
+        || preferences.autoReconnect && (typeof driver.reconnect !== "function"
+          || owner.attempts < retryDelays.length || record.extensionAttempts < retryDelays.length)) {
+      reloadTransition(owner, "reload_blocked");
+      return;
+    }
     if (wallNow - record.startedAt < preferences.reloadDelaySeconds * 1000) return;
     if (record.reloads.length >= preferences.reloadLimit) {
+      reloadTransition(owner, "reload_limit");
       showReloadBanner(`Đã đạt giới hạn ${preferences.reloadLimit} lần tải lại trong ${preferences.reloadWindowMinutes} phút. Hãy kiểm tra kết nối thủ công.`);
       return;
     }
@@ -411,6 +446,7 @@
         showReloadBanner("Không lưu được đếm ngược an toàn; extension sẽ không tự tải lại.");
         return;
       }
+      reloadTransition(owner, "countdown_started");
     }
     const due = record.countdownStartedAt + preferences.reloadCountdownSeconds * 1000;
     const remaining = Math.max(0, Math.ceil((due - wallNow) / 1000));
@@ -418,27 +454,47 @@
       const latestScope = reloadScope(owner.scene);
       if (latestScope !== scopeKey) { stopReloadCountdown(); hideReloadBanner(); return; }
       cancelCurrentOutage(scopeKey);
+      reloadTransition(owner, "countdown_canceled");
     });
     if (reloadTimer !== null || remaining > 0) {
       if (reloadTimer === null) reloadTimer = setTimeout(() => { reloadTimer = null; }, remaining * 1000);
       return;
     }
     const latestScope = reloadScope(owner.scene);
-    if (latestScope !== scopeKey || !preferences.autoReload || !recoverableNetworkNotice()
-        || navigator.onLine === false || owner.pending || driver.reconnecting || driver.handingOver
-        || driver.closing || driver.displaced || new URLSearchParams(location.search).has("gstAttempt")) return;
-    record.reloads.push(wallNow);
-    record.countdownStartedAt = 0;
-    if (!saveRecord(record)) {
+    const latest = readRecords()[scopeKey];
+    if (state !== owner || !eligible(owner.scene) || owner.scene.driver !== driver
+        || latestScope !== scopeKey || !recoveryAuthorized(owner)
+        || !preferencesReady || !preferences.autoReload || !recoverableNetworkNotice()
+        || navigator.onLine === false || owner.pending || owner.confirmed || driver.reconnecting || driver.handingOver
+        || (owner.lastPong !== null && owner.downSince !== null && owner.lastPong > owner.downSince
+          && performance.now() - owner.lastPong < replyTimeout)
+        || driver.noticed || driver.closing || driver.displaced || new URLSearchParams(location.search).has("gstAttempt")
+        || !owner.nativeReconnectStarted || preferences.autoReconnect
+          && (typeof driver.reconnect !== "function" || owner.attempts < retryDelays.length
+            || (latest?.extensionAttempts ?? 0) < retryDelays.length)
+        || !latest || latest.scopeKey !== scopeKey || latest.canceled || memoryCanceled.has(scopeKey)
+        || latest.countdownStartedAt !== record.countdownStartedAt
+        || !Array.isArray(latest.reloads)
+        || latest.reloads.filter((at) => Number.isFinite(at) && wallNow - at < reloadWindowMs).length >= preferences.reloadLimit) return;
+    latest.reloads.push(wallNow);
+    latest.countdownStartedAt = 0;
+    if (!saveRecord(latest)) {
       showReloadBanner("Không lưu được giới hạn an toàn trong tab; extension sẽ không tự tải lại.");
       return;
     }
     stopReloadCountdown();
+    reloadTransition(owner, "reload_executed");
     location.reload();
   }
   function observedFailureStatus(owner) {
     if (!owner) return "";
     const { driver } = owner;
+    if (owner.confirmed && !owner.successVerified && profileContext?.managed)
+      return owner.verificationTimedOut
+        ? "Mạng: chưa xác minh được kết nối đã khôi phục; cần kiểm tra thủ công."
+        : "Mạng: game báo đã kết nối lại; đang xác minh tài khoản.";
+    if (owner.recoveryRevoked)
+      return "Mạng: quyền khôi phục đang bị khóa; cần xác minh lại tài khoản khi kết nối an toàn.";
     if (recoverableNetworkNotice()) {
       if (driver.displaced)
         return "Mạng: trạng thái phiên đang mơ hồ; extension tạm dừng hành động tự động để tránh tải lại nhầm.";
@@ -536,7 +592,22 @@
     }
     if ((owner.recoveryIdentity && (!scopeKey || scopeKey !== owner.recoveryIdentity.scopeKey
         || nativeIdentity(scene).characterId !== owner.recoveryIdentity.characterId))
-        || driver.displaced || driver.noticed) revokeRecovery(owner);
+        || driver.displaced || driver.noticed) revokeRecovery(owner, true);
+    // After a relevant configuration change, require a fresh connected identity
+    // check before restoring authorization. Account switching remains locked.
+    if (owner.recoveryRevoked && owner.revokedIdentity && !owner.switchLocked && profileContext?.managed
+        && profileContext.verified && scopeKey === owner.scopeKey
+        && !driver.displaced && !driver.noticed && !driver.reconnecting && !driver.handingOver
+        && now - owner.reauthRequestedAt >= 5000) {
+      let open = false;
+      try { open = driver.link.open() === true; } catch {}
+      if (open && navigator.onLine !== false) {
+        owner.reauthCheck = ++recoveryCheckId;
+        owner.reauthRequestedAt = now;
+        window.postMessage({ channel: "gst:account-profile:v1", type: "recovery-check",
+          requestId: owner.reauthCheck }, location.origin);
+      }
+    }
     // A long scheduler gap can be browser suspension, not a network failure.
     if (now - owner.lastWatch > 5000 && !driver.reconnecting && !driver.handingOver) {
       owner.waitingSince = null;
@@ -545,7 +616,12 @@
     }
     owner.lastWatch = now;
     if (owner.confirmed && profileContext?.managed && !owner.successVerified
-        && now - owner.checkRequestedAt >= 5000 && recoveryAuthorized(owner)) {
+        && !owner.verificationTimedOut && now - owner.verificationStartedAt >= verificationTimeout) {
+      owner.verificationTimedOut = true;
+      recoveryEvent(owner, "verification_timeout");
+    }
+    if (owner.confirmed && profileContext?.managed && !owner.successVerified
+        && !owner.verificationTimedOut && now - owner.checkRequestedAt >= 5000 && recoveryAuthorized(owner)) {
       owner.successCheck = ++recoveryCheckId;
       owner.checkRequestedAt = now;
       window.postMessage({ channel: "gst:account-profile:v1", type: "recovery-check",
@@ -569,6 +645,7 @@
     if (stable && navigator.onLine !== false && owner.confirmed && recoveryAuthorized(owner)
         && (!profileContext?.managed || (profileContext.verified && owner.successVerified))) {
       owner.confirmed = false;
+      recoveryEvent(owner, "recovery_confirmed");
       owner.attempts = 0;
       owner.freshEpisode = false;
       owner.lastAttempt = -Infinity;
@@ -721,14 +798,38 @@
   };
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
-    if ((event.data?.channel === "gst:account-status:v1" && event.data.type === "invalidate-recovery")
-        || (event.data?.channel === "gst:account:v1" && event.data.type === "stop-for-switch")) {
+    if (event.data?.channel === "gst:account-status:v1" && event.data.type === "invalidate-recovery") {
       revokeRecovery(state);
+      return;
+    }
+    if (event.data?.channel === "gst:account:v1" && event.data.type === "stop-for-switch") {
+      revokeRecovery(state, true);
       return;
     }
     if (event.data?.channel !== "gst:account-profile:v1") return;
     if (event.data.type === "recovery-check-result") {
       const owner = state, result = event.data;
+      const id = nativeIdentity(owner?.scene);
+      if (owner?.reauthCheck && owner.reauthCheck === result.requestId && owner.recoveryRevoked
+          && !owner.switchLocked && eligible(owner.scene) && owner.scene.driver === owner.driver
+          && !owner.driver.displaced && !owner.driver.noticed && !owner.driver.reconnecting && !owner.driver.handingOver
+          && navigator.onLine !== false && profileContext?.verified
+          && owner.scopeKey && reloadScope(owner.scene) === owner.scopeKey
+          && owner.revokedIdentity?.scopeKey === owner.scopeKey
+          && owner.revokedIdentity?.characterId === id.characterId
+          && result.verified === true && result.accountId === profileContext.accountId
+          && result.slot === profileContext.slot && result.character === id.character
+          && result.classId === id.classId && result.characterId === id.characterId && id.characterId) {
+        let open = false;
+        try { open = owner.driver.link.open() === true; } catch {}
+        if (open) {
+          owner.recoveryIdentity = { scopeKey: owner.scopeKey, characterId: id.characterId };
+          owner.recoveryRevoked = false;
+          owner.revokedIdentity = null;
+          owner.reauthCheck = 0;
+          recoveryEvent(owner, "authorization_restored");
+        }
+      }
       if (owner?.confirmed && owner.successCheck === result.requestId && recoveryAuthorized(owner)
           && result.verified === true && result.accountId === profileContext?.accountId
           && result.slot === profileContext?.slot
