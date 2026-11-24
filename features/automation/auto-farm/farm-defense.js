@@ -180,6 +180,25 @@
     if (globalThis.GSTFarmPolicy?.isTool?.() && attackers.some((actor) => boss(actor)
         || globalThis.GSTFarmMonsterClassification?.isElite?.(actor))) return null;
     const pos = { x: scene.px, y: scene.py };
+    if (globalThis.GSTFarmPolicy?.isTool?.()) {
+      let best = null, bestScore = -Infinity;
+      for (const step of [2, 3]) for (let i = 0; i < 16; i++) {
+        const angle = i * Math.PI / 8;
+        const point = { x: pos.x + Math.cos(angle) * step, y: pos.y + Math.sin(angle) * step };
+        if (!boundary(scene, point) || !host.clear(pos.x, pos.y, point.x, point.y)
+            || globalThis.GSTFarmBossSafety?.toolRecoverySegmentSafe?.(scene, pos, point, scene.now()) !== true) continue;
+        const safe = attackers.every((actor) => [0.25, 0.5, 0.75, 1].every((fraction) => {
+          const sample = { x: pos.x + (point.x - pos.x) * fraction, y: pos.y + (point.y - pos.y) * fraction };
+          return distance(sample, actor) >= Math.min(0.7, distance(pos, actor) * 0.8);
+        }));
+        if (!safe) continue;
+        const nearest = Math.min(...attackers.map((actor) => distance(point, actor)));
+        const exposure = attackers.reduce((sum, actor) => sum + 1 / Math.max(0.3, distance(point, actor)), 0);
+        const score = nearest - exposure * 0.5;
+        if (score > bestScore) { best = point; bestScore = score; }
+      }
+      return best;
+    }
     const away = attackers.reduce((sum, actor) => {
       const dx = pos.x - actor.x, dy = pos.y - actor.y, length = Math.hypot(dx, dy) || 1;
       return { x: sum.x + dx / length, y: sum.y + dy / length };
@@ -517,7 +536,7 @@
       }
       job.boss ||= attackers.some(boss);
       job.threatIds = attackers.map((actor) => actor.id);
-      if (time - job.started > 4 || time - job.hitAt > 3) {
+      if ((!globalThis.GSTFarmPolicy?.isTool?.() && time - job.started > 4) || time - job.hitAt > 3) {
         clearEpisode("Tự vệ đã kết thúc lượt; chờ đòn mới.", true); return false;
       }
       const attacker = attackers.length === 1 ? attackers[0] : null;
@@ -533,19 +552,37 @@
         host.basic(); message = "Tự vệ · đã yêu cầu đòn đánh thường; chưa xác minh trúng đích."; return true;
       }
       if (!job.goal) {
+        if (globalThis.GSTFarmPolicy?.isTool?.() && time < (job.nextPlanAt ?? -Infinity)) return true;
+        job.nextPlanAt = time + 0.5;
         job.goal = retreat(scene, host, attackers);
         if (!job.goal) {
+          if (globalThis.GSTFarmPolicy?.isTool?.()) {
+            if (job.steer && scene.autoX === job.steer[0] && scene.autoY === job.steer[1]) scene.autoX = scene.autoY = 0;
+            job.steer = null;
+            message = "Tự vệ: chưa có đường thoát an toàn; đang tìm lại.";
+            return true;
+          }
           clearEpisode(job.ambiguous ? "Tự vệ nhường: nhiều mối đe dọa và không có hướng lùi an toàn." : "Tự vệ nhường: không có đường lùi an toàn.", true);
           return false;
         }
+        job.goalAt = time;
       }
       if (!boundary(scene, pos) || !boundary(scene, job.goal) || !host.clear(pos.x, pos.y, job.goal.x, job.goal.y)
-          || distance(pos, job.goal) <= 0.3 || time - job.started > 3) {
+          || distance(pos, job.goal) <= 0.3 || time - (job.goalAt ?? job.started) > 3
+          || globalThis.GSTFarmPolicy?.isTool?.() && (globalThis.GSTFarmBossSafety?.toolRecoverySegmentSafe?.(scene, pos, job.goal, time) !== true
+            || attackers.some((actor) => [0.25, 0.5, 0.75, 1].some((fraction) => {
+              const sample = { x: pos.x + (job.goal.x - pos.x) * fraction, y: pos.y + (job.goal.y - pos.y) * fraction };
+              return distance(sample, actor) < Math.min(0.7, distance(pos, actor) * 0.8);
+            })))) {
+        if (globalThis.GSTFarmPolicy?.isTool?.()) {
+          if (job.steer && scene.autoX === job.steer[0] && scene.autoY === job.steer[1]) scene.autoX = scene.autoY = 0;
+          job.steer = null; job.goal = null; message = "Tự vệ đang tìm hướng thoát tiếp theo."; return true;
+        }
         clearEpisode("Tự vệ đã kết thúc lượt lùi.", true); return false;
       }
       const dx = job.goal.x - pos.x, dy = job.goal.y - pos.y, length = Math.hypot(dx, dy);
       // Distance from every current threat must not decrease along the escape direction.
-      if (attackers.some((actor) => dx * (pos.x - actor.x) + dy * (pos.y - actor.y) <= 0)) {
+      if (!globalThis.GSTFarmPolicy?.isTool?.() && attackers.some((actor) => dx * (pos.x - actor.x) + dy * (pos.y - actor.y) <= 0)) {
         clearEpisode("Tự vệ nhường: đường lùi không còn an toàn.", true); return false;
       }
       if (!validateContext(scene, host)) return false;
