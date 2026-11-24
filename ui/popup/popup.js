@@ -37,6 +37,12 @@ const farmPolicyRuntimeStatus = document.getElementById("farmPolicyRuntimeStatus
 const farmPolicyFeedback = document.getElementById("farmPolicyFeedback");
 const farmAssistanceAvailability = document.getElementById("farmAssistanceAvailability");
 const farmNoRetreat = document.getElementById("farmNoRetreat");
+const toolRecoveryControls = document.getElementById("toolRecoveryControls");
+const toolRecoveryEnabled = document.getElementById("toolRecoveryEnabled");
+const toolRetreatHp = document.getElementById("toolRetreatHp");
+const toolResumeHp = document.getElementById("toolResumeHp");
+const toolRecoverySave = document.getElementById("toolRecoverySave");
+const toolRecoveryFeedback = document.getElementById("toolRecoveryFeedback");
 const farmReturnDeath = document.getElementById("farmReturnDeath");
 const breakSeals = document.getElementById("breakSeals");
 const farmSearchScope = document.getElementById("farmSearchScope");
@@ -541,7 +547,7 @@ async function refreshFarm() {
     autoFarmValue.textContent = status.autoOn === true ? "Đang bật" : status.autoOn === false ? "Đã tắt" : "Chưa rõ";
     autoFarmValue.dataset.state = status.autoOn === true ? "on" : status.autoOn === false ? "off" : "unknown";
     farmPolicyRuntimeStatus.textContent = status.policyMode === "tool"
-      ? `Farm của tool: ${{ OFF: "Đã tắt", SEARCH: "Tìm quái", APPROACH: "Đang đi", COMBAT: "Đánh thường", PAUSED: "Đang nhường" }[status.toolState] || "Chưa rõ"} · ${farmLabel}. ${status.message || ""}`
+      ? `Farm của tool: ${{ OFF: "Đã tắt", SEARCH: "Tìm quái", APPROACH: "Đang đi", COMBAT: "Đánh thường", PAUSED: "Đang nhường", RECOVERY: "Đang hồi phục" }[status.toolState] || "Chưa rõ"} · ${farmLabel}. ${status.message || ""}`
       : `Auto Farm gốc trong tab đang mở: ${farmLabel}${status.dead ? " · nhân vật đã chết" : ""}.`;
     const customStats = status.customStats;
     const statsLabel = customStats ? ` · So sánh tab: chạy ${Math.floor(customStats.elapsed/1000)}s, tạm dừng ${Math.floor(customStats.paused/1000)}s, kẹt ${Math.floor(customStats.stuck/1000)}s, chết ${customStats.observedDeaths}, mục tiêu có cờ chết ${customStats.observedKills}; XP/phút không khả dụng, potion không thể quy kết.` : "";
@@ -654,6 +660,9 @@ function normalizedFarmPreferences(raw = {}) {
   const radius = Number.isSafeInteger(raw.radius)
     ? Math.max(1, Math.min(1000, raw.radius)) : 22;
   return {
+    toolRecoveryEnabled: raw.toolRecoveryEnabled === true,
+    toolRetreatHp: validFarmHpThresholds(raw.toolRetreatHp, raw.toolResumeHp) ? raw.toolRetreatHp : 40,
+    toolResumeHp: validFarmHpThresholds(raw.toolRetreatHp, raw.toolResumeHp) ? raw.toolResumeHp : 100,
     policyMode: globalThis.GSTFarmPolicy.read(raw),
     ...globalThis.GSTFarmPolicy.actions(raw),
     enabled: raw.enabled === true, radius,
@@ -696,6 +705,7 @@ function syncFarmPolicyUI(raw = {}) {
   const assisted = tabMode === "tool";
   farmActionControls.disabled = !farmSyncReady || !assisted || !accountAllowed || farmActionWrites > 0;
   farmControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
+  toolRecoveryControls.disabled = !farmSyncReady || !assisted || !accountAllowed;
   farmRightControls.disabled = true; // Retired Farm behaviors; preferences remain stored.
   // This flag is also used by independent Harvest recovery.
   farmAutoRespawn.disabled = !farmSyncReady || !accountAllowed;
@@ -724,6 +734,10 @@ function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {})
   const draftMaxValue = oldMode === "range" ? farmSelectionValue(farmTargetRows.max, "max") : null;
   const next = normalizedFarmPreferences(raw);
   farmConfirmed = next;
+  toolRecoveryEnabled.checked = next.toolRecoveryEnabled;
+  if (document.activeElement !== toolRetreatHp && document.activeElement !== toolResumeHp) {
+    toolRetreatHp.value = String(next.toolRetreatHp); toolResumeHp.value = String(next.toolResumeHp);
+  }
   farmSearchScope.value = next.searchScope;
   farmNoRetreat.checked = next.noRetreat;
   farmBossDodge.checked = next.bossDodge;
@@ -960,6 +974,21 @@ async function saveFarmPatch(patch, rollback, { draftWrite = false, preserveDraf
     syncBossTargetControls();
   }
 }
+toolRecoveryEnabled.addEventListener("change", () => {
+  void saveFarmPatch({ toolRecoveryEnabled: toolRecoveryEnabled.checked }, () => { toolRecoveryEnabled.checked = farmConfirmed.toolRecoveryEnabled; });
+});
+toolRecoverySave.addEventListener("click", async () => {
+  const low = Number(toolRetreatHp.value), high = Number(toolResumeHp.value);
+  if (!toolRetreatHp.value.trim() || !toolResumeHp.value.trim() || !validFarmHpThresholds(low, high)) {
+    toolRecoveryFeedback.textContent = "Nhập số nguyên: 1 ≤ mức rút lui < mức tiếp tục ≤ 100."; return;
+  }
+  toolRecoverySave.disabled = true;
+  const ok = await saveFarmPatch({ toolRetreatHp: low, toolResumeHp: high }, () => {
+    toolRetreatHp.value = String(farmConfirmed.toolRetreatHp); toolResumeHp.value = String(farmConfirmed.toolResumeHp);
+  });
+  toolRecoveryFeedback.textContent = ok ? "Đã lưu mức HP." : "Chưa lưu được mức HP.";
+  toolRecoverySave.disabled = false;
+});
 for (const [input, key] of [[farmShowTargetLine, "showTargetLine"], [farmShowRange, "showRange"],
   [farmNearbyClear, "nearbyClear"], [farmNoRetreat, "noRetreat"],
   [breakSeals, "breakSeals"], [farmPreferLoot, "preferLoot"], [farmSelfDefense, "selfDefense"],

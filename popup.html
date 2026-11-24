@@ -115,6 +115,15 @@
       <div class="card-body" id="toolAutoBody">
         <button id="farmToggle" type="button" class="full" aria-pressed="false" disabled>Bật Farm</button>
         <p id="farmToggleFeedback" class="notice" role="status" aria-live="polite">Đang đọc trạng thái Farm của tab game…</p>
+        <fieldset id="toolRecoveryControls" disabled>
+          <label class="check-row"><input id="toolRecoveryEnabled" type="checkbox"><span>Rút lui và hồi HP khi hết đan</span></label>
+          <div class="two-columns">
+            <div><label for="toolRetreatHp">Rút lui khi HP dưới (%)</label><input id="toolRetreatHp" type="number" min="1" max="99" value="40"></div>
+            <div><label for="toolResumeHp">Tiếp tục khi HP đạt (%)</label><input id="toolResumeHp" type="number" min="2" max="100" value="100"></div>
+          </div>
+          <button id="toolRecoverySave" type="button">Lưu mức HP</button>
+          <p id="toolRecoveryFeedback" class="hint" role="status"></p>
+        </fieldset>
       </div>
     </details>
     <details class="card" data-category="auto" data-panel="independent" hidden>

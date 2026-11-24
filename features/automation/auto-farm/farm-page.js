@@ -57,10 +57,11 @@
         || event.keyCode === shortcut);
       const editing = event.target instanceof Element
         && event.target.closest('input,textarea,select,[contenteditable=true],#gst-game-menu');
-      const manualKey = event.type === "keydown" && /^(Key[WASDQ]|Arrow(Up|Down|Left|Right)|Space|Digit[1-6])$/.test(event.code);
+      const manualKey = event.type === "keydown" && /^(Key[WASDQT]|Arrow(Up|Down|Left|Right)|Space|Digit[1-6])$/.test(event.code);
       const manualPointer = event.type === "pointerdown" && event.target instanceof Element
         && event.target.closest('canvas,[data-key]');
-      if (!editing && !farmKey && !farmButton(event.target) && (manualKey || manualPointer)) {
+      if (!editing && !farmKey && !farmButton(event.target) && (manualKey || manualPointer)
+          && !(event.code === "KeyT" && sceneNow()?.chat?.typing)) {
         globalThis.GSTFarmUpdate?.manualActions?.(sceneNow());
         globalThis.GSTToolFarm?.manual?.(sceneNow());
       }
@@ -1632,6 +1633,11 @@
         allowPlayerTargets: data.allowPlayerTargets === true,
         enabled: data.enabled, radius: data.radius, autoRespawn: data.autoRespawn !== false,
         noRetreat: data.noRetreat !== false,
+        toolRecoveryEnabled: data.toolRecoveryEnabled === true,
+        toolRetreatHp: Number.isSafeInteger(data.toolRetreatHp) && Number.isSafeInteger(data.toolResumeHp)
+          && data.toolRetreatHp >= 1 && data.toolRetreatHp < data.toolResumeHp && data.toolResumeHp <= 100 ? data.toolRetreatHp : 40,
+        toolResumeHp: Number.isSafeInteger(data.toolRetreatHp) && Number.isSafeInteger(data.toolResumeHp)
+          && data.toolRetreatHp >= 1 && data.toolRetreatHp < data.toolResumeHp && data.toolResumeHp <= 100 ? data.toolResumeHp : 100,
         bossDodge: data.bossDodge !== false, eliteDodge: data.eliteDodge === true, bossRetreat: data.bossRetreat !== false,
         ...hpThresholds,
         showTargetLine: data.showTargetLine === true, showRange: data.showRange === true,

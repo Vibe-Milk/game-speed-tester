@@ -28,7 +28,7 @@
   function stop(scene, reason) {
     const s = scene && sessions.get(scene); if (!s) return;
     reason ??= s.enabled ? "Bạn đã tắt Farm của tool." : s.message;
-    s.enabled = false; s.skillAction = null; s.lifecycle = null; s.state = "OFF"; s.message = reason; messages.set(scene, reason); release(s);
+    s.recovery = null; s.enabled = false; s.skillAction = null; s.lifecycle = null; s.state = "OFF"; s.message = reason; messages.set(scene, reason); release(s);
     globalThis.GSTFarmSkills?.reset?.(scene);
     globalThis.GSTFarmPlanner?.reset?.(scene);
   }
@@ -58,6 +58,8 @@
           s.targetId = null; s.retries = 0; s.state = "SEARCH";
           s.message = "Đang áp dụng cấu hình tìm quái mới.";
         }
+        // Recovery preferences are independent of skill rotation and apply immediately.
+        for (const name of ["toolRecoveryEnabled", "toolRetreatHp", "toolResumeHp"]) s.options[name] = options[name];
         // Skill changes still wait for the current skill action to finish.
         s.pendingOptions = { ...options };
       } else s.options = { ...options };
@@ -129,13 +131,16 @@
     try {
       if (!s.auto.on) { stop(s.scene); return; }
       const error = context(s); if (error) { halt(s, error); return; }
+      if (s.recovery && sceneMeditationFrame(s)) return;
       if (paused(s)) { release(s); s.state = "PAUSED"; s.message = pauseReason(s); return; }
       const scene = s.scene, point = s.leg;
       // Native move() cannot advance during these locks. Forget the progress
       // baseline without charging a stuck retry or rejecting the target.
       if (movementBlocked(scene)) { release(s); return; }
       if (s.vector && (s.fix !== scene.self.fix || !point
-          || !scene.autoHost().clear(scene.px, scene.py, point[0], point[1]))) {
+          || !scene.autoHost().clear(scene.px, scene.py, point[0], point[1])
+          || s.recovery && globalThis.GSTFarmBossSafety?.toolRecoverySegmentSafe?.(scene,
+            { x: scene.px, y: scene.py }, { x: point[0], y: point[1] }, scene.now()) !== true)) {
         release(s); globalThis.GSTFarmPlanner.invalidateRoute(scene);
       }
     } catch { halt(s, "Farm đã dừng vì interface game thay đổi."); }
@@ -189,10 +194,116 @@
     globalThis.GSTFarmVisual?.attach?.(scene);
     return true;
   }
+  // Recovery shares the Farm session and dispatcher. The preupdate guard only
+  // observes meditation while native auto.update is suppressed by the game.
+  function sceneMeditationFrame(s) {
+    const scene = s.scene, r = s.recovery;
+    if (!r) return false;
+    if (performance.now() < s.manualUntil || GSTFarmInput.movement(scene) || otherOwner(scene)
+        || scene.heldAttack || scene.aiming || scene.pendingSkill) {
+      r.owned = false; r.pending = null; release(s); s.message = "Hồi phục đang nhường thao tác khác."; return true;
+    }
+    const hp = scene.self.hp / scene.self.mh;
+    if (!finite(hp) || !finite(scene.selfAt) || scene.now() - scene.selfAt > 3) {
+      release(s); s.message = "Hồi phục đang chờ trạng thái nhân vật mới."; return true;
+    }
+    if (r.pending) {
+      if (scene.selfAt <= r.pending.snapshot) { release(s); s.message = "Đang chờ game xác nhận thiền."; return true; }
+      if (r.pending.action === "start") {
+        r.owned = scene.self.med === true;
+        if (!r.owned) r.retryAt = performance.now() + 2000;
+      } else if (!scene.self.med) r.owned = false;
+      else { r.retryAt = performance.now() + 2000; r.stopAttempts++; }
+      r.pending = null;
+    }
+    if (scene.self.med) {
+      release(s);
+      if ((hp >= s.options.toolResumeHp / 100 || !s.options.toolRecoveryEnabled) && r.owned) {
+        const host = scene.autoHost();
+        if (typeof host.meditate === "function" && r.stopAttempts < 3 && performance.now() >= r.retryAt) {
+          r.pending = { action: "stop", snapshot: scene.selfAt }; host.meditate();
+          s.message = "Đã yêu cầu dừng thiền; chờ game xác nhận.";
+        } else s.message = "Chưa dừng được thiền; đang chờ game.";
+      } else s.message = r.owned ? "Đang thiền hồi HP." : "Đang thiền; chờ người chơi dừng thiền.";
+      return true;
+    }
+    if (hp >= s.options.toolResumeHp / 100 || !s.options.toolRecoveryEnabled) {
+      s.recovery = null; s.state = "SEARCH"; s.message = "Đã kết thúc hồi phục; tiếp tục Farm."; return false;
+    }
+    return false;
+  }
+  function recover(s, host, time) {
+    const scene = s.scene, hp = scene.self.hp / scene.self.mh;
+    if (!finite(hp) || scene.self.mh <= 0) return false;
+    if (!s.recovery) {
+      if (!s.options.toolRecoveryEnabled || hp >= s.options.toolRetreatHp / 100
+          || typeof host.pills !== "function") return false;
+      const pills = host.pills("hp");
+      if (!Array.isArray(pills) || pills.length < 2 || pills[0] !== 0 || pills[1] !== 0) return false;
+      release(s); s.recovery = { started: time, stableAt: null, point: null, pending: null, owned: false, retryAt: 0, attempts: 0, stopAttempts: 0 };
+    }
+    const r = s.recovery;
+    if (sceneMeditationFrame(s)) return true;
+    if (!s.recovery) return false;
+    if (scene.self.fly || scene.self.fish || scene.dashT > 0 || scene.self.realm?.inside?.protection > 0
+        || movementBlocked(scene) || scene.lockUntil > time || scene.skillLockUntil > time) {
+      release(s); s.message = "Chờ game cho phép hồi phục."; return true;
+    }
+    const enemies = host.enemies();
+    if (!Array.isArray(enemies)) { release(s); s.message = "Thiếu dữ liệu quái; đang chờ an toàn."; return true; }
+    if (enemies.some(e => !e || typeof e.dead !== "boolean" || typeof e.hostile !== "boolean"
+        || ![e.x, e.y].every(finite)) || ![scene.map?.w, scene.map?.h].every(finite)) {
+      release(s); s.message = "Dữ liệu quái hoặc bản đồ chưa đủ; đang chờ an toàn."; return true;
+    }
+    const threats = enemies.filter(e => !e.dead && e.hostile === true);
+    const pos = { x: scene.px, y: scene.py };
+    const nearby = threats.filter(e => Math.hypot(e.x-pos.x,e.y-pos.y) < 9);
+    if (nearby.length) {
+      r.stableAt = null;
+      let plan = null;
+      try { plan = globalThis.GSTFarmBossSafety?.toolRecoveryPlan?.(scene, host, time); } catch { /* Wait safely below. */ }
+      const goal = plan?.point;
+      if (r.retryMoveAt && performance.now() < r.retryMoveAt) { release(s); s.message = "Đường rút bị kẹt; đang chờ trước khi thử lại."; return true; }
+      if (!r.movePoint || Math.hypot(pos.x-r.movePoint.x,pos.y-r.movePoint.y) >= .2) {
+        r.movePoint = pos; r.moveSince = performance.now();
+      } else if (performance.now() - r.moveSince >= 2000) {
+        release(s); r.movePoint = null; r.retryMoveAt = performance.now() + 3000;
+        s.message = "Đường rút bị kẹt; đang chờ trước khi thử lại."; return true;
+      }
+      if (!goal) { release(s); s.message = "Chưa tìm được hướng rút an toàn; đang chờ."; return true; }
+      s.nav.path = plan.path.map((point) => [...point]);
+      while (s.nav.path.length > 1 && Math.hypot(s.nav.path[0][0] - pos.x, s.nav.path[0][1] - pos.y) < .25) s.nav.path.shift();
+      const step = s.nav.path[0];
+      if (!step || host.clear(pos.x, pos.y, step[0], step[1]) !== true
+          || globalThis.GSTFarmBossSafety?.toolRecoverySegmentSafe?.(scene, pos,
+            { x: step[0], y: step[1] }, time) !== true) {
+        release(s); s.message = "Không có đường rút an toàn; đang chờ."; return true;
+      }
+      const dx=step[0]-pos.x, dy=step[1]-pos.y, length=Math.hypot(dx,dy);
+      if (!length || context(s) || paused(s)) { release(s); return true; }
+      host.steer(dx/length,dy/length); s.vector=[scene.autoX,scene.autoY]; s.leg=[...step]; s.fix=scene.self.fix;
+      GSTNavigation.schedule(scene,s.nav,goal.x,goal.y,.25);
+      s.state="RECOVERY"; s.message="Đang rút xa quái để hồi HP."; return true;
+    }
+    release(s); s.state="RECOVERY"; r.movePoint = null;
+    if (host.inCombat?.() !== false) { r.stableAt=null; s.message="Chờ kết thúc giao tranh để thiền."; return true; }
+    let safe = false;
+    try { safe = globalThis.GSTFarmBossSafety?.toolRecoveryCanMeditate?.(scene, host, time) === true; } catch {}
+    if (!safe) { r.stableAt=null; s.message="Chờ khu vực an toàn trước khi thiền."; return true; }
+    if (r.stableAt === null || !r.point || Math.hypot(pos.x-r.point.x,pos.y-r.point.y)>.12) {
+      r.point=pos; r.stableAt=performance.now();
+    }
+    if (performance.now()-r.stableAt<2000) { s.message="Chờ đứng yên trước khi thiền."; return true; }
+    if (typeof host.meditate !== "function") { s.message="Game không cung cấp thao tác thiền; đang chờ."; return true; }
+    if (r.attempts >= 3 || performance.now() < r.retryAt) { s.message="Game chưa xác nhận thiền; đang chờ."; return true; }
+    r.attempts++; r.pending={ action:"start", snapshot:scene.selfAt }; host.meditate();
+    s.message="Đã yêu cầu thiền; chờ game xác nhận."; return true;
+  }
   function update(s, host, time) {
     if (!s.enabled) return;
     guard(s); if (!s.enabled || paused(s)) return;
     const scene = s.scene;
+    if (recover(s, host, time)) return;
     // Native WorldScene may skip auto.update during an action lock; guard still
     // runs on preupdate to release movement before the next native move().
     if (scene.lockUntil > time || scene.skillLockUntil > time || scene.moveLockUntil > time) { release(s); return; }
@@ -312,6 +423,7 @@
       + (GSTFarmSkills.status(scene) ? " · " + GSTFarmSkills.status(scene) : ""),
     manual(scene) {
       const s = scene && sessions.get(scene); if (!s?.enabled) return;
+      if (s.recovery) { s.recovery.owned = false; s.recovery.pending = null; }
       release(s); s.lockId = null; s.manualUntil = performance.now() + 2000;
     } });
   window.addEventListener("pagehide", () => { for (const scene of [...scenes]) { halt(sessions.get(scene), "Trang đã đóng; cần bật Farm lại."); dispose(scene); } });

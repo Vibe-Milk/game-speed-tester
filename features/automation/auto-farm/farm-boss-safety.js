@@ -1347,6 +1347,52 @@
     scene.events.on("preupdate", guard);
     scene.events.on("shutdown", detach); scene.events.on("destroy", detach);
   }
+  // Read-only planning for Tool Farm; this never attaches the legacy owner.
+  function toolRecoveryPlan(scene, host, time) {
+    if (!scene || sceneNow() !== scene || !finite(time) || !finite(scene.selfAt)
+        || time < scene.selfAt || time - scene.selfAt > 3 || ![scene.px, scene.py, scene.map?.w, scene.map?.h].every(finite)
+        || typeof host?.enemies !== "function" || typeof host.clear !== "function" || typeof host.route !== "function") return null;
+    const raw = host.enemies();
+    if (!Array.isArray(raw) || raw.length > maxThreatScan) return null;
+    const pos = { x: scene.px, y: scene.py };
+    // The retired boss controller does not collect warnings in Tool mode.
+    // Hold rather than plan through a boss/elite with unknown warning state.
+    for (const entry of raw) {
+      if (!entry || typeof entry.dead !== "boolean" || typeof entry.hostile !== "boolean"
+          || ![entry.x, entry.y].every(finite)) return null;
+      if (!entry.dead && entry.hostile && distance(pos, entry) < 12) {
+        const actor = scene.views?.get?.(entry.id), category = globalThis.GSTFarmMonsterClassification?.classify?.(actor);
+        if (!actor || !category || category === "boss" || category === "elite") return null;
+      }
+    }
+    const bounds = { w: scene.map.w, h: scene.map.h, home: pos, radius: Infinity };
+    const hazards = hazardZones(scene, time), threats = localThreats(scene, host, pos, time);
+    return destination(scene, host, pos, null, hazards, true, bounds, threats);
+  }
+  function toolRecoveryCanMeditate(scene, host, time) {
+    if (!scene || sceneNow() !== scene || !finite(time) || !finite(scene.selfAt)
+        || time < scene.selfAt || time - scene.selfAt > 3 || ![scene.px, scene.py].every(finite)) return false;
+    const enemies = host?.enemies?.();
+    if (!Array.isArray(enemies) || enemies.length > maxThreatScan) return false;
+    const pos = { x: scene.px, y: scene.py };
+    if (enemies.some((enemy) => !enemy || typeof enemy.dead !== "boolean" || typeof enemy.hostile !== "boolean"
+        || ![enemy.x, enemy.y].every(finite))) return false;
+    for (const enemy of enemies) {
+      if (enemy.dead || !enemy.hostile) continue;
+      const range = distance(pos, enemy);
+      if (range < 9) return false;
+      if (range < 12) {
+        const kind = globalThis.GSTFarmMonsterClassification?.classify?.(scene.views?.get?.(enemy.id));
+        if (!kind || kind === "boss" || kind === "elite") return false;
+      }
+    }
+    return hazardZones(scene, time).every((area) => distance(pos, area) > area.radius + 0.8);
+  }
+  function toolRecoverySegmentSafe(scene, from, to, time) {
+    if (!scene || sceneNow() !== scene || !finite(time) || !finite(scene.selfAt)
+        || time < scene.selfAt || time - scene.selfAt > 3 || ![from?.x, from?.y, to?.x, to?.y].every(finite)) return false;
+    return clearOfHazards(from, to, hazardZones(scene, time));
+  }
   globalThis.GSTFarmBossSafety = {
     configure(scene, value) {
       const stopRetreat = settings.bossRetreat === true && value.bossRetreat === false
@@ -1367,6 +1413,9 @@
     },
     attach(scene) { try { attach(scene); } catch { detach(); } },
     emergency,
+    toolRecoveryPlan,
+    toolRecoverySegmentSafe,
+    toolRecoveryCanMeditate,
     preemptsHarvest,
     controls: (scene) => !!binding && binding.scene === scene
       && (job !== null || retreating || !!returnIntent && returnIntent.phase !== "excluded" || cooldownHolding),

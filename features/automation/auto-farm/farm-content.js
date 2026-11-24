@@ -88,6 +88,11 @@
         ? Math.max(1, Math.min(6, value.nearbyRadius)) : 2,
       autoRespawn: value?.autoRespawn !== false,
       noRetreat: value?.noRetreat !== false,
+      toolRecoveryEnabled: value?.toolRecoveryEnabled === true,
+      toolRetreatHp: Number.isSafeInteger(value?.toolRetreatHp) && Number.isSafeInteger(value?.toolResumeHp)
+        && value.toolRetreatHp >= 1 && value.toolRetreatHp < value.toolResumeHp && value.toolResumeHp <= 100 ? value.toolRetreatHp : 40,
+      toolResumeHp: Number.isSafeInteger(value?.toolRetreatHp) && Number.isSafeInteger(value?.toolResumeHp)
+        && value.toolRetreatHp >= 1 && value.toolRetreatHp < value.toolResumeHp && value.toolResumeHp <= 100 ? value.toolResumeHp : 100,
       bossDodge: value?.bossDodge !== false,
       eliteDodge: value?.eliteDodge === true,
       bossRetreat: value?.bossRetreat !== false,
