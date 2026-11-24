@@ -8,11 +8,19 @@
 - Chỉ thực hiện task hiện tại; đề xuất, handoff và plan cũ không tự cấp quyền mới.
 - Giữ thay đổi nhỏ, architecture và tính năng đang hoạt động; không refactor, thêm dependency/quyền extension hoặc sửa issue ngoài scope nếu không cần.
 
+## Theo dõi tiến độ dự án
+
+- Đọc `ROADMAP.md` ngay sau `AGENTS.md` khi bắt đầu task hoặc tiếp quản chat. Xác nhận HEAD và đối chiếu commit liên quan; roadmap không thay thế source thật.
+- `ROADMAP.md` là nơi ghi ngắn gọn mục tiêu, task đang làm/chờ, commit implementation hoặc review, kết quả kiểm tra, blocker và việc tiếp theo. Không dùng làm changelog dài; Git lưu lịch sử thay đổi, CodeGraph lưu kiến trúc, Wiki lưu source game.
+- Khi thực hiện task đã được duyệt, cập nhật mục tiến độ liên quan trong cùng phạm vi commit. Sau review hoặc kiểm tra thực tế, cập nhật kết quả có bằng chứng và việc tiếp theo khi được phép sửa tài liệu; nếu yêu cầu chỉ review hoặc chỉ tạo prompt, chỉ báo nội dung cần cập nhật, không tự commit.
+- Phân biệt `IMPLEMENTED`, `STATIC REVIEW PASS` / `NEEDS FIX`, `RUNTIME VERIFIED` / `UNVERIFIED`, `PENDING` và `BLOCKED`. Ghi commit được review cụ thể; không suy diễn PASS runtime từ source, commit hoặc kết quả cũ. Không đánh dấu task hoàn tất nếu còn blocker; ghi rõ giới hạn hoặc bước xác minh còn thiếu.
+- Luôn giữ mục Việc tiếp theo ngắn và có thể thực hiện được; cập nhật mục cũ thay vì nhân bản thông tin. Không biến roadmap thành quyền tự triển khai task mới, chạy test, commit hoặc push ngoài phạm vi đã được người dùng cho phép.
+
 ## Workflow dựa trên Wiki
 
 Áp dụng cho feature, sửa đổi, debug và tối ưu:
 
-1. Đọc `AGENTS.md` để nắm quy tắc repository.
+1. Đọc `AGENTS.md` và `ROADMAP.md` để nắm quy tắc và tiến độ repository.
 2. Tham khảo `CODEGRAPH.md` để định vị component và luồng của extension.
 3. Đọc `GAME_ASSET_WIKI_v2.0/README.md` để nắm quy tắc điều hướng source game.
 4. Dùng `GAME_ASSET_WIKI_v2.0/FEATURE_INDEX.md` để tìm feature liên quan.
