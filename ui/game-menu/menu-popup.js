@@ -2,7 +2,7 @@
   "use strict";
   const embedded = new URLSearchParams(location.search).get("embedded") === "1";
   const button = document.getElementById("openGameMenu");
-  let shortcut = { code: "Tab", ctrl: false, alt: false, shift: false, meta: false }, recording = false, shortcutRevision = 0;
+  let shortcut = { code: "Tab", ctrl: false, alt: false, shift: false, meta: false }, shortcutRevision = 0;
   function matchesShortcut(event) {
     return event.code === shortcut.code && event.ctrlKey === shortcut.ctrl
       && event.altKey === shortcut.alt && event.shiftKey === shortcut.shift
@@ -13,11 +13,10 @@
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         event.preventDefault(); event.stopImmediatePropagation();
-        if (recording) { recording = false; shortcutFeedback.textContent = "Đã hủy."; return; }
         parent.postMessage({ channel: "gst:menu-close:v1" }, "https://nghichthienky.online");
         return;
       }
-      if (recording || event.repeat || !matchesShortcut(event)) return;
+      if (event.repeat || !matchesShortcut(event)) return;
       event.preventDefault(); event.stopImmediatePropagation();
       parent.postMessage({ channel: "gst:menu-close:v1" }, "https://nghichthienky.online");
     }, true);
@@ -25,26 +24,23 @@
   const controls = document.getElementById("menuPositionControls"), select = document.getElementById("menuPosition");
   const feedback = document.getElementById("menuPositionFeedback");
   const shortcutLabel = document.getElementById("menuShortcutLabel"), shortcutFeedback = document.getElementById("menuShortcutFeedback");
-  const showShortcut = () => { shortcutLabel.textContent = `${shortcut.ctrl ? "Ctrl + " : ""}${shortcut.alt ? "Alt + " : ""}${shortcut.shift ? "Shift + " : ""}${shortcut.meta ? "Meta + " : ""}${shortcut.code}`; };
+  const showShortcut = () => { shortcutLabel.textContent = GSTPopupShortcut.format(shortcut); };
   const storeShortcut = async (value) => {
     try { await chrome.storage.local.set({ menuShortcut: value }); shortcut = value; showShortcut(); shortcutFeedback.textContent = "Đã lưu phím mở Menu tool."; }
     catch { shortcutFeedback.textContent = "Chưa lưu được phím. Thử lại."; }
   };
-  document.getElementById("captureMenuShortcut").addEventListener("click", () => {
-    recording = true; shortcutFeedback.textContent = "Bấm một phím hoặc giữ Ctrl/Alt/Shift/Meta rồi bấm phím. Esc để hủy.";
+  GSTPopupShortcut.bind({
+    capture: document.getElementById("captureMenuShortcut"),
+    reset: document.getElementById("resetMenuShortcut"),
+    feedback: shortcutFeedback,
+    prompt: "Bấm một phím hoặc giữ Ctrl/Alt/Shift/Meta rồi bấm phím. Esc để hủy.",
+    invalidMessage: "Phím này không dùng được.",
+    ignore: (event) => GSTPopupShortcut.isModifier(event) || event.repeat,
+    valid: (event) => !!event.code && event.code !== "F5",
+    value: GSTPopupShortcut.chord,
+    defaultValue: { code: "Tab", ctrl: false, alt: false, shift: false, meta: false },
+    save: storeShortcut,
   });
-  document.getElementById("resetMenuShortcut").addEventListener("click", () => {
-    recording = false; void storeShortcut({ code: "Tab", ctrl: false, alt: false, shift: false, meta: false });
-  });
-  window.addEventListener("keydown", (event) => {
-    if (!recording) return;
-    event.preventDefault(); event.stopImmediatePropagation();
-    if (event.key === "Escape") { recording = false; shortcutFeedback.textContent = "Đã hủy."; return; }
-    if (["Control", "Alt", "Shift", "Meta"].includes(event.key) || event.repeat) return;
-    if (!event.code || event.code === "F5") { shortcutFeedback.textContent = "Phím này không dùng được."; return; }
-    recording = false;
-    void storeShortcut({ code: event.code, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey, meta: event.metaKey });
-  }, true);
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.menuShortcut) { shortcutRevision++; shortcut = changes.menuShortcut.newValue ?? shortcut; showShortcut(); }
   });

@@ -178,12 +178,11 @@ const farmFeedback = document.getElementById("farmFeedback");
 const shortcutControls = document.getElementById("shortcutControls");
 const shortcutLabel = document.getElementById("shortcutLabel");
 const shortcutFeedback = document.getElementById("shortcutFeedback");
-let capturingShortcut = false;
 
 async function saveShortcut(code) {
   shortcutControls.disabled = true;
   const label = code === null ? "V (mặc định)"
-    : `Phím tùy chỉnh: ${code >= 112 ? `F${code - 111}` : String.fromCharCode(code)}`;
+    : `Phím tùy chỉnh: ${GSTPopupShortcut.numericName(code)}`;
   try {
     await chrome.storage.local.set({ farmShortcut: { code } });
     shortcutLabel.textContent = label;
@@ -200,33 +199,17 @@ async function saveShortcut(code) {
     shortcutFeedback.textContent = "Chưa lưu được phím. Hãy mở lại popup.";
   } finally { shortcutControls.disabled = false; }
 }
-document.getElementById("captureShortcut").addEventListener("click", () => {
-  capturingShortcut = true;
-  shortcutFeedback.textContent = "Bấm phím muốn dùng… (Esc để hủy)";
+GSTPopupShortcut.bind({
+  capture: document.getElementById("captureShortcut"),
+  reset: document.getElementById("resetShortcut"),
+  feedback: shortcutFeedback,
+  prompt: "Bấm phím muốn dùng… (Esc để hủy)",
+  invalidMessage: "Chọn một chữ, số hoặc F1–F10 (trừ F5), không kèm Ctrl/Alt/Shift.",
+  valid: (event) => !GSTPopupShortcut.hasModifiers(event) && GSTPopupShortcut.validFarmCode(event.keyCode),
+  value: (event) => event.keyCode,
+  defaultValue: null,
+  save: saveShortcut,
 });
-document.getElementById("resetShortcut").addEventListener("click", () => {
-  capturingShortcut = false;
-  saveShortcut(null);
-});
-window.addEventListener("keydown", (event) => {
-  if (!capturingShortcut) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  if (event.key === "Escape") {
-    capturingShortcut = false;
-    shortcutFeedback.textContent = "Đã hủy.";
-    return;
-  }
-  const code = event.keyCode;
-  if (event.repeat || event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
-      || !((code >= 48 && code <= 57) || (code >= 65 && code <= 90)
-        || (code >= 112 && code <= 121 && code !== 116))) {
-    shortcutFeedback.textContent = "Chọn một chữ, số hoặc F1–F10 (trừ F5), không kèm Ctrl/Alt/Shift.";
-    return;
-  }
-  capturingShortcut = false;
-  saveShortcut(code);
-}, true);
 const farmToggle = document.getElementById("farmToggle");
 const farmToggleFeedback = document.getElementById("farmToggleFeedback");
 let farmTogglePending = false, farmRuntimeOn = null, farmRuntimePolicy = null;
@@ -1620,9 +1603,8 @@ chrome.storage.local.get(["preferences", "displayPreferences", "fontPreferences"
     }).catch(() => { farmFeedback.textContent = "Chưa đồng bộ được bộ lọc boss; hãy lưu lại."; });
   }
   const shortcutCode = farmShortcut?.code;
-  if (Number.isInteger(shortcutCode) && ((shortcutCode >= 48 && shortcutCode <= 57)
-      || (shortcutCode >= 65 && shortcutCode <= 90) || (shortcutCode >= 112 && shortcutCode <= 121 && shortcutCode !== 116))) {
-    shortcutLabel.textContent = `Phím tùy chỉnh: ${shortcutCode >= 112 ? `F${shortcutCode - 111}` : String.fromCharCode(shortcutCode)}`;
+  if (GSTPopupShortcut.validFarmCode(shortcutCode)) {
+    shortcutLabel.textContent = `Phím tùy chỉnh: ${GSTPopupShortcut.numericName(shortcutCode)}`;
   }
   document.getElementById("farmShortcutSummary").textContent = `Phím tắt · ${shortcutLabel.textContent}`;
   refresh();

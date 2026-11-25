@@ -14,7 +14,7 @@
   const capture = document.getElementById("areaMapShortcutCapture");
   const reset = document.getElementById("areaMapShortcutReset");
   const open = document.getElementById("areaMapOpen");
-  let recording = false, savedFarmKey = null, storageRevision = 0;
+  let savedFarmKey = null, storageRevision = 0;
   function numeric(code) {
     if (codes[code]) return codes[code];
     if (/^Key[A-Z]$/.test(code)) return code.charCodeAt(3);
@@ -23,7 +23,7 @@
   }
   function name(code) {
     if (!code) return ". (mặc định)";
-    return names[code] ?? code.replace(/^Key/, "").replace(/^Digit/, "");
+    return names[code] ?? GSTPopupShortcut.codeName(code);
   }
   async function save(code) {
     controls.disabled = true;
@@ -34,22 +34,15 @@
     } catch { feedback.textContent = "Chưa lưu được. Hãy thử lại."; }
     finally { controls.disabled = false; }
   }
-  capture.addEventListener("click", () => {
-    recording = true; feedback.textContent = "Bấm phím muốn dùng… (Esc để hủy).";
+  GSTPopupShortcut.bind({
+    capture, reset, feedback,
+    prompt: "Bấm phím muốn dùng… (Esc để hủy).",
+    invalidMessage: "Phím trùng thao tác game/Auto Farm hoặc không hợp lệ. Chọn chữ, số, dấu câu hoặc F1–F10 (trừ F5, M, V), không kèm Ctrl/Alt/Shift.",
+    valid: (event) => !GSTPopupShortcut.hasModifiers(event) && allowed.test(event.code)
+      && !["F5", "KeyM", "KeyV"].includes(event.code) && numeric(event.code) !== savedFarmKey,
+    value: (event) => event.code,
+    defaultValue: null, save,
   });
-  reset.addEventListener("click", () => { recording = false; save(null); });
-  window.addEventListener("keydown", (event) => {
-    if (!recording) return;
-    event.preventDefault(); event.stopImmediatePropagation();
-    if (event.key === "Escape") { recording = false; feedback.textContent = "Đã hủy."; return; }
-    const code = event.code;
-    if (event.repeat || event.isComposing || event.ctrlKey || event.altKey || event.shiftKey || event.metaKey
-        || !allowed.test(code) || ["F5", "KeyM", "KeyV"].includes(code) || numeric(code) === savedFarmKey) {
-      feedback.textContent = "Phím trùng thao tác game/Auto Farm hoặc không hợp lệ. Chọn chữ, số, dấu câu hoặc F1–F10 (trừ F5, M, V), không kèm Ctrl/Alt/Shift.";
-      return;
-    }
-    recording = false; save(code);
-  }, true);
   open.addEventListener("click", async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

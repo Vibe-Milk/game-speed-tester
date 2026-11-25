@@ -48,15 +48,13 @@
   const shortcutFeedback = byId("harvestShortcutFeedback");
   const shortcutCapture = byId("captureHarvestShortcut");
   const shortcutReset = byId("resetHarvestShortcut");
-  let capturingShortcut = false;
   function normalizedShortcut(value) {
     return { code: typeof value?.code === "string" ? value.code : "KeyH",
       ctrl: value?.ctrl === true, alt: value?.alt !== false, shift: value?.shift === true, meta: value?.meta === true };
   }
   function showShortcut(value) {
     const key = normalizedShortcut(value);
-    const code = key.code.replace(/^Key/, "").replace(/^Digit/, "");
-    shortcutLabel.textContent = `${key.ctrl ? "Ctrl + " : ""}${key.alt ? "Alt + " : ""}${key.shift ? "Shift + " : ""}${key.meta ? "Meta + " : ""}${code}${value?.code == null ? " (mặc định)" : ""}`;
+    shortcutLabel.textContent = GSTPopupShortcut.format(key) + (value?.code == null ? " (mặc định)" : "");
   }
   async function saveShortcut(value) {
     shortcutCapture.disabled = shortcutReset.disabled = true;
@@ -68,29 +66,14 @@
     } catch { shortcutFeedback.textContent = "Không lưu được phím tắt. Thử lại."; }
     finally { shortcutCapture.disabled = shortcutReset.disabled = false; }
   }
-  shortcutCapture.addEventListener("click", () => {
-    capturingShortcut = true;
-    shortcutFeedback.textContent = "Bấm một phím hoặc giữ Ctrl/Alt/Shift/Meta rồi bấm phím (Esc để hủy).";
+  GSTPopupShortcut.bind({
+    capture: shortcutCapture, reset: shortcutReset, feedback: shortcutFeedback,
+    prompt: "Bấm một phím hoặc giữ Ctrl/Alt/Shift/Meta rồi bấm phím (Esc để hủy).",
+    cancelMessage: "Đã hủy đặt phím.",
+    invalidMessage: "Chọn một phím hoặc tổ hợp phím hợp lệ.",
+    valid: (event) => !!event.code && !GSTPopupShortcut.isModifier(event) && event.code !== "F5",
+    value: GSTPopupShortcut.chord, defaultValue: null, save: saveShortcut,
   });
-  shortcutReset.addEventListener("click", () => {
-    capturingShortcut = false;
-    void saveShortcut(null);
-  });
-  window.addEventListener("keydown", (event) => {
-    if (!capturingShortcut) return;
-    event.preventDefault(); event.stopImmediatePropagation();
-    if (event.key === "Escape") {
-      capturingShortcut = false;
-      shortcutFeedback.textContent = "Đã hủy đặt phím.";
-      return;
-    }
-    if (event.repeat || event.isComposing || !event.code || ["Control", "Alt", "Shift", "Meta"].includes(event.key)
-        || event.code === "F5") {
-      shortcutFeedback.textContent = "Chọn một phím hoặc tổ hợp phím hợp lệ."; return;
-    }
-    capturingShortcut = false;
-    void saveShortcut({ code: event.code, ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey, meta: event.metaKey });
-  }, true);
   async function debugMessage(type, extra = {}) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) throw new Error("No active tab");
