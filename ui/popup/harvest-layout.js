@@ -8,83 +8,25 @@
   const groups = document.createElement("div");
   groups.className = "harvest-organized";
   oldGrid.before(groups);
-  const destinations = {};
+  const destinations = {}, sections = [];
   for (const [key, title] of [
     ["range", "Phạm vi & di chuyển"],
     ["resources", "Tài nguyên"],
     ["coordination", "Phối hợp & hiển thị"],
     ["advanced", "Nâng cao & phím tắt"],
   ]) {
-    const section = document.createElement("details");
-    section.className = "harvest-section";
-    section.id = `harvest-section-${key}`;
-    const heading = document.createElement("summary");
-    heading.textContent = title;
-    const content = document.createElement("div");
-    content.className = "harvest-section-body";
-    section.append(heading, content);
+    const open = key === "range" || key === "resources";
+    const { section, content } = GSTPopupSections.create({
+      id: "harvest-section-" + key, title, className: "harvest-section", bodyClass: "harvest-section-body", open,
+    });
     groups.append(section);
+    sections.push({ section, open });
     destinations[key] = content;
   }
 
-  const storagePrefix = "harvestSectionOpen:v1:";
-  const defaults = Object.fromEntries([...groups.children].map((section) => [
-    section.id,
-    ["harvest-section-range", "harvest-section-resources"].includes(section.id),
-  ]));
-  const storageKey = (id) => storagePrefix + id.slice("harvest-section-".length);
-  let pending = {};
-  let ready = false;
-  let saveQueue = Promise.resolve();
-  for (const section of groups.children) section.open = defaults[section.id];
-
-  function save(id, open) {
-    saveQueue = saveQueue
-      .catch(() => {})
-      .then(() => chrome.storage.local.set({ [storageKey(id)]: open }))
-      .catch(() => {});
-  }
-  function remember(section, open) {
-    if (!Object.hasOwn(defaults, section?.id)) return;
-    if (!ready) pending[section.id] = open;
-    save(section.id, open);
-  }
-  function setOpen(section, open) {
-    remember(section, open);
-    section.open = open;
-  }
-  globalThis.GSTHarvestSectionLayout = { setOpen };
-
-  for (const section of groups.children) {
-    const summary = section.querySelector(":scope > summary");
-    section.addEventListener("click", (event) => {
-      if ((event.target === summary || summary.contains(event.target)) && event.detail !== 0) {
-        remember(section, !section.open);
-      }
-    }, true);
-    summary.addEventListener("keydown", (event) => {
-      if (!event.repeat && event.key === "Enter") remember(section, !section.open);
-    }, true);
-    summary.addEventListener("keyup", (event) => {
-      if (event.key === " ") remember(section, !section.open);
-    }, true);
-  }
-
-  void (async () => {
-    let stored = {};
-    try {
-      stored = await chrome.storage.local.get([...groups.children].map((section) => storageKey(section.id)));
-    } catch (_) {}
-    for (const section of groups.children) {
-      const key = storageKey(section.id);
-      section.open = Object.hasOwn(pending, section.id) ? pending[section.id]
-        : typeof stored?.[key] === "boolean" ? stored[key]
-        : defaults[section.id];
-    }
-    ready = true;
-    for (const [id, open] of Object.entries(pending)) save(id, open);
-    pending = {};
-  })();
+  GSTPopupSections.register(sections, {
+    storageKey: (section) => "harvestSectionOpen:v1:" + section.id.slice("harvest-section-".length),
+  });
 
   const settings = oldGrid.querySelector(".harvest-settings");
   const settingsBody = settings?.querySelector(":scope > .feature-group-body");

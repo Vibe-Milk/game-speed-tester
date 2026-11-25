@@ -117,10 +117,6 @@ button:disabled, input:disabled, select:disabled { cursor: default; }
 .diagnostic p { margin: 8px 0 0; overflow-wrap: anywhere; }
 footer { padding: 0 2px; }
 input[type="search"] { width: 100%; min-height: 36px; padding: 7px 9px; font: inherit; color: var(--text); background: var(--subtle); border: 1px solid var(--border); border-radius: 7px; }
-.harvest-organized { display:grid; grid-template-columns:minmax(0, 1fr); align-items:start; gap:12px; }
-.harvest-section { margin:0; border:1px solid var(--border); border-radius:10px; background:var(--subtle); min-width:0; scroll-margin:20px; }
-.harvest-section > summary { cursor:pointer; padding:14px; font-weight:700; }
-.harvest-section-body { padding:0 14px 14px; }
 .harvest-header { margin-bottom: 18px; }
 .harvest-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; font-size: 11px; }
 #harvestItems { max-height: clamp(220px, 48vh, 480px); }
@@ -328,18 +324,28 @@ html[data-embedded="true"] body, body.embedded {
 .fps-group-body { padding: 0 2px; }
 .fps-group-body .hint { margin-block: 8px; }
 #fpsControls { padding: 0 !important; border: 0 !important; background: transparent !important; }
-.feature-group-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
-.feature-organized { display:grid; grid-template-columns:minmax(0, 1fr); gap:12px; align-items:start; }
+/* Shared settings group layout and appearance. Keep feature-specific classes
+   for existing control placement and compatibility. */
+.feature-group-grid, .feature-organized, .farm-organized, .harvest-organized {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start;
+}
 .feature-flat-grid { row-gap: 24px; column-gap: 28px; }
 .feature-flat-section { min-width: 0; }
 .feature-flat-section > h3 { margin: 0 0 10px; font-size: 16px; line-height: 1.4; font-weight: 650; }
 .feature-flat-section > h3 small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .feature-flat-section > .feature-group-body { padding: 0; }
 .feature-flat-section > .card-body { padding: 0; }
-.feature-group, .interface-groups > .subcard, .ui-section { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--subtle); overflow: hidden; scroll-margin:20px; }
-.feature-group > summary, .interface-groups > .subcard > summary { cursor: pointer; padding: 14px; font-weight: 650; }
-.ui-section > summary { cursor:pointer; padding:14px; font-weight:650; }
-.feature-group-body { min-width: 0; padding: 0 14px 14px; }
+.feature-group, .interface-groups > .subcard, .ui-section, .farm-section, .harvest-section {
+  min-width: 0; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--subtle); scroll-margin: 20px;
+}
+.feature-group, .interface-groups > .subcard, .ui-section { overflow: hidden; }
+.farm-section, .harvest-section { margin: 0; }
+.feature-group > summary, .interface-groups > .subcard > summary, .ui-section > summary,
+.farm-section > summary, .harvest-section > summary {
+  cursor: pointer; padding: 14px; font-weight: 650;
+}
+.feature-group-body, .farm-section-body, .harvest-section-body { min-width: 0; padding: 0 14px 14px; }
 .feature-group-body > fieldset { min-width: 0; padding: 0 !important; border: 0 !important; background: transparent !important; }
 .interface-groups > .interface-section fieldset { padding: 0 !important; border: 0 !important; background: transparent !important; }
 .interface-layout-setting { margin-bottom: 20px; }
@@ -456,10 +462,6 @@ html[data-embedded="true"] body, body.embedded {
 
 /* Auto Farm grouping moves original controls; settings ownership is unchanged. */
 .farm-grid[hidden] { display:none !important; }
-.farm-organized { display:grid; grid-template-columns:minmax(0, 1fr); align-items:start; gap:12px; }
-.farm-section { margin:0; border:1px solid var(--border); border-radius:10px; background:var(--subtle); min-width:0; scroll-margin:20px; }
-.farm-section > summary { cursor:pointer; padding:14px; font-weight:700; }
-.farm-section-body { padding:0 14px 14px; }
 .farm-section-controls { border:0; padding:0; margin:0; min-width:0; }
 .farm-section .farm-column { padding:0 !important; border:0 !important; background:transparent !important; }
 .farm-flat { border:0 !important; margin:0 !important; padding:0 !important; }
@@ -476,14 +478,12 @@ html[data-embedded="true"] body, body.embedded {
 .farm-status-chip[data-state="off"] { color:var(--muted); background:var(--subtle); }
 .farm-status-filters button[aria-pressed="true"] { outline:2px solid var(--accent); }
 @media(min-width:760px) {
-  body.embedded[data-orientation="horizontal"] .feature-organized,
-  body.embedded[data-orientation="horizontal"] .interface-groups { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  body.embedded[data-orientation="horizontal"] .feature-organized > .ui-section[open],
-  body.embedded[data-orientation="horizontal"] .interface-groups > .ui-section[open] { grid-column:1 / -1; }
-  body.embedded[data-orientation="horizontal"] .farm-organized { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  body.embedded[data-orientation="horizontal"] .farm-organized > .farm-section[open] { grid-column:1 / -1; }
-  body.embedded[data-orientation="horizontal"] .harvest-organized { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  body.embedded[data-orientation="horizontal"] .harvest-organized > .harvest-section[open] { grid-column:1 / -1; }
+  body.embedded[data-orientation="horizontal"] :is(.feature-organized, .interface-groups, .farm-organized, .harvest-organized) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  body.embedded[data-orientation="horizontal"] :is(.feature-organized, .interface-groups, .farm-organized, .harvest-organized) > :is(.ui-section, .farm-section, .harvest-section)[open] {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Retired Farm controls remain mounted only for preference compatibility. */

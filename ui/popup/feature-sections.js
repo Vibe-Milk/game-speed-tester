@@ -11,15 +11,13 @@
       if (!definition) return null;
       const title = source.querySelector(":scope > h3");
       const body = source.querySelector(":scope > .feature-group-body");
-      const section = document.createElement("details");
-      section.className = "feature-group ui-section";
-      section.id = `${namespace}-section-${definition.key}`;
-      section.dataset.uiSectionKey = `${namespace}:${definition.key}`;
-      const summary = document.createElement("summary");
-      summary.textContent = title?.textContent?.trim() || definition.title;
+      const { section } = GSTPopupSections.create({
+        id: namespace + "-section-" + definition.key,
+        title: title?.textContent?.trim() || definition.title,
+        className: "feature-group ui-section", bodyClass: "feature-group-body", body, open: definition.open,
+      });
+      section.dataset.uiSectionKey = namespace + ":" + definition.key;
       if (title) title.remove();
-      section.append(summary);
-      if (body) section.append(body);
       source.replaceWith(section);
       return { section, open: definition.open };
     }).filter(Boolean);
@@ -46,68 +44,7 @@
       return { section, open: false };
     });
   const allSections = [...questSections, ...connectionSections, ...interfaceSections];
-  if (!allSections.length) return;
-
-  const storagePrefix = "popupSectionOpen:v1:";
-  const storageKey = (section) => storagePrefix + section.dataset.uiSectionKey;
-  let pending = {};
-  let ready = false;
-  let saveQueue = Promise.resolve();
-
-  for (const { section, open } of allSections) section.open = open;
-
-  function save(section, open) {
-    const key = storageKey(section);
-    saveQueue = saveQueue
-      .catch(() => {})
-      .then(() => chrome.storage.local.set({ [key]: open }))
-      .catch(() => {});
-  }
-  function remember(section, open) {
-    if (!section?.matches?.("details.ui-section")) return;
-    const key = section.dataset.uiSectionKey;
-    if (!key) return;
-    if (!ready) pending[key] = open;
-    save(section, open);
-  }
-  function setOpen(section, open) {
-    remember(section, open);
-    section.open = open;
-  }
-  globalThis.GSTFeatureSectionLayout = { setOpen };
-
-  for (const { section } of allSections) {
-    const summary = section.querySelector(":scope > summary");
-    section.addEventListener("click", (event) => {
-      if ((event.target === summary || summary.contains(event.target)) && event.detail !== 0) {
-        remember(section, !section.open);
-      }
-    }, true);
-    summary?.addEventListener("keydown", (event) => {
-      if (!event.repeat && event.key === "Enter") remember(section, !section.open);
-    }, true);
-    summary?.addEventListener("keyup", (event) => {
-      if (event.key === " ") remember(section, !section.open);
-    }, true);
-  }
-
-  void (async () => {
-    let stored = {};
-    try {
-      stored = await chrome.storage.local.get(allSections.map(({ section }) => storageKey(section)));
-    } catch (_) {}
-    for (const { section, open } of allSections) {
-      const key = section.dataset.uiSectionKey;
-      const persisted = stored?.[storageKey(section)];
-      section.open = Object.hasOwn(pending, key) ? pending[key]
-        : typeof persisted === "boolean" ? persisted
-        : open;
-    }
-    ready = true;
-    for (const { section } of allSections) {
-      const key = section.dataset.uiSectionKey;
-      if (Object.hasOwn(pending, key)) save(section, pending[key]);
-    }
-    pending = {};
-  })();
+  GSTPopupSections.register(allSections, {
+    storageKey: (section) => "popupSectionOpen:v1:" + section.dataset.uiSectionKey,
+  });
 })();

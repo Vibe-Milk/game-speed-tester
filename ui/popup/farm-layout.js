@@ -22,11 +22,10 @@
   toolBody.append(byId('farmFeedback'));
   const mirrors = [], sections = [];
   function section(key, title, open = true) {
-    const node = document.createElement('details');
-    node.className = 'farm-section'; node.id = 'farm-section-' + key; node.open = open;
-    const heading = document.createElement('summary'); heading.textContent = title;
-    const content = document.createElement('div'); content.className = 'farm-section-body';
-    node.append(heading, content); groups.append(node); sections.push(node);
+    const { section: node, content } = GSTPopupSections.create({
+      id: 'farm-section-' + key, title, className: 'farm-section', bodyClass: 'farm-section-body', open,
+    });
+    groups.append(node); sections.push({ section: node, open });
     return content;
   }
   function move(nodes, destination, mirrorSource = true) {
@@ -76,30 +75,9 @@
   const targetDisplay = byId('farmShowTargetLine').closest('label');
   targetDisplay.querySelector('span').textContent = 'Hiện đường tới quái Farm đang chọn';
   move([rangeDisplay, rangeHint, targetDisplay], visual, false);
-  const prefix = 'farmSectionOpen:v1:', legacyKey = 'farmSectionOpen:v1';
-  const touched = new Set();
-  let ready = false;
-  const storageKey = (node) => prefix + node.id.slice('farm-section-'.length);
-  function remember(node, open) {
-    if (!sections.includes(node)) return;
-    touched.add(node.id);
-    if (ready) void chrome.storage.local.set({ [storageKey(node)]: open }).catch(() => {});
-  }
-  globalThis.GSTFarmSectionLayout = { setOpen(node, open) { remember(node, open); node.open = open; } };
-  for (const node of sections) {
-    const summary = node.querySelector(':scope > summary');
-    summary.addEventListener('click', (event) => { if (event.detail !== 0) remember(node, !node.open); });
-    summary.addEventListener('keydown', (event) => { if (!event.repeat && event.key === 'Enter') remember(node, !node.open); });
-    summary.addEventListener('keyup', (event) => { if (event.key === ' ') remember(node, !node.open); });
-  }
-  void chrome.storage.local.get([...sections.map(storageKey), legacyKey]).then((saved) => {
-    for (const node of sections) if (!touched.has(node.id)) {
-      const value = saved[storageKey(node)] ?? saved[legacyKey]?.[node.id];
-      if (typeof value === 'boolean') node.open = value;
-    }
-  }).catch(() => {}).finally(() => {
-    ready = true;
-    for (const node of sections) if (touched.has(node.id)) remember(node, node.open);
+  GSTPopupSections.register(sections, {
+    storageKey: (node) => 'farmSectionOpen:v1:' + node.id.slice('farm-section-'.length),
+    legacyKey: 'farmSectionOpen:v1',
   });
   function syncLocks() {
     for (const { wrapper, sources } of mirrors) {
