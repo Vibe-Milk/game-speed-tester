@@ -1,8 +1,8 @@
 (() => {
   "use strict";
-  const origin = "https://nghichthienky.online", channel = "gst:potion:v1";
+  const channel = "gst:potion:v1";
   const finite = Number.isFinite;
-  let settings = { hpEnabled: false, mpEnabled: false, hpPercent: 40, mpPercent: 25 };
+  let settings = { ...GSTFeatureOptions.potionDefaults };
   let binding = null, watcher = null, suspended = false, disableGamePills = false, toolDrinking = false;
 
   const enabled = () => settings.hpEnabled || settings.mpEnabled || disableGamePills;
@@ -12,7 +12,6 @@
     return !!scene.driver && !scene.driver.closing && !scene.driver.reconnecting
       && !scene.driver.displaced && (scene.driver.online === false || scene.driver.link?.open?.() === true);
   }
-  const percent = (value, fallback) => Number.isSafeInteger(value) && value >= 1 && value <= 99 ? value : fallback;
   function ratio(scene, kind) {
     const current = scene.self?.[kind], max = scene.self?.[kind === "hp" ? "mh" : "mm"];
     return finite(current) && finite(max) && max > 0 ? current / max : null;
@@ -92,12 +91,7 @@
     } catch { detach(); }
   }
   function configure(value) {
-    settings = {
-      hpEnabled: value?.hpEnabled === true,
-      mpEnabled: value?.mpEnabled === true,
-      hpPercent: percent(value?.hpPercent, 40),
-      mpPercent: percent(value?.mpPercent, 25)
-    };
+    settings = GSTFeatureOptions.normalizePotion(value);
     if (!enabled()) {
       clearInterval(watcher); watcher = null; detach();
       return;
@@ -106,15 +100,14 @@
     if (watcher === null && !suspended) watcher = setInterval(discover, 1000);
   }
   window.addEventListener("message", (event) => {
-    if (event.source === window && event.origin === origin && event.data?.channel === "gst:farm:v1"
+    if (GSTWindowBridge.matches(event, "gst:farm:v1")
         && event.data.type === "configure") {
       disableGamePills = event.data.disableGamePills === true;
       configure(settings);
     }
   });
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.origin !== origin
-        || event.data?.channel !== channel || event.data.type !== "configure") return;
+    if (!GSTWindowBridge.matches(event, channel) || event.data.type !== "configure") return;
     configure(event.data.preferences);
   });
   window.addEventListener("pagehide", () => {
@@ -123,5 +116,5 @@
   window.addEventListener("pageshow", () => {
     suspended = false; configure(settings);
   });
-  window.postMessage({ channel, type: "ready" }, origin);
+  GSTWindowBridge.send({ channel, type: "ready" });
 })();

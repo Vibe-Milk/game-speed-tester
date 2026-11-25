@@ -33,15 +33,15 @@
     try {
       await chrome.storage.local.set({ fpsPreferences: next });
       if (revision === before) saved = next;
-      render(); feedback.textContent = "";
+      render(); GSTPopupFeedback.clear(feedback);
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) throw new Error("No tab");
         const result = await chrome.tabs.sendMessage(tab.id, { type: "gst:fps-configure", preferences: saved });
         if (!result?.accepted) throw new Error("No bridge");
-      } catch { feedback.textContent = "Đã lưu. Tải lại tab game nếu chưa áp dụng được."; }
+      } catch { GSTPopupFeedback.info(feedback, "Đã lưu. Tải lại tab game nếu chưa áp dụng được."); }
       await refresh();
-    } catch { render(); feedback.textContent = "Chưa lưu được tùy chọn FPS. Thử mở lại popup."; }
+    } catch { render(); GSTPopupFeedback.error(feedback, "Chưa lưu được tùy chọn FPS. Thử mở lại popup."); }
     finally { saving = false; controls.disabled = false; }
   }
   controls.addEventListener("change", () => save());
@@ -66,7 +66,7 @@
   chrome.storage.local.get("fpsPreferences").then(({ fpsPreferences }) => {
     if (revision === initialRevision) saved = GSTFpsOptions.normalize(fpsPreferences);
     render(); controls.disabled = false;
-  }).catch(() => { feedback.textContent = "Không đọc được cài đặt FPS. Thử mở lại popup."; });
+  }).catch(() => { GSTPopupFeedback.error(feedback, "Không đọc được cài đặt FPS. Thử mở lại popup."); });
   globalThis.GSTFpsPopup = { refresh };
   refresh();
 })();

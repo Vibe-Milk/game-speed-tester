@@ -8,19 +8,19 @@
   const thresholdWrites = new Map();
   function summary() { document.getElementById("potionSummary").textContent = `Đan HP ${confirmed.hpEnabled ? "bật" : "tắt"} & MP ${confirmed.mpEnabled ? "bật" : "tắt"}`; }
   function sync() { hpPercent.disabled = !hpEnabled.checked; mpPercent.disabled = !mpEnabled.checked; }
-  function message(text) {
+  function message(text, state = "info") {
     const draft = hpPercent.value !== String(confirmed.hpPercent) || mpPercent.value !== String(confirmed.mpPercent);
-    feedback.textContent = text + (draft ? " · Có ngưỡng chưa xác nhận." : "");
+    GSTPopupFeedback.show(feedback, state, text + (draft ? " · Có ngưỡng chưa xác nhận." : ""));
   }
   async function save(patch, rollback) {
-    message("Đang lưu…");
+    message("Đang lưu…", "pending");
     const operation = queue.catch(() => {}).then(() => navigator.locks.request("gst:potion-preferences", async () => {
       const saved = await chrome.storage.local.get("potionPreferences");
       await chrome.storage.local.set({ potionPreferences: { ...saved.potionPreferences, ...patch } });
     }));
     queue = operation;
-    try { await operation; Object.assign(confirmed, patch); summary(); message("Đã lưu lựa chọn."); return true; }
-    catch { rollback?.(); sync(); message("Chưa lưu được lựa chọn; cài đặt cũ được giữ."); return false; }
+    try { await operation; Object.assign(confirmed, patch); summary(); message("Đã lưu lựa chọn.", "success"); return true; }
+    catch { rollback?.(); sync(); message("Chưa lưu được lựa chọn; cài đặt cũ được giữ.", "error"); return false; }
   }
   for (const [input, key] of [[hpEnabled, "hpEnabled"], [mpEnabled, "mpEnabled"]]) {
     input.addEventListener("change", async () => {
@@ -37,7 +37,7 @@
     if (!loaded) return Promise.resolve(false);
     if (thresholdWrites.has(key)) return thresholdWrites.get(key);
     if (!validThreshold(input)) {
-      feedback.textContent = `${key === "hpPercent" ? "Ngưỡng HP" : "Ngưỡng MP"} phải là số nguyên từ 1 đến 99; cài đặt cũ được giữ.`;
+      GSTPopupFeedback.error(feedback, `${key === "hpPercent" ? "Ngưỡng HP" : "Ngưỡng MP"} phải là số nguyên từ 1 đến 99; cài đặt cũ được giữ.`);
       return Promise.resolve(false);
     }
     const value = input.valueAsNumber;
@@ -73,11 +73,9 @@
   }
   globalThis.GSTPotionPopup = { flushNumericDrafts };
   chrome.storage.local.get("potionPreferences").then(({ potionPreferences: value }) => {
-    confirmed = { hpEnabled: value?.hpEnabled === true, mpEnabled: value?.mpEnabled === true,
-      hpPercent: Number.isSafeInteger(value?.hpPercent) && value.hpPercent >= 1 && value.hpPercent <= 99 ? value.hpPercent : 40,
-      mpPercent: Number.isSafeInteger(value?.mpPercent) && value.mpPercent >= 1 && value.mpPercent <= 99 ? value.mpPercent : 25 };
+    confirmed = GSTFeatureOptions.normalizePotion(value);
     hpEnabled.checked = confirmed.hpEnabled; mpEnabled.checked = confirmed.mpEnabled;
     hpPercent.value = confirmed.hpPercent; mpPercent.value = confirmed.mpPercent;
     controls.disabled = false; loaded = true; sync(); summary();
-  }).catch(() => { feedback.textContent = "Chưa đọc được cài đặt đan. Hãy mở lại menu."; });
+  }).catch(() => { GSTPopupFeedback.error(feedback, "Chưa đọc được cài đặt đan. Hãy mở lại menu."); });
 })();

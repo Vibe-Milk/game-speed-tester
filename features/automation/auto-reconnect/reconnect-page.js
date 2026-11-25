@@ -5,8 +5,7 @@
   const retryDelays = [15000, 30000, 60000];
   const replyTimeout = 12000;
   const verificationTimeout = 30000;
-  const defaults = Object.freeze({ autoReconnect: true, autoReload: false, reloadDelaySeconds: 90,
-    reloadCountdownSeconds: 10, reloadLimit: 3, reloadWindowMinutes: 15 });
+  const defaults = GSTFeatureOptions.recoveryDefaults;
   const episodeStorageKey = "gst:connection-recovery:v1";
   let suspended = false, timer = null, state = null;
   let preferences = { ...defaults }, profileContext = null, preferencesReady = false;
@@ -27,18 +26,7 @@
       && !driver.closing
       && typeof driver.link?.open === "function";
   }
-  function normalizePreferences(value = {}) {
-    const bounded = (candidate, min, max, fallback) => Number.isSafeInteger(candidate)
-      ? Math.max(min, Math.min(max, candidate)) : fallback;
-    return {
-      autoReconnect: value.autoReconnect !== false,
-      autoReload: value.autoReload === true,
-      reloadDelaySeconds: bounded(value.reloadDelaySeconds, 30, 600, defaults.reloadDelaySeconds),
-      reloadCountdownSeconds: bounded(value.reloadCountdownSeconds, 3, 60, defaults.reloadCountdownSeconds),
-      reloadLimit: bounded(value.reloadLimit, 1, 10, defaults.reloadLimit),
-      reloadWindowMinutes: bounded(value.reloadWindowMinutes, 5, 120, defaults.reloadWindowMinutes)
-    };
-  }
+  const normalizePreferences = GSTFeatureOptions.normalizeRecovery;
   function readRecords() {
     try {
       const value = JSON.parse(sessionStorage.getItem(episodeStorageKey) ?? "{}");

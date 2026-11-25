@@ -532,3 +532,10 @@ html[data-embedded="true"] body, body.embedded {
   .global-help-content { padding: 12px 14px 16px; font-size: 14px; }
   .global-help-section + .global-help-section { margin-top: 10px; padding-top: 10px; }
 }
+
+/* Global Feedback: explicit operation state, shared with light/dark theme. */
+[data-feedback-state] { overflow-wrap: anywhere; }
+[data-feedback-state]:empty { display: none !important; }
+[data-feedback-state="info"], [data-feedback-state="pending"] { color: var(--text); background: var(--subtle); }
+[data-feedback-state="success"] { color: var(--accent); background: var(--accent-bg); }
+[data-feedback-state="error"] { color: var(--danger); background: var(--subtle); }

@@ -121,7 +121,7 @@
     title.textContent = "Sửa tài khoản";
     byId("accountSave").textContent = "Lưu thay đổi";
     cancel.hidden = false;
-    feedback.textContent = "Mật khẩu đã lưu đang hiển thị. Sửa trực tiếp nếu muốn đổi; để trống thì giữ mật khẩu cũ.";
+    GSTPopupFeedback.info(feedback, "Mật khẩu đã lưu đang hiển thị. Sửa trực tiếp nếu muốn đổi; để trống thì giữ mật khẩu cũ.");
     labelInput.focus();
   }
   function render() {
@@ -216,18 +216,18 @@
   async function launch(row, mode) {
     if (busy) return;
     setBusy(true);
-    feedback.textContent = mode === "current" ? "Đang dừng công việc hiện tại rồi mở form game…" : "Đang mở tab game mới…";
+    GSTPopupFeedback.pending(feedback, mode === "current" ? "Đang dừng công việc hiện tại rồi mở form game…" : "Đang mở tab game mới…");
     try {
       const result = await chrome.runtime.sendMessage({ type: "gst:account-launch", accountId: row.id, mode });
       if (result?.accepted) {
-        feedback.textContent = result.reused
+        GSTPopupFeedback.info(feedback, result.reused
           ? "Đã xác nhận " + row.label + " · " + result.character + "."
           : result.recoveryStarted ? "Đã dùng nút đăng xuất của game trên tab này; đang chờ form để đăng nhập lại."
           : result.submitted ? "Đã gửi form đăng nhập của game; chờ game xác nhận nhân vật."
-            : "Tab game đã mở; chờ giao diện game xác nhận tài khoản.";
-      } else feedback.textContent = explain(result?.reason);
+            : "Tab game đã mở; chờ giao diện game xác nhận tài khoản.");
+      } else GSTPopupFeedback.error(feedback, explain(result?.reason));
       await refreshStatus();
-    } catch { feedback.textContent = "Chưa liên hệ được bộ mở tài khoản."; }
+    } catch { GSTPopupFeedback.error(feedback, "Chưa liên hệ được bộ mở tài khoản."); }
     finally { setBusy(false); }
   }
   async function removeAccount(row) {
@@ -237,15 +237,15 @@
     try {
       const active = await GSTAccountProfiles.activeContext();
       if (active?.verified && active.accountId === row.id) {
-        feedback.textContent = "Chuyển khỏi tài khoản đang mở trước khi xóa để giữ an toàn cho công việc đang chạy.";
+        GSTPopupFeedback.info(feedback, "Chuyển khỏi tài khoản đang mở trước khi xóa để giữ an toàn cho công việc đang chạy.");
         return;
       }
       await GSTAccountProfiles.updateAccounts((current) => current.filter((item) => item.id !== row.id));
       await GSTAccountProfiles.removeAccountProfiles(row.slot);
       if (editingId === row.id) resetForm();
       await reload();
-      feedback.textContent = "Đã xóa tài khoản và cài đặt riêng trong extension.";
-    } catch { feedback.textContent = "Chưa xóa được tài khoản."; }
+      GSTPopupFeedback.success(feedback, "Đã xóa tài khoản và cài đặt riêng trong extension.");
+    } catch { GSTPopupFeedback.error(feedback, "Chưa xóa được tài khoản."); }
     finally { setBusy(false); }
   }
   async function clearSavedIdentity(row) {
@@ -259,7 +259,7 @@
         try { stopped = await chrome.tabs.sendMessage(captured.tabId, { type: "gst:account-stop" }); }
         catch { stopped = null; }
         if (stopped?.ready !== true || stopped.autoOn !== false) {
-          feedback.textContent = explain(stopped?.reason || "automation_stop_unconfirmed");
+          GSTPopupFeedback.error(feedback, explain(stopped?.reason || "automation_stop_unconfirmed"));
           return;
         }
       }
@@ -274,9 +274,9 @@
           : item);
       });
       await reload();
-      feedback.textContent = "Đã xóa dấu xác nhận nhân vật. Hồ sơ riêng được giữ nguyên; hãy đăng nhập lại để xác nhận.";
+      GSTPopupFeedback.success(feedback, "Đã xóa dấu xác nhận nhân vật. Hồ sơ riêng được giữ nguyên; hãy đăng nhập lại để xác nhận.");
       await refreshStatus();
-    } catch { feedback.textContent = "Chưa cập nhật được dấu xác nhận nhân vật."; }
+    } catch { GSTPopupFeedback.error(feedback, "Chưa cập nhật được dấu xác nhận nhân vật."); }
     finally { setBusy(false); }
   }
   form.addEventListener("submit", async (event) => {
@@ -285,7 +285,7 @@
     const username = usernameInput.value.trim(), password = passwordInput.value;
     const label = labelInput.value.trim() || username;
     if (!username || (!editingId && !password)) {
-      feedback.textContent = "Nhập tên đăng nhập và mật khẩu.";
+      GSTPopupFeedback.error(feedback, "Nhập tên đăng nhập và mật khẩu.");
       return;
     }
     setBusy(true);
@@ -312,10 +312,10 @@
       if (usernameChanged) await GSTAccountProfiles.removeAccountProfiles(previousSlot);
       rows = next;
       render(); resetForm();
-      feedback.textContent = usernameChanged
+      GSTPopupFeedback.success(feedback, usernameChanged
         ? "Đã lưu. Tên đăng nhập đổi nên extension tạo slot và hồ sơ mới."
-        : existing ? "Đã cập nhật tài khoản." : "Đã lưu tài khoản trên trình duyệt này.";
-    } catch { feedback.textContent = "Chưa lưu được tài khoản."; }
+        : existing ? "Đã cập nhật tài khoản." : "Đã lưu tài khoản trên trình duyệt này.");
+    } catch { GSTPopupFeedback.error(feedback, "Chưa lưu được tài khoản."); }
     finally { setBusy(false); }
   });
   cancel.addEventListener("click", resetForm);
@@ -333,7 +333,7 @@
       renderAutoLogin();
     }
   });
-  void reload().catch(() => { feedback.textContent = "Chưa đọc được danh sách tài khoản."; });
+  void reload().catch(() => { GSTPopupFeedback.error(feedback, "Chưa đọc được danh sách tài khoản."); });
   void refreshStatus();
   const timer = setInterval(() => { void refreshStatus(); }, 1500);
   window.addEventListener("pagehide", () => clearInterval(timer), { once: true });

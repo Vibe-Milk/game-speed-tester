@@ -30,8 +30,8 @@
     try {
       await chrome.storage.local.set({ areaMapShortcut: { code } });
       label.textContent = name(code);
-      feedback.textContent = "Đã lưu phím mở bản đồ.";
-    } catch { feedback.textContent = "Chưa lưu được. Hãy thử lại."; }
+      GSTPopupFeedback.success(feedback, "Đã lưu phím mở bản đồ.");
+    } catch { GSTPopupFeedback.error(feedback, "Chưa lưu được. Hãy thử lại."); }
     finally { controls.disabled = false; }
   }
   GSTPopupShortcut.bind({
@@ -51,7 +51,7 @@
       if (new URLSearchParams(location.search).get("embedded") === "1")
         parent.postMessage({ channel: "gst:menu-close:v1" }, origin);
       else window.close();
-    } catch { feedback.textContent = "Không mở được bản đồ. Hãy tải lại tab game sau khi cập nhật extension."; }
+    } catch { GSTPopupFeedback.error(feedback, "Không mở được bản đồ. Hãy tải lại tab game sau khi cập nhật extension."); }
   });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
@@ -67,5 +67,5 @@
     savedFarmKey = Number.isSafeInteger(value.farmShortcut?.code) ? value.farmShortcut.code : 86;
     label.textContent = name(value.areaMapShortcut?.code);
     controls.disabled = false;
-  }).catch(() => { feedback.textContent = "Chưa đọc được phím tắt; hãy mở lại Menu tool."; });
+  }).catch(() => { GSTPopupFeedback.error(feedback, "Chưa đọc được phím tắt; hãy mở lại Menu tool."); });
 })();

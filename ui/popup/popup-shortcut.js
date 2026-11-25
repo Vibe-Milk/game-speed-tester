@@ -20,14 +20,14 @@
     if (!active) return;
     const previous = active;
     active = null;
-    previous.feedback.textContent = previous.cancelMessage;
+    GSTPopupFeedback.info(previous.feedback, previous.cancelMessage);
   }
   function bind(options) {
     const recorder = { cancelMessage: "Đã hủy.", ...options };
     recorder.capture.addEventListener("click", () => {
       if (active && active !== recorder) cancel();
       active = recorder;
-      recorder.feedback.textContent = recorder.prompt;
+      GSTPopupFeedback.info(recorder.feedback, recorder.prompt);
     });
     recorder.reset.addEventListener("click", () => {
       cancel();
@@ -48,7 +48,7 @@
     }
     if (recorder.ignore?.(event)) return;
     if (event.repeat || event.isComposing || !recorder.valid(event)) {
-      recorder.feedback.textContent = recorder.invalidMessage;
+      GSTPopupFeedback.error(recorder.feedback, recorder.invalidMessage);
       return;
     }
     active = null;

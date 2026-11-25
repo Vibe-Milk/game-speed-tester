@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const origin = "https://nghichthienky.online", pending = new Map();
+  const pending = new Map();
   let preferences = null, measure = false, revision = 0, displayRevision = 0, sequence = 0, suspended = false;
   let navigating = false;
   let selfColor = null;
@@ -15,10 +15,10 @@
       }
       return;
     }
-    window.postMessage({ channel: "gst:fps:v1", type: "configure", preferences: { ...preferences, minimapSelfColor: selfColor }, measure }, origin);
+    GSTWindowBridge.send({ channel: "gst:fps:v1", type: "configure", preferences: { ...preferences, minimapSelfColor: selfColor }, measure });
   }
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:fps-status:v1") return;
+    if (!GSTWindowBridge.matches(event, "gst:fps-status:v1")) return;
     if (event.data.ready) { configure(); return; }
     const entry = pending.get(event.data.requestId);
     if (!entry) return;
@@ -41,7 +41,7 @@
       respond({ message: "Chưa kết nối tối ưu FPS. Tải lại extension rồi tải lại tab game." });
     }, 800);
     pending.set(requestId, { respond, timer });
-    window.postMessage({ channel: "gst:fps:v1", type: "status", requestId }, origin);
+    GSTWindowBridge.send({ channel: "gst:fps:v1", type: "status", requestId });
     return true;
   });
   chrome.storage.onChanged.addListener((changes, area) => {

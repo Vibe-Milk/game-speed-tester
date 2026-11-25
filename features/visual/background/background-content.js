@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   let chest = false, chestRevision = 0;
-  const send = () => window.postMessage({ channel: "gst:background:v1", chest }, "https://nghichthienky.online");
+  const send = () => GSTWindowBridge.send({ channel: "gst:background:v1", chest });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (changes.chestPreferences) { chestRevision++; chest = changes.chestPreferences.newValue?.enabled === true; }
@@ -13,7 +13,7 @@
     send();
   }).catch(() => {});
   window.addEventListener("message", (event) => {
-    if (event.source === window && event.origin === "https://nghichthienky.online" && event.data?.channel === "gst:background-ready:v1") send();
+    if (GSTWindowBridge.matches(event, "gst:background-ready:v1")) send();
   });
   window.addEventListener("pageshow", send);
 })();

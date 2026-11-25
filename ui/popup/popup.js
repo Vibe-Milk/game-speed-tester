@@ -187,16 +187,16 @@ async function saveShortcut(code) {
     await chrome.storage.local.set({ farmShortcut: { code } });
     shortcutLabel.textContent = label;
     document.getElementById("farmShortcutSummary").textContent = `Phím tắt · ${label}`;
-    shortcutFeedback.textContent = "Đã lưu.";
+    GSTPopupFeedback.success(shortcutFeedback, "Đã lưu.");
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const result = await chrome.tabs.sendMessage(tab.id, { type: "gst:farm-shortcut", preferences: { code } });
       if (!result?.accepted) throw new Error("Not accepted.");
     } catch {
-      shortcutFeedback.textContent = "Đã lưu. Tải lại trang game nếu chưa áp dụng được.";
+      GSTPopupFeedback.info(shortcutFeedback, "Đã lưu. Tải lại trang game nếu chưa áp dụng được.");
     }
   } catch {
-    shortcutFeedback.textContent = "Chưa lưu được phím. Hãy mở lại popup.";
+    GSTPopupFeedback.error(shortcutFeedback, "Chưa lưu được phím. Hãy mở lại popup.");
   } finally { shortcutControls.disabled = false; }
 }
 GSTPopupShortcut.bind({
@@ -221,7 +221,7 @@ function syncFarmToggle() {
 }
 window.addEventListener("gst:popup-account-context-change", () => {
   farmRuntimeOn = null; farmRuntimePolicy = null; syncFarmToggle();
-  farmToggleFeedback.textContent = "Đang đọc trạng thái của nhân vật mới…";
+  GSTPopupFeedback.pending(farmToggleFeedback, "Đang đọc trạng thái của nhân vật mới…");
 });
 farmToggle.addEventListener("click", async (event) => {
   if (!event.isTrusted || farmTogglePending || farmRuntimeOn === null || !popupAccountContext?.verified) return;
@@ -229,7 +229,7 @@ farmToggle.addEventListener("click", async (event) => {
   const enabled = !farmRuntimeOn, policyMode = farmRuntimePolicy;
   if (!Number.isInteger(tabId) || !["tool", "native"].includes(policyMode)) return;
   farmTogglePending = true; syncFarmToggle();
-  farmToggleFeedback.textContent = "Đang xác nhận yêu cầu với tab game…";
+  GSTPopupFeedback.pending(farmToggleFeedback, "Đang xác nhận yêu cầu với tab game…");
   // Reserve at the user gesture, before waiting for saves or identity refresh.
   const reservation = chrome.tabs.sendMessage(tabId, { type: "gst:intent-begin", feature: "farm", enabled,
     targetTabId: tabId, profileIdentity: GSTAccountProfiles.identity(expected),
@@ -245,11 +245,11 @@ farmToggle.addEventListener("click", async (event) => {
     const result = await chrome.tabs.sendMessage(tabId, { type: "gst:farm-control", enabled, policyMode,
       targetTabId: tabId, profileIdentity: GSTAccountProfiles.identity(expected), token: intent.token });
     if (version !== popupAccountContextVersion) return;
-    farmToggleFeedback.textContent = result?.reason || "Chưa nhận được trạng thái xác nhận của game.";
+    GSTPopupFeedback.error(farmToggleFeedback, result?.reason || "Chưa nhận được trạng thái xác nhận của game.");
     // No optimistic ON/OFF. refreshFarm reads the actual game state.
   } catch (error) {
     if (version === popupAccountContextVersion)
-      farmToggleFeedback.textContent = error.message || "Không gửi được yêu cầu bật/tắt Farm.";
+      GSTPopupFeedback.error(farmToggleFeedback, error.message || "Không gửi được yêu cầu bật/tắt Farm.");
   } finally {
     if (!submitted && enabled) void reservation.then((intent) => {
       if (intent?.ok) return chrome.tabs.sendMessage(tabId, { type: "gst:farm-control", enabled,
@@ -382,10 +382,7 @@ async function readCurrentFarmPreferences() {
   return GSTAccountProfiles.currentProfile(popupAccountContext, "farm", stored);
 }
 
-const connectionRecoveryDefaults = Object.freeze({
-  autoReconnect: true, autoReload: false, reloadDelaySeconds: 90,
-  reloadCountdownSeconds: 10, reloadLimit: 3, reloadWindowMinutes: 15
-});
+const connectionRecoveryDefaults = GSTFeatureOptions.recoveryDefaults;
 const connectionRecoveryControls = document.getElementById("connectionRecoveryControls");
 const connectionAutoReconnect = document.getElementById("connectionAutoReconnect");
 const connectionAutoReload = document.getElementById("connectionAutoReload");
@@ -399,18 +396,7 @@ let connectionRecoveryConfirmed = { ...connectionRecoveryDefaults };
 let connectionRecoveryReady = false;
 let connectionRecoveryRevision = 0;
 let connectionRecoveryQueue = Promise.resolve();
-function normalizeConnectionRecovery(raw = {}) {
-  const bounded = (value, min, max, fallback) => Number.isSafeInteger(value)
-    ? Math.max(min, Math.min(max, value)) : fallback;
-  return {
-    autoReconnect: raw.autoReconnect !== false,
-    autoReload: raw.autoReload === true,
-    reloadDelaySeconds: bounded(raw.reloadDelaySeconds, 30, 600, 90),
-    reloadCountdownSeconds: bounded(raw.reloadCountdownSeconds, 3, 60, 10),
-    reloadLimit: bounded(raw.reloadLimit, 1, 10, 3),
-    reloadWindowMinutes: bounded(raw.reloadWindowMinutes, 5, 120, 15)
-  };
-}
+const normalizeConnectionRecovery = GSTFeatureOptions.normalizeRecovery;
 function syncConnectionRecovery(raw, { allowed, managed, known = true, label = "" } = {}) {
   connectionRecoveryConfirmed = normalizeConnectionRecovery(raw);
   connectionAutoReconnect.checked = connectionRecoveryConfirmed.autoReconnect;
@@ -481,7 +467,7 @@ function updateConnectionRecovery(patch) {
       catch { /* The storage change still syncs on the next bridge refresh. */ }
     }
     if (revision === connectionRecoveryRevision) {
-      connectionRecoveryFeedback.textContent = "Đã lưu cài đặt kết nối.";
+      GSTPopupFeedback.success(connectionRecoveryFeedback, "Đã lưu cài đặt kết nối.");
       await loadConnectionRecovery();
     }
     return written;
@@ -489,7 +475,7 @@ function updateConnectionRecovery(patch) {
   connectionRecoveryQueue = save;
   void save.catch((error) => {
     if (revision !== connectionRecoveryRevision) return;
-    connectionRecoveryFeedback.textContent = error?.message || "Chưa lưu được cài đặt kết nối.";
+    GSTPopupFeedback.error(connectionRecoveryFeedback, error?.message || "Chưa lưu được cài đặt kết nối.");
     void loadConnectionRecovery();
   });
   return save;
@@ -497,24 +483,25 @@ function updateConnectionRecovery(patch) {
 for (const [input, key] of [[connectionAutoReconnect, "autoReconnect"], [connectionAutoReload, "autoReload"]]) {
   input.addEventListener("change", () => {
     input.disabled = true;
-    connectionRecoveryFeedback.textContent = "Đang lưu cài đặt kết nối…";
+    GSTPopupFeedback.pending(connectionRecoveryFeedback, "Đang lưu cài đặt kết nối…");
     void updateConnectionRecovery({ [key]: input.checked });
   });
 }
-for (const [input, key, min, max, label] of [
-  [connectionReloadDelay, "reloadDelaySeconds", 30, 600, "Khoảng chờ phải từ 30 đến 600 giây."],
-  [connectionReloadCountdown, "reloadCountdownSeconds", 3, 60, "Đếm ngược phải từ 3 đến 60 giây."],
-  [connectionReloadLimit, "reloadLimit", 1, 10, "Số lần tải lại phải từ 1 đến 10."],
-  [connectionReloadWindow, "reloadWindowMinutes", 5, 120, "Khoảng giới hạn phải từ 5 đến 120 phút."]
+for (const [input, key, label] of [
+  [connectionReloadDelay, "reloadDelaySeconds", "Khoảng chờ phải từ 30 đến 600 giây."],
+  [connectionReloadCountdown, "reloadCountdownSeconds", "Đếm ngược phải từ 3 đến 60 giây."],
+  [connectionReloadLimit, "reloadLimit", "Số lần tải lại phải từ 1 đến 10."],
+  [connectionReloadWindow, "reloadWindowMinutes", "Khoảng giới hạn phải từ 5 đến 120 phút."]
 ]) input.addEventListener("change", () => {
+  const { min, max } = GSTFeatureOptions.recoveryLimits[key];
   const value = GSTPopupNumericInput.read(input, { min, max, integer: true, nativeValidity: false });
   if (value === null) {
-    connectionRecoveryFeedback.textContent = label;
+    GSTPopupFeedback.error(connectionRecoveryFeedback, label);
     input.value = String(connectionRecoveryConfirmed[key]);
     return;
   }
   input.disabled = true;
-  connectionRecoveryFeedback.textContent = "Đang lưu cài đặt kết nối…";
+  GSTPopupFeedback.pending(connectionRecoveryFeedback, "Đang lưu cài đặt kết nối…");
   void updateConnectionRecovery({ [key]: value });
 });
 void accountContextPromise.then(loadConnectionRecovery);
@@ -535,7 +522,7 @@ async function refreshFarm() {
     farmRuntimeOn = typeof status.autoOn === "boolean" ? status.autoOn : null;
     farmRuntimePolicy = status.policyMode; syncFarmToggle();
     if (!farmTogglePending && /^Đang đọc trạng thái/.test(farmToggleFeedback.textContent))
-      farmToggleFeedback.textContent = status.message || "Chọn Bật Farm để gửi yêu cầu tới tab game.";
+      GSTPopupFeedback.info(farmToggleFeedback, status.message || "Chọn Bật Farm để gửi yêu cầu tới tab game.");
     if (document.activeElement !== farmCustomStats) farmCustomStats.checked = status.customComparisonEnabled === true;
     if (["tool", "native", "disabled"].includes(status.policyMode)) {
       farmTabPolicyMode = status.policyMode;
@@ -791,7 +778,7 @@ function syncFarmPreferences(raw, { preserveDraft = true, forceKeys = [] } = {})
   }
   syncFarmScope(); syncFarmLevelInputs(); farmSummaries();
   syncFarmPolicyUI(raw); syncFarmActions();
-  farmFeedback.textContent = farmHasDraft() ? "Có bản nháp chưa lưu." : "Đã đồng bộ cài đặt.";
+  GSTPopupFeedback.show(farmFeedback, farmHasDraft() ? "info" : "success", farmHasDraft() ? "Có bản nháp chưa lưu." : "Đã đồng bộ cài đặt.");
   syncBossTargetControls();
 }
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -828,12 +815,12 @@ farmCustomStats.addEventListener("change", async () => {
       profileIdentity: context?.verified === true ? GSTAccountProfiles.identity(context) : null
     });
     if (result?.accepted !== true) throw new Error("Not accepted.");
-    farmPolicyFeedback.textContent = enabled
+    GSTPopupFeedback.success(farmPolicyFeedback, enabled
       ? "Thống kê thử nghiệm được bật riêng cho tab này."
-      : "Thống kê thử nghiệm đã tắt riêng cho tab này.";
+      : "Thống kê thử nghiệm đã tắt riêng cho tab này.");
   } catch {
     farmCustomStats.checked = !enabled;
-    farmPolicyFeedback.textContent = "Không thể xác nhận cài đặt theo tab; trạng thái trước đó được giữ.";
+    GSTPopupFeedback.error(farmPolicyFeedback, "Không thể xác nhận cài đặt theo tab; trạng thái trước đó được giữ.");
   } finally {
     farmCustomStats.disabled = !farmSyncReady || (farmTabPolicyMode ?? farmPolicyConfirmed) !== "custom";
   }
@@ -849,7 +836,7 @@ farmPolicyMode.addEventListener("change", async () => {
   farmPolicyPending++;
   syncBossTargetControls();
   farmPolicyDescription.textContent = farmPolicyDescriptions[mode];
-  farmPolicyFeedback.textContent = "Đang lưu chế độ Auto Farm…";
+  GSTPopupFeedback.pending(farmPolicyFeedback, "Đang lưu chế độ Auto Farm…");
   try {
     const written = await updateFarmPreferences({ policyMode: mode });
     let committed = written;
@@ -872,11 +859,11 @@ farmPolicyMode.addEventListener("change", async () => {
     if (requestRevision !== farmPolicyRequestRevision) return;
     if (localAccepted) farmTabPolicyMode = committed.policyMode;
     syncFarmPreferences(committed);
-    farmPolicyFeedback.textContent = committed.policyMode === mode && localAccepted
+    GSTPopupFeedback.info(farmPolicyFeedback, committed.policyMode === mode && localAccepted
       ? `Đã lưu mặc định ${farmPolicyLabels[mode]} và gửi tới tab này; xem trạng thái thực tế phía trên. Các tab đang mở khác giữ chế độ riêng của chúng.`
       : localAccepted
         ? `Đã gửi chế độ ${farmPolicyLabels[committed.policyMode]} mới nhất tới tab này; xem trạng thái thực tế phía trên.`
-        : "Đã lưu chế độ hồ sơ, nhưng chưa xác nhận được chế độ cục bộ của tab này.";
+        : "Đã lưu chế độ hồ sơ, nhưng chưa xác nhận được chế độ cục bộ của tab này.");
   } catch {
     if (requestRevision === farmPolicyRequestRevision) {
       let rollback = latestFarmPreferences ?? farmConfirmed;
@@ -887,7 +874,7 @@ farmPolicyMode.addEventListener("change", async () => {
       syncFarmPreferences(rollback);
       farmPolicyMode.value = farmTabPolicyMode ?? farmPolicyConfirmed;
       farmPolicyDescription.textContent = farmPolicyDescriptions[farmPolicyMode.value];
-      farmPolicyFeedback.textContent = "Chưa lưu được chế độ; đã trả bộ chọn về giá trị đã xác nhận gần nhất.";
+      GSTPopupFeedback.error(farmPolicyFeedback, "Chưa lưu được chế độ; đã trả bộ chọn về giá trị đã xác nhận gần nhất.");
     }
   } finally {
     farmPolicyPending--;
@@ -922,9 +909,11 @@ function farmHpThresholdDraft() {
     error: valid ? "" : "Nhập số nguyên: 1 ≤ HP rút lui < HP quay lại ≤ 100%.",
   };
 }
-function farmMessage(message) {
-  farmFeedback.textContent = message + (farmDraftError ? " · Cảnh giới/tầng chưa hợp lệ, chưa lưu."
-    : farmHpThresholdDraft().error ? ` · ${farmHpThresholdDraft().error}` : farmHasDraft() ? " · Có bản nháp chưa lưu." : "");
+function farmMessage(message, state = "info") {
+  const draftError = farmHpThresholdDraft().error;
+  GSTPopupFeedback.show(farmFeedback, farmDraftError || draftError ? "error" : state,
+    message + (farmDraftError ? " · Cảnh giới/tầng chưa hợp lệ, chưa lưu."
+    : draftError ? ` · ${draftError}` : farmHasDraft() ? " · Có bản nháp chưa lưu." : ""));
 }
 function syncFarmScope() {
   farmRadius.closest(".input-action").hidden = farmSearchScope.value === "map";
@@ -958,7 +947,7 @@ async function saveFarmPatch(patch, rollback, { draftWrite = false, preserveDraf
   const contextVersion = popupAccountContextVersion;
   farmPreferenceWritesPending++;
   syncBossTargetControls();
-  farmMessage("Đang lưu…");
+  farmMessage("Đang lưu…", "pending");
   try {
     const written = await updateFarmPreferences(patch, { draftWrite });
     if (contextVersion !== popupAccountContextVersion) return false;
@@ -970,12 +959,12 @@ async function saveFarmPatch(patch, rollback, { draftWrite = false, preserveDraf
     latestFarmPreferences = committed;
     syncFarmPreferences(committed, { forceKeys: [...Object.keys(patch), "targetMode", "excludeBoss"]
       .filter((key) => !preserveDraftKeys.includes(key)) });
-    farmMessage(typeof successMessage === "function" ? successMessage(committed) : "Đã lưu cài đặt.");
+    farmMessage(typeof successMessage === "function" ? successMessage(committed) : "Đã lưu cài đặt.", "success");
     return true;
   } catch {
     if (contextVersion !== popupAccountContextVersion) return false;
     rollback?.();
-    farmMessage("Chưa lưu được lựa chọn; cài đặt cũ được giữ.");
+    farmMessage("Chưa lưu được lựa chọn; cài đặt cũ được giữ.", "error");
     return false;
   } finally {
     farmPreferenceWritesPending--;
@@ -995,13 +984,13 @@ toolRecoverySave.addEventListener("click", async () => {
   const low = GSTPopupNumericInput.read(toolRetreatHp, { min: 1, max: 99, integer: true, nativeValidity: false });
   const high = GSTPopupNumericInput.read(toolResumeHp, { min: 2, max: 100, integer: true, nativeValidity: false });
   if (!validFarmHpThresholds(low, high)) {
-    toolRecoveryFeedback.textContent = "Nhập số nguyên: 1 ≤ mức rút lui < mức tiếp tục ≤ 100."; return;
+    GSTPopupFeedback.error(toolRecoveryFeedback, "Nhập số nguyên: 1 ≤ mức rút lui < mức tiếp tục ≤ 100."); return;
   }
   toolRecoverySave.disabled = true;
   const ok = await saveFarmPatch({ toolRetreatHp: low, toolResumeHp: high }, () => {
     toolRetreatHp.value = String(farmConfirmed.toolRetreatHp); toolResumeHp.value = String(farmConfirmed.toolResumeHp);
   });
-  toolRecoveryFeedback.textContent = ok ? "Đã lưu mức HP." : "Chưa lưu được mức HP.";
+  GSTPopupFeedback.show(toolRecoveryFeedback, ok ? "success" : "error", ok ? "Đã lưu mức HP." : "Chưa lưu được mức HP.");
   toolRecoverySave.disabled = false;
 });
 for (const [input, key] of [[farmShowTargetLine, "showTargetLine"], [farmShowRange, "showRange"],
@@ -1026,7 +1015,7 @@ farmNearbyRadius.addEventListener("change", async () => {
   const value = GSTPopupNumericInput.read(farmNearbyRadius, { min: 1, max: 6, integer: true, nativeValidity: false });
   if (value === null) {
     farmNearbyRadius.value = String(farmConfirmed.nearbyRadius);
-    farmMessage("Bán kính dọn gần phải là số nguyên từ 1 đến 6.");
+    farmMessage("Bán kính dọn gần phải là số nguyên từ 1 đến 6.", "error");
     return;
   }
   farmNearbyRadius.disabled = true;
@@ -1053,7 +1042,7 @@ farmTargetMode.addEventListener("change", async () => {
     syncFarmLevelInputs();
     farmTargetMode.disabled = false;
     syncBossTargetControls();
-    farmMessage("Hoàn tất lựa chọn cảnh giới/tầng hiện tại trước khi đổi chế độ.");
+    farmMessage("Hoàn tất lựa chọn cảnh giới/tầng hiện tại trước khi đổi chế độ.", "error");
     return;
   }
   farmTargetMode.value = mode;
@@ -1101,7 +1090,7 @@ function commitFarmSingle(mode = activeFarmTargetMode()) {
   if (value === null) {
     farmDraftError = true;
     row.error.textContent = "Chọn đủ cảnh giới và tầng từ 1 đến 10.";
-    farmFeedback.textContent = row.error.textContent;
+    GSTPopupFeedback.error(farmFeedback, row.error.textContent);
     return Promise.resolve(false);
   }
   farmDraftError = false;
@@ -1112,7 +1101,7 @@ function commitFarmSingle(mode = activeFarmTargetMode()) {
     syncFarmLevelInputs();
     if (!saved) {
       row.error.textContent = "Chưa lưu được lựa chọn; mức đã lưu trước đó vẫn được giữ.";
-      farmFeedback.textContent = row.error.textContent;
+      GSTPopupFeedback.error(farmFeedback, row.error.textContent);
     }
     return saved;
   })();
@@ -1132,19 +1121,19 @@ function commitFarmRange() {
   if (min === null) {
     farmDraftError = true;
     farmTargetMinLevelError.textContent = "Chọn đủ cảnh giới và tầng tối thiểu từ 1 đến 10.";
-    farmFeedback.textContent = farmTargetMinLevelError.textContent;
+    GSTPopupFeedback.error(farmFeedback, farmTargetMinLevelError.textContent);
     return Promise.resolve(false);
   }
   if (max === null) {
     farmDraftError = true;
     farmTargetMaxLevelError.textContent = "Chọn đủ cảnh giới và tầng tối đa từ 1 đến 10.";
-    farmFeedback.textContent = farmTargetMaxLevelError.textContent;
+    GSTPopupFeedback.error(farmFeedback, farmTargetMaxLevelError.textContent);
     return Promise.resolve(false);
   }
   if (min > max) {
     farmDraftError = true;
     farmTargetMaxLevelError.textContent = "Cảnh giới/tầng tối đa phải bằng hoặc cao hơn tối thiểu.";
-    farmFeedback.textContent = farmTargetMaxLevelError.textContent;
+    GSTPopupFeedback.error(farmFeedback, farmTargetMaxLevelError.textContent);
     return Promise.resolve(false);
   }
   farmDraftError = false;
@@ -1154,7 +1143,7 @@ function commitFarmRange() {
     syncFarmLevelInputs();
     if (!saved) {
       farmTargetMaxLevelError.textContent = "Chưa lưu được khoảng cảnh giới; mức đã lưu trước đó vẫn được giữ.";
-      farmFeedback.textContent = farmTargetMaxLevelError.textContent;
+      GSTPopupFeedback.error(farmFeedback, farmTargetMaxLevelError.textContent);
     }
     return saved;
   })();
@@ -1176,7 +1165,7 @@ for (const [name, row] of Object.entries(farmTargetRows)) {
     if (row.realm.value !== "legacy") {
       farmDraftError = true;
       row.error.textContent = "Chọn tầng để hoàn tất lựa chọn cảnh giới.";
-      farmFeedback.textContent = row.error.textContent;
+      GSTPopupFeedback.error(farmFeedback, row.error.textContent);
     } else void (name === "single" ? commitFarmSingle() : commitFarmRange());
     syncFarmLevelInputs();
   });
@@ -1191,12 +1180,12 @@ function commitFarmRadius() {
   const value = GSTPopupNumericInput.read(farmRadius, { min: 1, max: 1000, integer: true });
   if (value === null) {
     farmRadiusError.textContent = "Giới hạn vùng farm phải là số nguyên từ 1 đến 1.000 ô.";
-    farmFeedback.textContent = farmRadiusError.textContent;
+    GSTPopupFeedback.error(farmFeedback, farmRadiusError.textContent);
     return Promise.resolve(false);
   }
   if (value === farmConfirmed.radius) {
     farmRadius.value = String(farmConfirmed.radius);
-    farmFeedback.textContent = farmHasDraft() ? "Có bản nháp chưa lưu." : "";
+    GSTPopupFeedback.info(farmFeedback, farmHasDraft() ? "Có bản nháp chưa lưu." : "");
     return Promise.resolve(true);
   }
   const save = (async () => {
@@ -1205,7 +1194,7 @@ function commitFarmRadius() {
     farmRadius.disabled = false;
     if (!saved) {
       farmRadiusError.textContent = "Chưa lưu được giới hạn vùng farm; cài đặt đã lưu trước đó được giữ.";
-      farmFeedback.textContent = farmRadiusError.textContent;
+      GSTPopupFeedback.error(farmFeedback, farmRadiusError.textContent);
     }
     return saved;
   })();
@@ -1221,7 +1210,7 @@ function commitFarmHpThresholds() {
   const draft = farmHpThresholdDraft();
   if (!draft.valid) {
     farmRetreatThresholdError.textContent = draft.error;
-    farmFeedback.textContent = draft.error;
+    GSTPopupFeedback.error(farmFeedback, draft.error);
     return Promise.resolve(false);
   }
   farmRetreatThresholdError.textContent = "";
@@ -1393,10 +1382,10 @@ farmReturnDeath.addEventListener("change", async () => {
     await chrome.storage.local.set({
       areaMapOptions: { ...saved.areaMapOptions, returnDeath: next }
     });
-    farmMessage("Đã lưu lựa chọn.");
+    farmMessage("Đã lưu lựa chọn.", "success");
   } catch {
     farmReturnDeath.checked = !next;
-    farmFeedback.textContent = "Chưa lưu được tùy chọn quay lại điểm chết. Hãy thử lại.";
+    GSTPopupFeedback.error(farmFeedback, "Chưa lưu được tùy chọn quay lại điểm chết. Hãy thử lại.");
   } finally { farmReturnDeath.disabled = false; }
 });
 for (const name of Object.keys(GSTFont.families)) {
@@ -1451,7 +1440,7 @@ function save() {
   if (saving) return Promise.resolve(false);
   const invalid = invalidSpeedInput();
   if (invalid) {
-    feedback.textContent = `${speedLabels[invalid.id]} phải từ 1 đến 6.`;
+    GSTPopupFeedback.error(feedback, `${speedLabels[invalid.id]} phải từ 1 đến 6.`);
     return Promise.resolve(false);
   }
   const values = speedSnapshot();
@@ -1460,11 +1449,11 @@ function save() {
     try {
       await chrome.storage.local.set({ preferences: values });
       speedConfirmed = { ...values };
-      feedback.textContent = "";
+      GSTPopupFeedback.clear(feedback);
       void refresh();
       return true;
     } catch {
-      feedback.textContent = "Chưa lưu được cài đặt tốc độ. Hãy thử lưu lại.";
+      GSTPopupFeedback.error(feedback, "Chưa lưu được cài đặt tốc độ. Hãy thử lưu lại.");
       return false;
     }
   });
@@ -1505,7 +1494,7 @@ displayControls.addEventListener("change", async () => {
   };
   try {
     await chrome.storage.local.set({ displayPreferences });
-    feedback.textContent = "";
+    GSTPopupFeedback.clear(feedback);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error("No active tab.");
@@ -1515,10 +1504,10 @@ displayControls.addEventListener("change", async () => {
       const shouldHide = !displayPreferences.visible || !Object.values(displayPreferences.fields).some(Boolean);
       if (!result?.applied || (shouldHide && result.visible)) throw new Error("Display update not confirmed.");
     } catch {
-      feedback.textContent = "Đã lưu lựa chọn hiển thị. Tải lại tab game nếu bảng chưa thay đổi sau khi cập nhật extension.";
+      GSTPopupFeedback.info(feedback, "Đã lưu lựa chọn hiển thị. Tải lại tab game nếu bảng chưa thay đổi sau khi cập nhật extension.");
     }
   } catch {
-    feedback.textContent = "Chưa lưu được lựa chọn hiển thị. Hãy mở lại popup và thử lại.";
+    GSTPopupFeedback.error(feedback, "Chưa lưu được lựa chọn hiển thị. Hãy mở lại popup và thử lại.");
   } finally {
     displayControls.disabled = false;
   }
@@ -1529,17 +1518,17 @@ fontControls.addEventListener("change", async () => {
   const fontPreferences = GSTFont.normalize({ enabled: fontEnabled.checked, font: fontFamily.value });
   try {
     await chrome.storage.local.set({ fontPreferences });
-    fontFeedback.textContent = "";
+    GSTPopupFeedback.clear(fontFeedback);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error("No active tab.");
       const result = await chrome.tabs.sendMessage(tab.id, { type: "gst:font", preferences: fontPreferences });
       if (!result?.accepted) throw new Error("Font request not confirmed.");
     } catch {
-      fontFeedback.textContent = "Đã lưu. Nếu font chưa đổi, hãy tải lại trang game sau khi cập nhật extension.";
+      GSTPopupFeedback.info(fontFeedback, "Đã lưu. Nếu font chưa đổi, hãy tải lại trang game sau khi cập nhật extension.");
     }
   } catch {
-    fontFeedback.textContent = "Chưa lưu được font. Hãy mở lại popup và thử lại.";
+    GSTPopupFeedback.error(fontFeedback, "Chưa lưu được font. Hãy mở lại popup và thử lại.");
   } finally {
     fontFamily.disabled = !fontEnabled.checked;
     fontControls.disabled = false;
@@ -1586,7 +1575,7 @@ chrome.storage.local.get(["preferences", "displayPreferences", "fontPreferences"
   farmSyncReady = true;
   farmPolicyLoaded = true;
   syncFarmPolicyUI(farmPreferencesWithPolicy);
-  farmPolicyFeedback.textContent = "";
+  GSTPopupFeedback.clear(farmPolicyFeedback);
   const accountAllowed = !context || context.verified === true;
   const migrationNeeded = accountAllowed && (initialFarmPreferences.excludeBoss && ["boss", "bossLevel"].includes(normalizeFarmTargetMode(initialFarmPreferences.targetMode))
     || ["bossFirst", "level"].includes(initialFarmPreferences.targetMode));
@@ -1600,7 +1589,7 @@ chrome.storage.local.get(["preferences", "displayPreferences", "fontPreferences"
       if (farmStorageRevision !== revisionAtRead && latestFarmPreferences) current = latestFarmPreferences;
       latestFarmPreferences = current;
       syncFarmPreferences(current);
-    }).catch(() => { farmFeedback.textContent = "Chưa đồng bộ được bộ lọc boss; hãy lưu lại."; });
+    }).catch(() => { GSTPopupFeedback.error(farmFeedback, "Chưa đồng bộ được bộ lọc boss; hãy lưu lại."); });
   }
   const shortcutCode = farmShortcut?.code;
   if (GSTPopupShortcut.validFarmCode(shortcutCode)) {
@@ -1610,7 +1599,7 @@ chrome.storage.local.get(["preferences", "displayPreferences", "fontPreferences"
   refresh();
 }).catch(() => {
   farmPolicySavedMode.textContent = "Không đọc được chế độ Auto Farm đã lưu.";
-  farmPolicyFeedback.textContent = "Bộ chọn đang khóa để tránh ghi đè cài đặt chưa đọc được. Hãy mở lại cửa sổ cài đặt để thử lại.";
+  GSTPopupFeedback.error(farmPolicyFeedback, "Bộ chọn đang khóa để tránh ghi đè cài đặt chưa đọc được. Hãy mở lại cửa sổ cài đặt để thử lại.");
   farmPolicyMode.disabled = true;
   farmPolicyRuntimeStatus.textContent = "Auto Farm gốc trong tab đang mở: chưa rõ.";
 });
@@ -1631,8 +1620,8 @@ document.getElementById("resetGameSpeed").addEventListener("click", async () => 
   try {
     await operation;
     enabledInput.checked = false;
-    feedback.textContent = "Đã tắt điều chỉnh tốc độ để dùng tốc độ gốc của game.";
+    GSTPopupFeedback.success(feedback, "Đã tắt điều chỉnh tốc độ để dùng tốc độ gốc của game.");
     await refresh();
-  } catch { feedback.textContent = "Chưa khôi phục được tốc độ. Thử lại."; }
+  } catch { GSTPopupFeedback.error(feedback, "Chưa khôi phục được tốc độ. Thử lại."); }
   finally { saving = false; controls.disabled = false; }
 });

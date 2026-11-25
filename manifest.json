@@ -29,6 +29,8 @@
         "https://nghichthienky.online/*"
       ],
       "js": [
+        "shared/preferences/feature-options.js",
+        "shared/coordination/window-bridge.js",
         "features/automation/auto-harvest/harvest-main-options.js",
         "shared/diagnostics/background-diagnostics.js",
         "shared/diagnostics/movement-log-schema.js",
@@ -87,6 +89,8 @@
         "https://nghichthienky.online/*"
       ],
       "js": [
+        "shared/preferences/feature-options.js",
+        "shared/coordination/window-bridge.js",
         "shared/accounts/account-profiles.js",
         "shared/accounts/account-content.js",
         "shared/coordination/intent-authority-content.js",

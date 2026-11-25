@@ -17,7 +17,7 @@
   let confirmed = GSTHarvest.normalize(null);
   let queue = Promise.resolve(), pending = [], storageRevision = 0;
   let preferenceReadRevision = 0, userEditRevision = 0;
-  let mapAvailable = false, saveMessage = "";
+  let mapAvailable = false, saveMessage = "", saveState = "idle";
   const rangeErrors = new Map();
   const dirty = new Set(), editVersions = new Map(), failedFields = new Set();
   const rangeWrites = new Map();
@@ -62,8 +62,8 @@
       const shortcut = normalizedShortcut(value);
       await chrome.storage.local.set({ harvestShortcut: shortcut });
       showShortcut(shortcut);
-      shortcutFeedback.textContent = "Đã lưu phím tắt Thu hoạch.";
-    } catch { shortcutFeedback.textContent = "Không lưu được phím tắt. Thử lại."; }
+      GSTPopupFeedback.success(shortcutFeedback, "Đã lưu phím tắt Thu hoạch.");
+    } catch { GSTPopupFeedback.error(shortcutFeedback, "Không lưu được phím tắt. Thử lại."); }
     finally { shortcutCapture.disabled = shortcutReset.disabled = false; }
   }
   GSTPopupShortcut.bind({
@@ -86,10 +86,10 @@
       const data = await debugMessage("gst:harvest-history");
       if (!Array.isArray(data.recentAttempts)) throw new Error("History unavailable");
       output.value = JSON.stringify({ build: "harvest-history-4", scope: "Last 10 completed attempts in this game tab; no runtime credentials", attempts: data.recentAttempts });
-      if (!data.recentAttempts.length) { feedback.textContent = "Chưa có lượt kết thúc. Cho Thu hoạch chạy rồi sao chép lại."; return; }
-      if (await GSTClipboard.write(output.value)) feedback.textContent = "Đã sao chép. Dán log vào chat để kiểm tra.";
-      else { output.hidden = false; output.focus(); output.select(); feedback.textContent = "Đã chọn log; bấm Ctrl+C để sao chép."; }
-    } catch { feedback.textContent = "Chưa đọc được lịch sử. Reload extension rồi tải lại game nếu vừa cập nhật."; }
+      if (!data.recentAttempts.length) { GSTPopupFeedback.error(feedback, "Chưa có lượt kết thúc. Cho Thu hoạch chạy rồi sao chép lại."); return; }
+      if (await GSTClipboard.write(output.value)) GSTPopupFeedback.success(feedback, "Đã sao chép. Dán log vào chat để kiểm tra.");
+      else { output.hidden = false; output.focus(); output.select(); GSTPopupFeedback.info(feedback, "Đã chọn log; bấm Ctrl+C để sao chép."); }
+    } catch { GSTPopupFeedback.error(feedback, "Chưa đọc được lịch sử. Reload extension rồi tải lại game nếu vừa cập nhật."); }
     finally { button.disabled = false; }
   });
   async function refreshDebug() {
@@ -101,7 +101,7 @@
       const value = JSON.stringify(data);
       if (debugOutput.value !== value) debugOutput.value = value;
     } catch {
-      debugFeedback.textContent = "Chưa nhận được log bản mới. Tải lại extension rồi tải lại tab game.";
+      GSTPopupFeedback.error(debugFeedback, "Chưa nhận được log bản mới. Tải lại extension rồi tải lại tab game.");
     } finally { debugBusy = false; }
   }
   debugToggle.addEventListener("change", async () => {
@@ -111,32 +111,33 @@
       await chrome.storage.local.set({ harvestDebugEnabled: debugToggle.checked });
       const data = await debugMessage("gst:harvest-debug-set", { enabled: debugToggle.checked });
       debugOutput.value = JSON.stringify(data);
-      debugFeedback.textContent = "";
+      GSTPopupFeedback.clear(debugFeedback);
       await refreshDebug();
-    } catch { debugFeedback.textContent = "Đã yêu cầu ghi log; tải lại trang game nếu chưa nhận được log."; }
+    } catch { GSTPopupFeedback.info(debugFeedback, "Đã yêu cầu ghi log; tải lại trang game nếu chưa nhận được log."); }
     finally { debugToggle.disabled = false; }
   });
   debugPanel.addEventListener("toggle", refreshDebug);
   byId("copyHarvestDebug").addEventListener("click", async () => {
-    if (!debugOutput.value) { debugFeedback.textContent = "Bật ghi log và chờ đọc được dữ liệu trước."; return; }
+    if (!debugOutput.value) { GSTPopupFeedback.info(debugFeedback, "Bật ghi log và chờ đọc được dữ liệu trước."); return; }
     if (await GSTClipboard.write(debugOutput.value)) {
-      debugFeedback.textContent = "Đã sao chép. Bạn có thể dán log vào chat.";
+      GSTPopupFeedback.success(debugFeedback, "Đã sao chép. Bạn có thể dán log vào chat.");
     } else {
       debugOutput.focus(); debugOutput.select();
-      debugFeedback.textContent = "Đã chọn log; bấm Ctrl+C để sao chép.";
+      GSTPopupFeedback.info(debugFeedback, "Đã chọn log; bấm Ctrl+C để sao chép.");
     }
   });
   byId("clearHarvestDebug").addEventListener("click", async () => {
     try {
       debugOutput.value = JSON.stringify(await debugMessage("gst:harvest-debug-clear"));
-      debugFeedback.textContent = "Đã xóa log.";
-    } catch { debugFeedback.textContent = "Chưa xóa được log; tab có thể đang tải lại."; }
+      GSTPopupFeedback.success(debugFeedback, "Đã xóa log.");
+    } catch { GSTPopupFeedback.error(debugFeedback, "Chưa xóa được log; tab có thể đang tải lại."); }
   });
   const fold = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
   const kind = byId("harvestKind"), line = byId("harvestShowTargetLine");
   function updateMessage() {
     const draft = dirty.size ? " · Có số chưa lưu; rời ô nhập để lưu." : "";
-    feedback.textContent = ([...rangeErrors.values()][0] || (failedFields.size ? "Một lựa chọn chưa lưu; hãy kiểm tra và thử lại." : pending.length ? "Đang lưu…" : saveMessage)) + draft;
+    const state = rangeErrors.size || failedFields.size ? "error" : pending.length ? "pending" : dirty.size ? "info" : saveState;
+    GSTPopupFeedback.show(feedback, state, ([...rangeErrors.values()][0] || (failedFields.size ? "Một lựa chọn chưa lưu; hãy kiểm tra và thử lại." : pending.length ? "Đang lưu…" : saveMessage)) + draft);
   }
   function derivePreferences() {
     preferences = pending.reduce((value, action) => GSTHarvest.normalize({ ...value, ...action(value) }), confirmed);
@@ -187,7 +188,7 @@
       ? action(GSTHarvest.normalize(confirmed)).enabled === true : confirmed.enabled === true;
     if ((expectedContext && expectedContext.verified !== true)
         || (harvestProfileBindingRequired && expectedContext?.verified !== true)) {
-      saveMessage = "Chưa xác nhận nick trong tab game; chưa lưu cài đặt.";
+      saveMessage = "Chưa xác nhận nick trong tab game; chưa lưu cài đặt."; saveState = "error";
       updateMessage();
       return Promise.resolve(false);
     }
@@ -200,7 +201,7 @@
     userEditRevision++;
     preferenceReadRevision++;
     pending.push(action); derivePreferences(); renderList();
-    saveMessage = "Đang lưu…"; updateMessage();
+    saveMessage = "Đang lưu…"; saveState = "pending"; updateMessage();
     const operation = queue.catch(() => {}).then(async () => {
       await harvestAccountContextPromise;
       const binding = harvestAccountSession
@@ -253,10 +254,10 @@
     operation.then(({ applied, resultMessage, revision }) => {
       if (expectedVersion !== harvestAccountContextVersion) return;
       if (storageRevision === revision) confirmed = applied;
-      failedFields.delete(field); saveMessage = resultMessage;
+      failedFields.delete(field); saveMessage = resultMessage; saveState = "info";
     }, () => {
       if (expectedVersion !== harvestAccountContextVersion) return;
-      failedFields.add(field); saveMessage = "Chưa lưu được cài đặt; giá trị đã lưu vẫn được giữ.";
+      failedFields.add(field); saveMessage = "Chưa lưu được cài đặt; giá trị đã lưu vẫn được giữ."; saveState = "error";
     }).finally(() => {
       pending = pending.filter((item) => item !== action);
       derivePreferences(); renderList(); updateMessage();
@@ -400,7 +401,7 @@
     pending = [];
     dirty.clear();
     for (const [key] of ranges) editVersions.set(key, (editVersions.get(key) ?? 0) + 1);
-    rangeErrors.clear(); rangeWrites.clear(); failedFields.clear(); saveMessage = "";
+    rangeErrors.clear(); rangeWrites.clear(); failedFields.clear(); saveMessage = ""; saveState = "idle";
     preferenceReadRevision++;
     if (loaded) void reloadPreferences(context);
   });
@@ -434,6 +435,6 @@
     refresh();
   })().catch(() => {
     debugToggle.disabled = false;
-    feedback.textContent = "Chưa đọc được cài đặt Thu hoạch; hãy mở lại popup.";
+    GSTPopupFeedback.error(feedback, "Chưa đọc được cài đặt Thu hoạch; hãy mở lại popup.");
   });
 })();

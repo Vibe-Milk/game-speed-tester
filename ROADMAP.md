@@ -34,11 +34,15 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 
 - Global Help UI Standardization: IMPLEMENTED trong commit UI này — hover ngắn, click mở dialog giữa viewport, dùng chung cho các nút giải thích, đồng bộ theme; không đổi automation. Runtime UI UNVERIFIED; kiểm tra thủ công cả popup và menu nhúng. Connection Recovery vẫn là mục tiêu tiếp theo.
 
-- Shared UI Task 1 — Global Section + Global UI Style: IMPLEMENTED trong commit này (baseline `36edef9`), dùng chung nhóm cài đặt, đóng/mở/lưu trạng thái và CSS; giữ storage keys/default, fieldset locks và control gốc. Runtime UI UNVERIFIED; kiểm tra mở/đóng, tìm kiếm và trạng thái lưu trong popup/menu nhúng. Các task Feedback, Shared Preferences/Bridge chỉ là đề xuất, chưa được duyệt. Connection Recovery vẫn chờ kiểm tra thực tế.
+- Shared UI Task 1 — Global Section + Global UI Style: IMPLEMENTED trong commit này (baseline `36edef9`), dùng chung nhóm cài đặt, đóng/mở/lưu trạng thái và CSS; giữ storage keys/default, fieldset locks và control gốc. Runtime UI UNVERIFIED; kiểm tra mở/đóng, tìm kiếm và trạng thái lưu trong popup/menu nhúng. Các task Feedback, Shared Preferences/Bridge được xử lý ở mục 4–6 bên dưới. Connection Recovery vẫn chờ kiểm tra thực tế.
 
 - Shared UI Task 2 — Global Input: IMPLEMENTED trong commit này (baseline `e4149a4`), dùng chung đọc/kiểm tra số và Enter/blur cho Farm, Harvest, Potion, Speed; Connection dùng validation chung và giữ change-save. Giữ giới hạn, save queue, profile, cặp HP, nút lưu riêng và flush khi đóng menu. Runtime UI UNVERIFIED. Connection Recovery vẫn chờ kiểm tra thực tế.
 
 - Shared UI Task 3 — Global Shortcut: IMPLEMENTED trong commit này (baseline `ac69bca`); bộ ghi nhận và format phím dùng chung cho Farm, Harvest, Menu và Map, một recorder tại một thời điểm, giữ giá trị mặc định, storage và giới hạn phím riêng. Runtime UI UNVERIFIED; kiểm tra đặt/hủy/reset phím và menu nhúng. Connection Recovery vẫn chờ kiểm tra thực tế.
+
+- Shared UI Task 4 — Global Feedback: IMPLEMENTED trong commit này (baseline `a1f160e`); helper trạng thái feedback và CSS chung, tích hợp các đường lưu/đặt phím chính. Giữ thông báo và status game riêng; runtime UNVERIFIED.
+- Shared UI Task 5 — Shared Preferences: IMPLEMENTED; schema dùng chung Potion và Connection Recovery, giữ keys/default/limits/profile/save ownership. Không di chuyển dữ liệu hoặc hợp nhất các controller. Runtime UNVERIFIED.
+- Shared UI Task 6 — Shared Bridge: IMPLEMENTED phạm vi transport cơ bản Potion, Background, FPS, Flight, Quest; giữ nguyên origin/channel/sender/request/timeout, không sửa bridge account/intent/Farm/Harvest. Runtime UNVERIFIED; cần tải lại extension và game, kiểm tra từng tính năng. Không đổi manifest version hoặc quyền. Connection Recovery vẫn chờ kiểm tra thực tế.
 
 ## Giới hạn và việc còn mở
 

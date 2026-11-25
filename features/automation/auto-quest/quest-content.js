@@ -1,9 +1,9 @@
 (() => {
   "use strict";
-  const origin = "https://nghichthienky.online", pending = new Map();
+  const pending = new Map();
   let selected = [], sequence = 0, revision = 0;
   const normalize = (v) => Array.isArray(v?.selected) ? [...new Set(v.selected.filter((id) => typeof id === "string" && id.length <= 150))].slice(0, 200) : [];
-  function configure() { window.postMessage({ channel: "gst:quest:v1", type: "configure", selected }, origin); }
+  function configure() { GSTWindowBridge.send({ channel: "gst:quest:v1", type: "configure", selected }); }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.questPreferences) { revision++; selected = normalize(changes.questPreferences.newValue); configure(); }
   });
@@ -12,7 +12,7 @@
     if (initial === revision) { selected = normalize(value.questPreferences); configure(); }
   }).catch(() => {});
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.origin !== origin || event.data?.channel !== "gst:quest-status:v1") return;
+    if (!GSTWindowBridge.matches(event, "gst:quest-status:v1")) return;
     if (event.data.ready) { configure(); return; }
     const item = pending.get(event.data.requestId); if (!item) return;
     pending.delete(event.data.requestId); clearTimeout(item.timer);
@@ -41,7 +41,7 @@
     if (message.command === "start") {
       revision++; selected = normalize({ selected: message.selected }); configure();
     }
-    window.postMessage({ channel: "gst:quest:v1", type: message.command, requestId }, origin);
+    GSTWindowBridge.send({ channel: "gst:quest:v1", type: message.command, requestId });
     return true;
   });
   window.addEventListener("pageshow", configure);

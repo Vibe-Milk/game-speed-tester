@@ -70,9 +70,9 @@
       });
       if (next.revision >= confirmed.revision) {
         confirmed = next; loaded = true;
-        feedback.textContent = `Đã lưu Luôn thiền ${choice ? "BẬT" : "TẮT"}. Trạng thái thiền được đọc riêng từ game.`;
+        GSTPopupFeedback.success(feedback, `Đã lưu Luôn thiền ${choice ? "BẬT" : "TẮT"}. Trạng thái thiền được đọc riêng từ game.`);
       } else {
-        feedback.textContent = "Cửa sổ khác đã lưu lựa chọn mới hơn; đã giữ giá trị mới nhất.";
+        GSTPopupFeedback.info(feedback, "Cửa sổ khác đã lưu lựa chọn mới hơn; đã giữ giá trị mới nhất.");
       }
       return { saved: true };
     } catch (error) {
@@ -81,7 +81,7 @@
         const latest = normalize((await chrome.storage.local.get("meditationPreferences")).meditationPreferences);
         if (latest.revision >= confirmed.revision) confirmed = latest;
       } catch { /* Keep the last confirmed value. */ }
-      feedback.textContent = message;
+      GSTPopupFeedback.error(feedback, message);
       return { saved: false, reason: "persistence" };
     } finally {
       syncSaved();
@@ -90,7 +90,7 @@
   input.addEventListener("change", () => {
     if (!loaded || saving) { syncSaved(); return; }
     const choice = input.checked, baseRevision = confirmed.revision, requestedAt = Date.now(), current = ++operation;
-    saving = true; syncSaved(); feedback.textContent = "Đang lưu Luôn thiền…";
+    saving = true; syncSaved(); GSTPopupFeedback.pending(feedback, "Đang lưu Luôn thiền…");
     pendingSave = saveChoice(choice, baseRevision, requestedAt).then((result) => {
       if (current !== operation) return result;
       return result;

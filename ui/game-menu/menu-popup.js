@@ -26,8 +26,8 @@
   const shortcutLabel = document.getElementById("menuShortcutLabel"), shortcutFeedback = document.getElementById("menuShortcutFeedback");
   const showShortcut = () => { shortcutLabel.textContent = GSTPopupShortcut.format(shortcut); };
   const storeShortcut = async (value) => {
-    try { await chrome.storage.local.set({ menuShortcut: value }); shortcut = value; showShortcut(); shortcutFeedback.textContent = "Đã lưu phím mở Menu tool."; }
-    catch { shortcutFeedback.textContent = "Chưa lưu được phím. Thử lại."; }
+    try { await chrome.storage.local.set({ menuShortcut: value }); shortcut = value; showShortcut(); GSTPopupFeedback.success(shortcutFeedback, "Đã lưu phím mở Menu tool."); }
+    catch { GSTPopupFeedback.error(shortcutFeedback, "Chưa lưu được phím. Thử lại."); }
   };
   GSTPopupShortcut.bind({
     capture: document.getElementById("captureMenuShortcut"),
@@ -48,15 +48,15 @@
   chrome.storage.local.get("menuShortcut").then((value) => {
     if (shortcutRevision === initialShortcutRevision) shortcut = value.menuShortcut ?? shortcut;
     showShortcut();
-  }).catch(() => { shortcutFeedback.textContent = "Chưa đọc được phím tắt."; });
+  }).catch(() => { GSTPopupFeedback.error(shortcutFeedback, "Chưa đọc được phím tắt."); });
   let saved = GSTMenuPosition.normalize(null), busy = false, revision = 0;
   function render() { select.value = saved.position; }
   async function savePosition(value) {
     if (busy) return;
     busy = true; controls.disabled = true;
     const before = revision;
-    try { await chrome.storage.local.set({ menuPosition: value }); if (revision === before) saved = value; render(); feedback.textContent = "Đã lưu vị trí nút Menu tool."; }
-    catch { render(); feedback.textContent = "Chưa lưu được vị trí. Thử lại."; }
+    try { await chrome.storage.local.set({ menuPosition: value }); if (revision === before) saved = value; render(); GSTPopupFeedback.success(feedback, "Đã lưu vị trí nút Menu tool."); }
+    catch { render(); GSTPopupFeedback.error(feedback, "Chưa lưu được vị trí. Thử lại."); }
     finally { busy = false; controls.disabled = false; }
   }
   select.addEventListener("change", () => savePosition(GSTMenuPosition.normalize({ ...saved, position: select.value })));
@@ -66,15 +66,15 @@
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const result = await chrome.tabs.sendMessage(tab.id, { type: "gst:menu-position-edit" });
-      if (result.editing) window.close(); else feedback.textContent = "Chờ game tải xong rồi thử lại.";
-    } catch { feedback.textContent = "Mở tab game và tải lại sau cập nhật để kéo nút."; }
+      if (result.editing) window.close(); else GSTPopupFeedback.info(feedback, "Chờ game tải xong rồi thử lại.");
+    } catch { GSTPopupFeedback.info(feedback, "Mở tab game và tải lại sau cập nhật để kéo nút."); }
   });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.menuPosition) { revision++; saved = GSTMenuPosition.normalize(changes.menuPosition.newValue); render(); }
   });
   const initialRevision = revision;
   chrome.storage.local.get("menuPosition").then((value) => { if (revision === initialRevision) saved = GSTMenuPosition.normalize(value.menuPosition); render(); controls.disabled = false; })
-    .catch(() => { feedback.textContent = "Chưa đọc được cài đặt vị trí. Mở lại menu để thử."; });
+    .catch(() => { GSTPopupFeedback.error(feedback, "Chưa đọc được cài đặt vị trí. Mở lại menu để thử."); });
   button.addEventListener("click", async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
