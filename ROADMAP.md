@@ -34,7 +34,9 @@ Duy trì kết nối khi chạy nền; khôi phục an toàn bằng cơ chế g�
 
 - Global Help UI Standardization: IMPLEMENTED trong commit UI này — hover ngắn, click mở dialog giữa viewport, dùng chung cho các nút giải thích, đồng bộ theme; không đổi automation. Runtime UI UNVERIFIED; kiểm tra thủ công cả popup và menu nhúng. Connection Recovery vẫn là mục tiêu tiếp theo.
 
-- Shared UI Task 1 — Global Section + Global UI Style: IMPLEMENTED trong commit này (baseline `36edef9`), dùng chung nhóm cài đặt, đóng/mở/lưu trạng thái và CSS; giữ storage keys/default, fieldset locks và control gốc. Runtime UI UNVERIFIED; kiểm tra mở/đóng, tìm kiếm và trạng thái lưu trong popup/menu nhúng. Các task Global Input, Shortcut, Feedback, Shared Preferences/Bridge chỉ là đề xuất, chưa được duyệt. Connection Recovery vẫn chờ kiểm tra thực tế.
+- Shared UI Task 1 — Global Section + Global UI Style: IMPLEMENTED trong commit này (baseline `36edef9`), dùng chung nhóm cài đặt, đóng/mở/lưu trạng thái và CSS; giữ storage keys/default, fieldset locks và control gốc. Runtime UI UNVERIFIED; kiểm tra mở/đóng, tìm kiếm và trạng thái lưu trong popup/menu nhúng. Các task Shortcut, Feedback, Shared Preferences/Bridge chỉ là đề xuất, chưa được duyệt. Connection Recovery vẫn chờ kiểm tra thực tế.
+
+- Shared UI Task 2 — Global Input: IMPLEMENTED trong commit này (baseline `e4149a4`), dùng chung đọc/kiểm tra số và Enter/blur cho Farm, Harvest, Potion, Speed; Connection dùng validation chung và giữ change-save. Giữ giới hạn, save queue, profile, cặp HP, nút lưu riêng và flush khi đóng menu. Runtime UI UNVERIFIED. Connection Recovery vẫn chờ kiểm tra thực tế.
 
 ## Giới hạn và việc còn mở
 

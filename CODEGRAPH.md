@@ -57,7 +57,7 @@ Các đường dẫn dưới đây tương đối từ root; tên file rút gọ
 | Nhịp gameplay nền | `features/visual/background/` | background-page.js, background-content.js |
 | Tài khoản / hồ sơ | `shared/accounts/` | account-profiles.js, account-content.js, account-page.js, account-background.js, accounts-popup.js |
 | Chẩn đoán | `shared/diagnostics/` | background-diagnostics.js, movement-log-schema.js, movement-diagnostics.js, farm-diagnostics.js, farm-diagnostics-content.js, farm-diagnostics-popup.js |
-| Popup và layout | `ui/popup/` | popup.js, popup-layout.js, popup-search.js, popup-sections.js, farm-layout.js, harvest-layout.js, feature-sections.js, popup-help.js |
+| Popup và layout | `ui/popup/` | popup.js, popup-layout.js, popup-search.js, popup-sections.js, popup-numeric-input.js, farm-layout.js, harvest-layout.js, feature-sections.js, popup-help.js |
 | Menu game | `ui/game-menu/` | game-menu.js, menu-embedded.js, menu-position.js, menu-popup.js, menu-monitor.js, menu-orientation.js |
 | Font / toast | `ui/interface/` | font.js, font-options.js, feature-toasts.js |
 
@@ -140,6 +140,7 @@ Native resume/ping/pong được đối chiếu từ snapshot `index-ymL7Xfvg.js
 
 - `popup.html` khai báo các trang hiện hành; `popup-layout.js` quản lý điều hướng, `popup-search.js` tìm kiếm, `farm-layout.js` / `harvest-layout.js` chuyển nhóm điều khiển. Tool Farm ở Auto của tool; potion và tiện ích độc lập ở Tiện ích độc lập. Legacy farm page bị ẩn, không dùng làm mô tả UI hiện hành.
 - `popup-sections.js` là Global Section, nạp trước farm/harvest-layout và feature-sections; `GSTPopupSections.create/register/setOpen` dựng nhóm, lưu/mở nhóm chung, dùng cả khi search mở kết quả. Giữ namespace `farmSectionOpen:v1:*` (fallback `farmSectionOpen:v1`), `harvestSectionOpen:v1:*` và `popupSectionOpen:v1:*` cùng default từng nhóm. Layout riêng vẫn di chuyển control gốc và giữ fieldset locks; CSS dùng chung appearance/grid, không đổi cài đặt automation.
+- `popup-numeric-input.js` là Global Input: nạp trước `popup.js`, Harvest/Potion popup; `GSTPopupNumericInput.read()` đọc số hữu hạn, min/max, số nguyên nếu cần và validity của input; `bind()` dùng chung Enter/blur/input callback. Farm, Harvest, Potion, Speed và Connection dùng helper phù hợp; giữ save queue, draft revision, kiểm tra identity, paired HP, flush-before-close và thông báo/lỗi riêng từng feature. Các ô lưu bằng nút hoặc change vẫn giữ trigger cũ.
 - `popup-help.js` là Global Help UI: nạp trước popup shortcut handlers, dựng sau DOMContentLoaded khi các layout đã chuyển control. Static `p.hint` đủ điều kiện dùng nút `?` chung; `data-help-for` gắn đúng control, `data-help-title` và `data-help-heading` tùy chọn. Một preview ngắn và một native dialog giữa viewport dùng chung CSS, không can thiệp trạng thái hoặc storage. Hint có ID/role và archive Farm được giữ nguyên; menu embedded nhường keyboard khi dialog mở. Không tạo tooltip riêng cho từng tab.
 - Menu nhúng là `popup.html?embedded=1` qua `game-menu.js`. Đường đóng/lưu có message `gst:menu-before-close:v1` / `gst:menu-before-close-result:v1`; xem popup.js và menu trước khi sửa draft/save hoặc shortcut.
 - Speed/flight/meditation: `core/page.js` và các controller riêng; `core/page.js` có guard automation và cài đặt tốc độ riêng. Đọc `speedFor` và các nhánh apply/suspend hiện tại, không dùng mô tả tốc độ lịch sử làm contract.

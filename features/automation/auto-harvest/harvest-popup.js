@@ -301,8 +301,8 @@
   });
   function commitRange(key, input) {
     if (!loaded) return Promise.resolve(false);
-    const value = input.valueAsNumber;
-    if (!input.checkValidity() || !Number.isFinite(value)) {
+    const value = GSTPopupNumericInput.read(input);
+    if (value === null) {
       rangeErrors.set(key, "Số không hợp lệ; hãy kiểm tra giới hạn và bước nhập.");
       updateMessage();
       return Promise.resolve(false);
@@ -320,7 +320,7 @@
     const operation = save(() => ({ [key]: value }), key);
     // Only clear the draft if the user has not edited again during persistence.
     const done = operation.then(() => {
-      if ((editVersions.get(key) ?? 0) === version && input.valueAsNumber === value && input.checkValidity()) dirty.delete(key);
+      if ((editVersions.get(key) ?? 0) === version && GSTPopupNumericInput.read(input) === value) dirty.delete(key);
       return true;
     }, () => false).finally(() => {
       if (rangeWrites.get(key)?.promise === done) rangeWrites.delete(key);
@@ -330,23 +330,20 @@
     return done;
   }
   for (const [key, input] of ranges) {
-    input.addEventListener("input", () => {
-      dirty.add(key);
-      editVersions.set(key, (editVersions.get(key) ?? 0) + 1);
-      if (input.checkValidity()) rangeErrors.delete(key);
-      updateMessage();
-    });
-    input.addEventListener("blur", () => { void commitRange(key, input); });
-    input.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      void commitRange(key, input);
+    GSTPopupNumericInput.bind(input, {
+      commit: () => commitRange(key, input),
+      onInput: () => {
+        dirty.add(key);
+        editVersions.set(key, (editVersions.get(key) ?? 0) + 1);
+        if (GSTPopupNumericInput.read(input) !== null) rangeErrors.delete(key);
+        updateMessage();
+      },
     });
   }
   async function flushNumericDrafts() {
     if (!loaded) return { saved: false, reason: "load" };
     for (const [key, input] of ranges)
-      if (!input.checkValidity() || !Number.isFinite(input.valueAsNumber))
+      if (GSTPopupNumericInput.read(input) === null)
         return { saved: false, reason: "invalid", field: key === "radius" ? "harvestRadius" : "harvestReach" };
     const results = await Promise.all(ranges.map(([key, input]) => commitRange(key, input)));
     const queued = await queue.then(() => true, () => false);

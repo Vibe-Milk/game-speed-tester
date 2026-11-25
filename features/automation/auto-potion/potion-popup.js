@@ -31,8 +31,7 @@
     });
   }
   function validThreshold(input) {
-    const value = input.valueAsNumber;
-    return input.checkValidity() && Number.isSafeInteger(value) && value >= 1 && value <= 99;
+    return GSTPopupNumericInput.read(input, { min: 1, max: 99, integer: true }) !== null;
   }
   function commitThreshold(input, key) {
     if (!loaded) return Promise.resolve(false);
@@ -59,12 +58,9 @@
   }
   const thresholds = [[hpPercent, "hpPercent"], [mpPercent, "mpPercent"]];
   for (const [input, key] of thresholds) {
-    input.addEventListener("input", () => message("Bản nháp chưa lưu; rời ô nhập để lưu."));
-    input.addEventListener("blur", () => { void commitThreshold(input, key); });
-    input.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter") return;
-      event.preventDefault();
-      void commitThreshold(input, key);
+    GSTPopupNumericInput.bind(input, {
+      commit: () => commitThreshold(input, key),
+      onInput: () => message("Bản nháp chưa lưu; rời ô nhập để lưu."),
     });
   }
   async function flushNumericDrafts() {

@@ -524,8 +524,8 @@ for (const [input, key, min, max, label] of [
   [connectionReloadLimit, "reloadLimit", 1, 10, "Số lần tải lại phải từ 1 đến 10."],
   [connectionReloadWindow, "reloadWindowMinutes", 5, 120, "Khoảng giới hạn phải từ 5 đến 120 phút."]
 ]) input.addEventListener("change", () => {
-  const value = Number(input.value);
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
+  const value = GSTPopupNumericInput.read(input, { min, max, integer: true, nativeValidity: false });
+  if (value === null) {
     connectionRecoveryFeedback.textContent = label;
     input.value = String(connectionRecoveryConfirmed[key]);
     return;
@@ -930,8 +930,8 @@ function farmHasDraft() {
     || farmHpThresholdDraft().dirty;
 }
 function farmHpThresholdDraft() {
-  const retreat = farmRetreatHpPercent.value.trim() === "" ? NaN : Number(farmRetreatHpPercent.value);
-  const recovery = farmRecoveryHpPercent.value.trim() === "" ? NaN : Number(farmRecoveryHpPercent.value);
+  const retreat = GSTPopupNumericInput.read(farmRetreatHpPercent, { min: 1, max: 99, integer: true, nativeValidity: false });
+  const recovery = GSTPopupNumericInput.read(farmRecoveryHpPercent, { min: 2, max: 100, integer: true, nativeValidity: false });
   const valid = validFarmHpThresholds(retreat, recovery);
   return { retreat, recovery, valid,
     dirty: farmHpEditRevision > farmHpSyncedEditRevision
@@ -1009,8 +1009,9 @@ toolRecoveryEnabled.addEventListener("change", () => {
   void saveFarmPatch({ toolRecoveryEnabled: toolRecoveryEnabled.checked }, () => { toolRecoveryEnabled.checked = farmConfirmed.toolRecoveryEnabled; });
 });
 toolRecoverySave.addEventListener("click", async () => {
-  const low = Number(toolRetreatHp.value), high = Number(toolResumeHp.value);
-  if (!toolRetreatHp.value.trim() || !toolResumeHp.value.trim() || !validFarmHpThresholds(low, high)) {
+  const low = GSTPopupNumericInput.read(toolRetreatHp, { min: 1, max: 99, integer: true, nativeValidity: false });
+  const high = GSTPopupNumericInput.read(toolResumeHp, { min: 2, max: 100, integer: true, nativeValidity: false });
+  if (!validFarmHpThresholds(low, high)) {
     toolRecoveryFeedback.textContent = "Nhập số nguyên: 1 ≤ mức rút lui < mức tiếp tục ≤ 100."; return;
   }
   toolRecoverySave.disabled = true;
@@ -1039,8 +1040,8 @@ farmNearbyRadius.addEventListener("keydown", (event) => {
   if (event.key === "Enter") farmNearbyRadius.blur();
 });
 farmNearbyRadius.addEventListener("change", async () => {
-  const value = Number(farmNearbyRadius.value);
-  if (!Number.isSafeInteger(value) || value < 1 || value > 6) {
+  const value = GSTPopupNumericInput.read(farmNearbyRadius, { min: 1, max: 6, integer: true, nativeValidity: false });
+  if (value === null) {
     farmNearbyRadius.value = String(farmConfirmed.nearbyRadius);
     farmMessage("Bán kính dọn gần phải là số nguyên từ 1 đến 6.");
     return;
@@ -1204,8 +1205,8 @@ for (const [name, row] of Object.entries(farmTargetRows)) {
 function commitFarmRadius() {
   if (farmRadiusCommit) return farmRadiusCommit;
   farmRadiusError.textContent = "";
-  const value = farmRadius.valueAsNumber;
-  if (!farmRadius.value.trim() || !farmRadius.checkValidity() || !Number.isSafeInteger(value) || value < 1 || value > 1000) {
+  const value = GSTPopupNumericInput.read(farmRadius, { min: 1, max: 1000, integer: true });
+  if (value === null) {
     farmRadiusError.textContent = "Giới hạn vùng farm phải là số nguyên từ 1 đến 1.000 ô.";
     farmFeedback.textContent = farmRadiusError.textContent;
     return Promise.resolve(false);
@@ -1279,36 +1280,29 @@ function commitFarmHpThresholds() {
   });
   return save;
 }
+function allowFarmNumericBlur(event) {
+  return ["tool"].includes(farmConfirmed.policyMode) && !selectingFarmPolicy
+    && event.relatedTarget !== farmPolicyMode && document.activeElement !== farmPolicyMode;
+}
 for (const input of [farmRetreatHpPercent, farmRecoveryHpPercent]) {
-  input.addEventListener("input", () => {
-    farmHpEditRevision++;
-    if (farmHpThresholdCommit && farmHpThresholdFollowupCount < 2
-        && ["tool"].includes(farmConfirmed.policyMode)) farmHpThresholdFollowupRequested = true;
-    farmRetreatThresholdError.textContent = "";
-  });
-  input.addEventListener("blur", (event) => {
-    if (!["tool"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
-        || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
-    void commitFarmHpThresholds();
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault(); void commitFarmHpThresholds();
+  GSTPopupNumericInput.bind(input, {
+    commit: commitFarmHpThresholds,
+    allowBlur: allowFarmNumericBlur,
+    onInput: () => {
+      farmHpEditRevision++;
+      if (farmHpThresholdCommit && farmHpThresholdFollowupCount < 2
+          && ["tool"].includes(farmConfirmed.policyMode)) farmHpThresholdFollowupRequested = true;
+      farmRetreatThresholdError.textContent = "";
+    },
   });
 }
-farmRadius.addEventListener("input", () => {
-  farmRadiusError.textContent = "";
-  farmMessage("Bản nháp chưa lưu.");
-});
-farmRadius.addEventListener("blur", (event) => {
-  if (!["tool"].includes(farmConfirmed.policyMode) || selectingFarmPolicy
-      || event.relatedTarget === farmPolicyMode || document.activeElement === farmPolicyMode) return;
-  void commitFarmRadius();
-});
-farmRadius.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  void commitFarmRadius();
+GSTPopupNumericInput.bind(farmRadius, {
+  commit: commitFarmRadius,
+  allowBlur: allowFarmNumericBlur,
+  onInput: () => {
+    farmRadiusError.textContent = "";
+    farmMessage("Bản nháp chưa lưu.");
+  },
 });
 async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (!farmSyncReady) return { saved: false, reason: "load" };
@@ -1374,8 +1368,7 @@ async function flushFarmNumericDrafts({ discardInactiveDrafts = false } = {}) {
   if (farmHpThresholdDraft().dirty)
     return { saved: false, reason: "persistence" };
   if (failedWrites.length || !results.every(Boolean)) return { saved: false, reason: "persistence" };
-  if (!farmRadius.value.trim() || !farmRadius.checkValidity()
-      || !Number.isSafeInteger(farmRadius.valueAsNumber) || farmRadius.valueAsNumber < 1 || farmRadius.valueAsNumber > 1000)
+  if (GSTPopupNumericInput.read(farmRadius, { min: 1, max: 1000, integer: true }) === null)
     return { saved: false, reason: "invalid", field: "radius" };
   if (farmDraftError) return { saved: false, reason: "invalid", field: mode === "range" ? "min" : "target" };
   const saved = !farmLevelDraft().dirty && farmRadius.value === String(farmConfirmed.radius);
@@ -1464,8 +1457,7 @@ const speedLabels = {
   farmWalkingSpeed: "Tốc độ đi bộ khi farm", farmFlyingSpeed: "Tốc độ bay khi farm"
 };
 function invalidSpeedInput() {
-  return speedInputs.find((input) => !input.checkValidity()
-    || !Number.isFinite(input.valueAsNumber) || input.valueAsNumber < 1 || input.valueAsNumber > 6);
+  return speedInputs.find((input) => GSTPopupNumericInput.read(input, { min: 1, max: 6 }) === null);
 }
 function speedSnapshot() {
   return { enabled: enabledInput.checked, walkingSpeed: walkingInput.valueAsNumber,
@@ -1520,12 +1512,7 @@ enabledInput.addEventListener("change", () => {
   }
   void save();
 });
-for (const input of speedInputs) {
-  input.addEventListener("blur", () => { void save(); });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") { event.preventDefault(); void save(); }
-  });
-}
+for (const input of speedInputs) GSTPopupNumericInput.bind(input, { commit: save });
 
 displayControls.addEventListener("change", async () => {
   displayControls.disabled = true;
